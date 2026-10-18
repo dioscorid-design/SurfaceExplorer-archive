@@ -356,14 +356,12 @@ void MainWindow::setupEquationsDock()
         if (ui->glWidget) ui->glWidget->setUpdatesEnabled(false);
     });
 
-    // (3) sliderReleased: riattiva il rendering e rigenera al rilascio. Il
-    // fondo corsa, allargato dal campo, torna sul valore (pushStepsRange).
+    // (3) sliderReleased: riattiva il rendering e rigenera al rilascio
     connect(ui->stepSlider, &QSlider::sliderReleased, this, [this]() {
         if (ui->glWidget) {
             ui->glWidget->setUpdatesEnabled(true);
             ui->glWidget->update();
         }
-        pushStepsRange(ui->stepSlider->value());
         m_meshDebounce->start();
     });
 
@@ -393,10 +391,10 @@ void MainWindow::setupEquationsDock()
             }
         }
         // Oltre il fondo corsa dello slider si puo' scrivere, fino a
-        // stepsLimit: lo slider si allarga fino al valore (pushStepsRange) e
-        // si ristringe quando il valore torna sotto. Prima si allarga, poi il
-        // valore a segnali vivi, poi si stringe: stringere prima taglierebbe
-        // il valore corrente in silenzio e il setValue non emetterebbe nulla.
+        // stepsLimit: il fondo corsa diventa il valore scritto (pushStepsRange),
+        // o di nuovo mille se e' piu' basso. Prima si allarga, poi il valore a
+        // segnali vivi, poi si stringe: stringere prima taglierebbe il valore
+        // corrente in silenzio e il setValue non emetterebbe nulla.
         const int limit = stepsLimit();
         val = std::clamp(val, ui->stepSlider->minimum(), limit);
         if (val > ui->stepSlider->maximum()) pushStepsRange(val);
@@ -1030,12 +1028,6 @@ void MainWindow::checkParametricDependency()
     QString composedAllEqs = composeEquation(allEqs, defU, defV, defW);
 
     bool isGeodesicActive = (rawUpperCount > 0) && geoHasText && (!implicitMode());
-
-    // Fondo corsa sul valore (pushStepsRange): sopra mille si arriva solo
-    // dal campo, e un controllo delle dipendenze non deve tagliarlo. Prima
-    // qui il massimo tornava a mille a segnali vivi: ogni Steps piu' alto,
-    // anche da un preset, si riduceva a mille.
-    pushStepsRange(m_scene.steps);
 
     updateConstraintState();
     updateConstantsUIState();

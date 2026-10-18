@@ -5344,6 +5344,10 @@ void ScenarioTest::runStepsScenarios()
                              "(tetto %1, slider %2 su %3, motore %4)")
                   .arg(limit).arg(ui->stepSlider->value()).arg(ui->stepSlider->maximum())
                   .arg(gl->getEngine()->getNumU()));
+        ui->stepSlider->setValue(1200);  emit ui->stepSlider->sliderReleased();  wait(900);
+        check(m_mw->m_scene.steps == 1200 && ui->stepSlider->maximum() == 1500,
+              QStringLiteral("slider trascinato a 1200 -> il fondo corsa scritto resta 1500, come le costanti (%1 su %2)")
+                  .arg(m_mw->m_scene.steps).arg(ui->stepSlider->maximum()));
         typeSteps(QStringLiteral("600"));
         check(m_mw->m_scene.steps == 600 && ui->stepSlider->value() == 600 && ui->stepSlider->maximum() == 1000,
               QStringLiteral("campo Steps 600 -> slider di nuovo fino a mille (%1 su %2)")

@@ -926,9 +926,11 @@ private:
     // setRaySteps) lo scrive chi chiama. setSteps: dal programma, a segnali
     // bloccati, col fondo corsa dello slider sul valore (pushStepsRange).
     void setSteps(int steps);
-    // Fondo corsa dello slider Steps: kStepsSliderMax, o il valore se e' piu'
-    // grande; mentre lo si trascina non si stringe. A segnali bloccati: chi
-    // chiama non deve stringerlo sotto il valore corrente.
+    // Fondo corsa dello slider Steps quando il valore si SCRIVE (campo, load):
+    // kStepsSliderMax, o il valore se e' piu' grande. Lo slider stesso non lo
+    // cambia: trascinandolo il fondo corsa resta quello scritto, come negli
+    // slider delle costanti. A segnali bloccati: chi chiama non deve
+    // stringerlo sotto il valore corrente.
     void pushStepsRange(int steps);
     // Il massimo che il campo Steps accetta (vedi kStepsPointBudget).
     int stepsLimit() const;
