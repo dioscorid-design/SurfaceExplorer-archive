@@ -1842,7 +1842,16 @@ private:
     // nello stesso shader per le texture per-mesh (getCustomColor_<k>).
     QString buildTextureFunction(const QString &customLogic, const QString &funcName);
     QString generateGlslHelperVars(const QString& sourceCode);
+    // Compila per il solo backend in uso; gli shader validi gia' compilati
+    // si riprendono da m_bakedShaders.
     QShader bakeShader(const QByteArray &source, QShader::Stage stage);
+    // Shader compilati da bakeShader, per sorgente e stadio. Accendere e
+    // spegnere il bordo, cambiare texture o tornare a una superficie gia' vista
+    // ricompila sorgenti gia' visti: la traduzione (glslang + SPIRV-Cross) e'
+    // la parte lenta del rebuild sulla CPU. Oltre kBakedShadersMax voci si
+    // riparte da vuoto.
+    QHash<QByteArray, QShader> m_bakedShaders;
+    static constexpr int kBakedShadersMax = 48;
     bool applyTubeSource(const std::function<void()> &setCurve,
                          const std::vector<SurfaceEngine::TubeCopy> &copies);
 

@@ -6,6 +6,7 @@
 #include "expressionparser.h"
 #include "tubecurvesampler.h"
 
+#include <QCryptographicHash>
 #include <QTimer>
 #include <cmath>
 #include <vector>
@@ -1341,7 +1342,7 @@ void main() {
 
     QShader shader;
     QString error;
-    if (!TubeCurveSampler::bakeCompute(src, &shader, &error)) {
+    if (!TubeCurveSampler::bakeCompute(rhi(), src, &shader, &error)) {
         qWarning() << "Bordo: passata dei lati coperti non compilata, resta il test del vertex:" << error;
         return;
     }
@@ -1596,7 +1597,7 @@ void main() {
 
     QShader shader;
     QString error;
-    if (!TubeCurveSampler::bakeCompute(src, &shader, &error)) {
+    if (!TubeCurveSampler::bakeCompute(rhi(), src, &shader, &error)) {
         qWarning() << "Tubi: passata della sezione non compilata, resta l'orientamento locale:" << error;
         return;
     }
@@ -7480,6 +7481,14 @@ void GLWidget::buildWireframeGeometry() {
 
  // --- Shader Generation & Compilation ---
 
+// La riga che accende il codice del bordo nel vertex (createVertexShaderSource)
+// e che buildPipeline toglie per ricavarne il sorgente del compute dei lati
+// coperti. Lo stesso testo nei due punti, a capo iniziale compreso: togliendo
+// solo "#define HAS_BORDER\n" restava un a capo in piu', il compute risultava
+// diverso da quello a bordo spento e si ricompilava a ogni accensione (con la
+// sonda del bordo ripartita da capo).
+static const QLatin1String kBorderDefineLine("\n#define HAS_BORDER\n");
+
 QString GLWidget::createVertexShaderSource(const QString &xEq, const QString &yEq, const QString &zEq, const QString &wEq)
 {
     // 1. Carica il template
@@ -7616,7 +7625,7 @@ QString GLWidget::createVertexShaderSource(const QString &xEq, const QString &yE
     // custom i vertici sono posizioni, non parametri: i punti dei lati li
     // legge dalla texture dei lati (borderSupported).
     if (m_borderRadius > 0.0f && borderSupported()) {
-        source.replace("#version 450", "#version 450\n#define HAS_BORDER\n");
+        source.replace(QStringLiteral("#version 450"), QStringLiteral("#version 450") + kBorderDefineLine);
     }
     // Tubo: il template lo costruisce nella scena (emitTubeVertex).
     if (engine->isTubeModeActive() && !engine->isScriptModeActive() && !m_isCustomMesh) {
@@ -8153,6 +8162,13 @@ QString GLWidget::generateGlslHelperVars(const QString& sourceCode) {
 
 QShader GLWidget::bakeShader(const QByteArray &source, QShader::Stage stage)
 {
+    // Gia' compilato (m_bakedShaders): solo gli shader validi, un errore si
+    // ricalcola per averne il messaggio (m_lastCompilationError).
+    QByteArray cacheKey = QCryptographicHash::hash(source, QCryptographicHash::Sha1);
+    cacheKey.append(char(stage));
+    if (const auto it = m_bakedShaders.constFind(cacheKey); it != m_bakedShaders.constEnd())
+        return *it;
+
     QShaderBaker baker;
     baker.setSourceString(source, stage);
     baker.setGeneratedShaderVariants({QShader::StandardShader});
@@ -8177,7 +8193,9 @@ QShader GLWidget::bakeShader(const QByteArray &source, QShader::Stage stage)
     targets.append({QShader::MslShader,  QShaderVersion(12)});
 #endif
 
-    baker.setGeneratedShaders(targets);
+    // Solo quelli del backend in uso: gli altri erano traduzioni che nessuno
+    // legge (su Mac 8 per shader, di cui serve l'MSL).
+    baker.setGeneratedShaders(TubeCurveSampler::targetsForBackend(rhi(), targets));
 
     QShader shader = baker.bake();
     if (!shader.isValid()) {
@@ -8206,6 +8224,10 @@ QShader GLWidget::bakeShader(const QByteArray &source, QShader::Stage stage)
                                "fix it.")
                     .arg(g_lastMissingShaderResource);
         }
+    }
+    if (shader.isValid()) {
+        if (m_bakedShaders.size() >= kBakedShadersMax) m_bakedShaders.clear();
+        m_bakedShaders.insert(cacheKey, shader);
     }
     return shader;
 }
@@ -8303,7 +8325,7 @@ void GLWidget::buildPipeline() {
     QString edgeSource;
     if (!vsSource.contains(QLatin1String("#define IS_TUBE")) && !vsSource.contains(QLatin1String("#define CUSTOM_MESH"))) {
         edgeSource = vsSource;
-        edgeSource.remove(QLatin1String("#define HAS_BORDER\n"));
+        edgeSource.remove(kBorderDefineLine);
     }
     if (edgeSource != m_sharedEdgeSource) {
         releaseSharedEdgePipeline();

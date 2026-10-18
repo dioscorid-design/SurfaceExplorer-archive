@@ -14,6 +14,7 @@
 #include <QString>
 #include <QVector>
 #include <QVector4D>
+#include <rhi/qshaderbaker.h>
 
 class QRhi;
 class QShader;
@@ -28,10 +29,19 @@ public:
                        const QVector<QVector4D> &params, const float constants[7],
                        QVector<QVector4D> *out, QString *error = nullptr);
 
-    // Compila un compute shader per tutti i backend (gli stessi target del
-    // flusso geodetico), con la precisione alta forzata nelle varianti GLSL ES.
-    // Lo usa anche il trasporto della sezione dei tubi (GLWidget).
-    static bool bakeCompute(const QString &source, QShader *shader, QString *error = nullptr);
+    // Compila un compute shader per il backend di `rhi` (tutti i backend, gli
+    // stessi target del flusso geodetico, se `rhi` e' nullo), con la
+    // precisione alta forzata nelle varianti GLSL ES. Lo usano anche il
+    // trasporto della sezione dei tubi e i lati coperti del bordo (GLWidget).
+    // Gli shader gia' compilati si riprendono dalla memoria.
+    static bool bakeCompute(QRhi *rhi, const QString &source, QShader *shader, QString *error = nullptr);
+
+    // Dei target di `all` tiene solo quelli che il backend di `rhi` legge:
+    // MSL su Metal, SPIR-V su Vulkan, GLSL su OpenGL, HLSL su Direct3D. Ogni
+    // target in piu' e' una traduzione di SPIRV-Cross che nessuno usa (fino a
+    // 8 per shader). `rhi` nullo o backend sconosciuto: tutti, come prima.
+    static QList<QShaderBaker::GeneratedShader> targetsForBackend(QRhi *rhi,
+                                                                  const QList<QShaderBaker::GeneratedShader> &all);
 };
 
 #endif // TUBECURVESAMPLER_H

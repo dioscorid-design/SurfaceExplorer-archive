@@ -2,7 +2,9 @@
 
 #include <rhi/qrhi.h>
 #include <rhi/qshaderbaker.h>
+#include <QCryptographicHash>
 #include <QFile>
+#include <QHash>
 #include <QTextStream>
 #include <memory>
 
@@ -13,12 +15,48 @@ static QString loadShaderLibrary(const QString &path)
     return QTextStream(&f).readAll();
 }
 
-bool TubeCurveSampler::bakeCompute(const QString &source, QShader *shader, QString *error)
+QList<QShaderBaker::GeneratedShader> TubeCurveSampler::targetsForBackend(QRhi *rhi,
+                                                                         const QList<QShaderBaker::GeneratedShader> &all)
 {
+    if (!rhi) return all;
+    QShader::Source wanted;
+    switch (rhi->backend()) {
+    case QRhi::Metal:     wanted = QShader::MslShader;   break;
+    case QRhi::Vulkan:    wanted = QShader::SpirvShader; break;
+    case QRhi::OpenGLES2: wanted = QShader::GlslShader;  break;
+    case QRhi::D3D11:
+    case QRhi::D3D12:     wanted = QShader::HlslShader;  break;
+    default:              return all;
+    }
+    QList<QShaderBaker::GeneratedShader> kept;
+    for (const QShaderBaker::GeneratedShader &t : all)
+        if (t.first == wanted) kept.append(t);
+    return kept.isEmpty() ? all : kept;
+}
+
+// Compute tenuti in memoria (bakeCompute): oltre, si riparte da vuoto.
+static constexpr int kBakedComputeMax = 32;
+
+bool TubeCurveSampler::bakeCompute(QRhi *rhi, const QString &source, QShader *shader, QString *error)
+{
+    // GIA' COMPILATI, per backend e sorgente: il trasporto dei tubi e i lati
+    // coperti del bordo si rifanno a ogni ricompilazione della superficie, e
+    // la loro sorgente spesso non cambia (accendere il bordo, cambiare
+    // texture). Solo quelli validi: un errore si ricalcola per averne il
+    // messaggio. Tutto sul thread della GUI (render di QRhiWidget e Run).
+    static QHash<QByteArray, QShader> baked;
+    const QByteArray utf8 = source.toUtf8();
+    QByteArray cacheKey = QCryptographicHash::hash(utf8, QCryptographicHash::Sha1);
+    cacheKey.append(char(rhi ? int(rhi->backend()) : -1));
+    if (const auto it = baked.constFind(cacheKey); it != baked.constEnd()) {
+        *shader = *it;
+        return true;
+    }
+
     QShaderBaker baker;
-    baker.setSourceString(source.toUtf8(), QShader::ComputeStage);
+    baker.setSourceString(utf8, QShader::ComputeStage);
     baker.setGeneratedShaderVariants({QShader::StandardShader});
-    baker.setGeneratedShaders({
+    baker.setGeneratedShaders(targetsForBackend(rhi, {
         {QShader::SpirvShader, QShaderVersion(100)},
         {QShader::SpirvShader, QShaderVersion(130)},
         {QShader::GlslShader,  QShaderVersion(430)},
@@ -28,7 +66,7 @@ bool TubeCurveSampler::bakeCompute(const QString &source, QShader *shader, QStri
         {QShader::MslShader,   QShaderVersion(20)},
         {QShader::HlslShader,  QShaderVersion(50)},
         {QShader::HlslShader,  QShaderVersion(60)}
-    });
+    }));
     *shader = baker.bake();
     if (!shader->isValid()) {
         if (error) *error = baker.errorMessage();
@@ -49,6 +87,8 @@ bool TubeCurveSampler::bakeCompute(const QString &source, QShader *shader, QStri
         patched.setShader(code);
         shader->setShader(key, patched);
     }
+    if (baked.size() >= kBakedComputeMax) baked.clear();
+    baked.insert(cacheKey, *shader);
     return true;
 }
 
@@ -91,7 +131,7 @@ bool TubeCurveSampler::sample(QRhi *rhi, const QString &curveFunction,
 
     // --- 2. Bake, stessi target del flusso geodetico.
     QShader shader;
-    if (!bakeCompute(source, &shader, error)) return false;
+    if (!bakeCompute(rhi, source, &shader, error)) return false;
 
     // --- 3. Risorse: i campioni in un SSBO (entrano come parametri, escono
     // come punti), costanti e conteggio in un UBO std140.
