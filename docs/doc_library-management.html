@@ -26,9 +26,9 @@
             <p style="font-size: 6px; margin: 0;">&nbsp;</p><table width="100%" cellpadding="6" cellspacing="0" bgcolor="#252526"><tr><td><p style="font-size: 19px; color: #4ec9b0; margin: 0;"><b>1. Shapes (*.json)</b></p></td></tr></table>
             <p>Saving a Shape captures the mathematical definition and the base visual style of your 3D/4D object. It is ideal for storing pure geometry without linking it to a specific animation or texture.</p>
             <ul>
-                <li><strong>What it saves:</strong> the geometry (equations or surface script, constraints, constants A&ndash;F and S, U/V/W limits, Steps, 4D rotation state), the visual style (color, transparency, render mode, lighting) and the framing (camera, projection, field of view).</li>
+                <li><strong>What it saves:</strong> the geometry (equations or surface script, constraints, constants A&ndash;F and S, U/V/W limits, Steps, 4D rotation state), the visual style (color, transparency, render mode, lighting, background color) and the framing (camera, projection, field of view). Equations or a script that use the time <em>t</em> are saved with their animation, which starts again when the Shape is opened.</li>
                 <li><strong>Multi-mesh surfaces:</strong> the appearance and the domain of every grid you customized are saved too, with the domain of the All scope and the active All/Mesh scope.</li>
-                <li><strong>What it ignores:</strong> Textures, the background (both its color and any background texture), 3D/4D paths, and animation speeds. A Shape always loads over the default dark gray background; to store a scene complete with textures and background, save a <em>Record</em> instead.</li>
+                <li><strong>What it ignores:</strong> Textures, the background texture, 3D/4D paths, and rotation and path speeds. To store a scene complete with textures, background texture and motions, save a <em>Record</em> instead.</li>
             </ul>
 
             <p style="font-size: 6px; margin: 0;">&nbsp;</p><table width="100%" cellpadding="6" cellspacing="0" bgcolor="#252526"><tr><td><p style="font-size: 19px; color: #4ec9b0; margin: 0;"><b>2. Textures (*.json)</b></p></td></tr></table>
