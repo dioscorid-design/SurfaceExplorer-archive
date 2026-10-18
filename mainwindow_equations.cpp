@@ -356,12 +356,14 @@ void MainWindow::setupEquationsDock()
         if (ui->glWidget) ui->glWidget->setUpdatesEnabled(false);
     });
 
-    // (3) sliderReleased: riattiva il rendering e rigenera al rilascio
+    // (3) sliderReleased: riattiva il rendering e rigenera al rilascio. Il
+    // fondo corsa, allargato dal campo, torna sul valore (pushStepsRange).
     connect(ui->stepSlider, &QSlider::sliderReleased, this, [this]() {
         if (ui->glWidget) {
             ui->glWidget->setUpdatesEnabled(true);
             ui->glWidget->update();
         }
+        pushStepsRange(ui->stepSlider->value());
         m_meshDebounce->start();
     });
 
@@ -390,9 +392,19 @@ void MainWindow::setupEquationsDock()
                 return;
             }
         }
-        val = std::clamp(val, ui->stepSlider->minimum(), ui->stepSlider->maximum());
+        // Oltre il fondo corsa dello slider si puo' scrivere, fino a
+        // stepsLimit: lo slider si allarga fino al valore (pushStepsRange) e
+        // si ristringe quando il valore torna sotto. Prima si allarga, poi il
+        // valore a segnali vivi, poi si stringe: stringere prima taglierebbe
+        // il valore corrente in silenzio e il setValue non emetterebbe nulla.
+        const int limit = stepsLimit();
+        val = std::clamp(val, ui->stepSlider->minimum(), limit);
+        if (val > ui->stepSlider->maximum()) pushStepsRange(val);
         if (val != m_scene.steps)
             ui->stepSlider->setValue(val);   // emette valueChanged -> stato, glWidget e testo
+        else
+            ui->lineSteps->setText(QString::number(val));   // tagliato al tetto: il campo lo mostra
+        pushStepsRange(val);
     };
 
     // Trigger "forti": al commit notifichiamo (notify=true)
@@ -1019,9 +1031,11 @@ void MainWindow::checkParametricDependency()
 
     bool isGeodesicActive = (rawUpperCount > 0) && geoHasText && (!implicitMode());
 
-    if (ui->stepSlider->maximum() != 1000) {
-        ui->stepSlider->setMaximum(1000);
-    }
+    // Fondo corsa sul valore (pushStepsRange): sopra mille si arriva solo
+    // dal campo, e un controllo delle dipendenze non deve tagliarlo. Prima
+    // qui il massimo tornava a mille a segnali vivi: ogni Steps piu' alto,
+    // anche da un preset, si riduceva a mille.
+    pushStepsRange(m_scene.steps);
 
     updateConstraintState();
     updateConstantsUIState();

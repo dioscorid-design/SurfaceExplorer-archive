@@ -324,7 +324,7 @@ bool marchField(vec3 rayPos, vec3 rayDir, bool useInner, float tStart, out vec3 
 
     float stepRelax = (ubuf.u_mathParams.w > 0.001) ? ubuf.u_mathParams.w : 0.4;
 
-    for(int i = 0; i < 1000; i++) {
+    for(int i = 0; i < %MAX_RAY_STEPS%; i++) {
         if (i >= ubuf.u_raySteps) break;
         pModel = rayPos + rayDir * t_dist;
 

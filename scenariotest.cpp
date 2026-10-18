@@ -1880,6 +1880,11 @@ void ScenarioTest::run()
         finish();
         return;
     }
+    if (m_only == QLatin1String("steps")) {
+        runStepsScenarios();
+        finish();
+        return;
+    }
     if (m_only == QLatin1String("load-order")) {
         runLoadOrderScenarios();
         finish();
@@ -3720,6 +3725,7 @@ void ScenarioTest::run()
     runResetButtonScenarios();
     runBorderScenarios();
     runMeshCountScenarios();
+    runStepsScenarios();
     runAnimatedLoadScenarios();
     runLoadOrderScenarios();
 
@@ -5316,6 +5322,62 @@ void ScenarioTest::waitBorderProbe()
         wait(50);
     }
     wait(100);
+}
+
+void ScenarioTest::runStepsScenarios()
+{
+    Ui::MainWindow *ui = m_mw->ui;
+    GLWidget *gl = ui->glWidget;
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Steps e Ray Steps oltre mille dal campo =="));
+    auto typeSteps = [&](const QString &text) {
+        ui->lineSteps->setText(text);
+        emit ui->lineSteps->editingFinished();
+        wait(900);
+    };
+    if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) {
+        const int limit = m_mw->stepsLimit();
+        typeSteps(QStringLiteral("1500"));
+        check(limit >= 1500 && m_mw->m_scene.steps == 1500 && ui->stepSlider->value() == 1500
+                  && ui->stepSlider->maximum() == 1500 && gl->getEngine()->getNumU() == 1500,
+              QStringLiteral("toro, campo Steps 1500 -> slider allargato fino a 1500, mesh a 1500 "
+                             "(tetto %1, slider %2 su %3, motore %4)")
+                  .arg(limit).arg(ui->stepSlider->value()).arg(ui->stepSlider->maximum())
+                  .arg(gl->getEngine()->getNumU()));
+        typeSteps(QStringLiteral("600"));
+        check(m_mw->m_scene.steps == 600 && ui->stepSlider->value() == 600 && ui->stepSlider->maximum() == 1000,
+              QStringLiteral("campo Steps 600 -> slider di nuovo fino a mille (%1 su %2)")
+                  .arg(ui->stepSlider->value()).arg(ui->stepSlider->maximum()));
+        typeSteps(QStringLiteral("999999"));
+        check(m_mw->m_scene.steps == limit && ui->lineSteps->text() == QString::number(limit),
+              QStringLiteral("campo Steps 999999 -> tagliato al tetto %1 ('%2')").arg(limit).arg(ui->lineSteps->text()));
+        typeSteps(QStringLiteral("1200"));
+        // Un controllo delle dipendenze (scrivere un'equazione) non lo riporta a mille.
+        m_mw->checkParametricDependency();  wait(300);
+        check(m_mw->m_scene.steps == 1200 && ui->stepSlider->value() == 1200,
+              QStringLiteral("Steps 1200, poi controllo delle dipendenze -> resta 1200 (%1)").arg(m_mw->m_scene.steps));
+        typeSteps(QStringLiteral("100"));
+    }
+    if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Multi Meshes/Torus Necklace.json"))) {
+        typeSteps(QStringLiteral("1500"));
+        check(m_mw->m_scene.steps == 1000 && ui->stepSlider->maximum() == 1000,
+              QStringLiteral("Torus Necklace (%1 mesh), campo Steps 1500 -> mille, il tetto dei punti (%2)")
+                  .arg(gl->getEngine()->getMeshParts().size()).arg(m_mw->m_scene.steps));
+    }
+    if (loadRecord(QString::fromLatin1(kImplicitRecord))) {
+        typeSteps(QStringLiteral("1500"));
+        check(m_mw->m_scene.steps == 1500 && ui->stepSlider->maximum() == 1500 && gl->m_raySteps == 1500,
+              QStringLiteral("Ray Marching, campo Ray Steps 1500 -> slider allargato, motore a 1500 (%1, %2)")
+                  .arg(m_mw->m_scene.steps).arg(gl->m_raySteps));
+        typeSteps(QStringLiteral("999999"));
+        check(m_mw->m_scene.steps == GLWidget::kRayStepsMax && gl->m_raySteps == GLWidget::kRayStepsMax,
+              QStringLiteral("Ray Marching, campo Ray Steps 999999 -> il tetto del ciclo %1 (%2)")
+                  .arg(GLWidget::kRayStepsMax).arg(m_mw->m_scene.steps));
+        typeSteps(QStringLiteral("400"));
+        check(m_mw->m_scene.steps == 400 && ui->stepSlider->maximum() == 1000,
+              QStringLiteral("Ray Marching, campo Ray Steps 400 -> slider di nuovo fino a mille (%1)")
+                  .arg(ui->stepSlider->maximum()));
+    }
 }
 
 void ScenarioTest::runBorderAuditScenarios()

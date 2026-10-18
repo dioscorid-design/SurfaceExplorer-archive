@@ -24,7 +24,7 @@
 #       (script-dock, texture-target, mesh-image, mesh-clocks, record-texture,
 #        library-folder, library-paste, library-rename, master-records[:filtro],
 #        renderer-all[:filtro], reset-scene, reset-button, tubes, border, meshes,
-#        animated-load, load-order, border-audit[:filtro])
+#        animated-load, load-order, steps, border-audit[:filtro])
 #       border-audit: bordo acceso su ogni superficie parametrica, flag dei lati
 #       coperti riletti dalla GPU (~30 min); i dati restano in border-audit/ del
 #       report e ExC/Mac/Test/border-replica.py li rifa' in Python.

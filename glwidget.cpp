@@ -4176,7 +4176,7 @@ void GLWidget::setResolution(int n) {
 }
 
 void GLWidget::setRaySteps(int steps) {
-    m_raySteps = steps; // Salva il valore nello stato del Widget
+    m_raySteps = std::clamp(steps, 1, kRayStepsMax);   // il tetto del ciclo nello shader
     update();           // Richiede un nuovo fotogramma
 }
 
@@ -6997,6 +6997,10 @@ QString GLWidget::createImplicitFragmentShader()
     templateSource.replace("%MAX_LAYER_STEPS%", "2000");
     templateSource.replace("%BISECT_ITERS%", "24");
 #endif
+    // Tetto del ciclo dei Ray Steps (marchField): il ciclo esce a u_raySteps,
+    // e questo e' solo il massimo che il campo Steps accetta. Era 1000 fisso:
+    // oltre, il valore scritto non avrebbe cambiato nulla.
+    templateSource.replace("%MAX_RAY_STEPS%", QString::number(kRayStepsMax));
 
     // safePow (pow sicura per basi negative) vive in common.glsl, iniettato qui sotto.
     QString commonCode = loadShaderSource(":/shaders/common.glsl");

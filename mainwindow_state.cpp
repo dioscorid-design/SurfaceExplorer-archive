@@ -1097,13 +1097,33 @@ void MainWindow::refreshConstantSliders()
 void MainWindow::setSteps(int steps)
 {
     m_scene.steps = steps;
-    // Vista: slider (il suo range si allarga per contenere il valore, o
-    // setValue lo taglierebbe in silenzio) e campo, a segnali bloccati.
+    // Vista: slider (il suo range contiene il valore, o setValue lo
+    // taglierebbe in silenzio) e campo, a segnali bloccati.
     const QSignalBlocker bs(ui->stepSlider), bl(ui->lineSteps);
-    if (ui->stepSlider->maximum() < steps) ui->stepSlider->setMaximum(std::max(1000, steps));
-    if (ui->stepSlider->minimum() > steps) ui->stepSlider->setMinimum(steps);
+    pushStepsRange(steps);
     ui->stepSlider->setValue(steps);
     ui->lineSteps->setText(QString::number(steps));
+}
+
+void MainWindow::pushStepsRange(int steps)
+{
+    QSlider *s = ui->stepSlider;
+    const QSignalBlocker blocker(s);
+    int hi = std::max(kStepsSliderMax, steps);
+    if (s->isSliderDown()) hi = std::max(hi, s->maximum());
+    if (s->minimum() > steps) s->setMinimum(steps);
+    s->setMaximum(hi);
+}
+
+int MainWindow::stepsLimit() const
+{
+    if (implicitMode()) return GLWidget::kRayStepsMax;
+    // Le parti della figura: ciascuna fino a (Steps + 1)^2 punti.
+    int parts = 1;
+    if (ui->glWidget && ui->glWidget->getEngine())
+        parts = std::max(1, (int)ui->glWidget->getEngine()->getMeshParts().size());
+    const int fit = int(std::sqrt(kStepsPointBudget / parts)) - 1;
+    return std::max(kStepsSliderMax, fit);
 }
 
 QString MainWindow::activeEquationsText() const

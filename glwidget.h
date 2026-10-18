@@ -281,6 +281,14 @@ public:
     void setRangeY(float min, float max);
     void setRangeZ(float min, float max);
     void setResolution(int n);
+    // Massimo dei Ray Steps: tetto del ciclo del ray marching (%MAX_RAY_STEPS%)
+    // e del campo Steps in Ray Marching. Il costo e' per pixel: piu' basso sui
+    // dispositivi mobili, dove un frame troppo lungo fa chiudere l'app.
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    static constexpr int kRayStepsMax = 2000;
+#else
+    static constexpr int kRayStepsMax = 5000;
+#endif
     void setRaySteps(int steps);
     int raySteps() const { return m_raySteps; }
     // uMin/uMax/vMin/vMax: il DOMINIO su cui la griglia e' stata integrata. Serve

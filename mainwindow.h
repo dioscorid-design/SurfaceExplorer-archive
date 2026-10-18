@@ -924,8 +924,14 @@ private:
     // Steps: in parametrico la risoluzione della mesh, in Ray Marching i Ray
     // Steps. Lo slider e il campo ne sono la vista; il motore (setResolution /
     // setRaySteps) lo scrive chi chiama. setSteps: dal programma, a segnali
-    // bloccati, allargando il range dello slider se serve.
+    // bloccati, col fondo corsa dello slider sul valore (pushStepsRange).
     void setSteps(int steps);
+    // Fondo corsa dello slider Steps: kStepsSliderMax, o il valore se e' piu'
+    // grande; mentre lo si trascina non si stringe. A segnali bloccati: chi
+    // chiama non deve stringerlo sotto il valore corrente.
+    void pushStepsRange(int steps);
+    // Il massimo che il campo Steps accetta (vedi kStepsPointBudget).
+    int stepsLimit() const;
 
     bool m_blockTextureGen = false;
     // Alzato durante un cambio tab AUTOMATICO, cioe' deciso dal preset che si

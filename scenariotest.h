@@ -224,6 +224,11 @@ private:
     // sulle superfici chiuse, GLWidget::borderAvailability).
     void waitBorderProbe();
     void runMeshCountScenarios();
+    // STEPS E RAY STEPS OLTRE MILLE: dal campo il fondo corsa dello slider si
+    // allarga fino al valore e torna a mille quando ci rientra, fino al tetto
+    // (MainWindow::stepsLimit: punti della mesh in parametrico, tetto del
+    // ciclo in Ray Marching). Da sola: --scenario-only steps.
+    void runStepsScenarios();
     // SUPERFICIE ANIMATA DA EQUAZIONI: il load (che svuota la mesh) e il Run
     // dopo un NEW devono sganciare il gate della scena vuota, cioe' lasciare
     // accesi i comandi del dock RENDERER. Il Run lo sganciava solo per le

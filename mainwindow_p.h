@@ -187,6 +187,20 @@ inline float resolveSavedFov(float cameraFov, float fov3D, float fov4D)
 // su Border col bordo spento lo accende a kBorderThicknessDisplayDefault.
 // Le conversioni stanno qui insieme: lo slider (clic) e setBorderUI (load,
 // reset) devono concordare.
+// STEPS. Lo slider va da 10 a kStepsSliderMax, come sempre; dal campo si scrive
+// anche di piu' e il fondo corsa si allarga fino al valore, tornando a
+// kStepsSliderMax quando il valore ci rientra (come gli slider delle costanti,
+// syncConstantSliders). Fino a un tetto (MainWindow::stepsLimit): in
+// parametrico i punti della mesh, tutte le parti insieme -- ogni punto costa 40
+// byte di vertice e circa 24 di indici, sulla CPU e sulla GPU; in Ray Marching
+// GLWidget::kRayStepsMax, il tetto del ciclo nello shader.
+inline constexpr int kStepsSliderMax = 1000;
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+inline constexpr double kStepsPointBudget = 2250000.0;   // una superficie fino a 1500
+#else
+inline constexpr double kStepsPointBudget = 4000000.0;   // una superficie fino a 2000
+#endif
+
 inline constexpr float kBorderThicknessMax = 0.2f;
 inline constexpr float kBorderThicknessUnit = 0.02f;          // raggio per unita' mostrata
 inline constexpr float kBorderThicknessDisplayMin = 0.25f;
