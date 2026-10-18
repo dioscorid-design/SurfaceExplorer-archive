@@ -772,6 +772,12 @@ LibraryItem LibraryManager::parseJson(const QString &filePath, LibraryType type)
 
         parseSceneCommon(root, d);
 
+        // Colore di sfondo: assente nelle Shape salvate col grigio di default.
+        if (root.contains("background")) {
+            const QJsonObject bg = root["background"].toObject();
+            if (bg.contains("color")) d.bgColor = bg["color"].toString();
+        }
+
         // Caso 1: È uno SCRIPT
         if (root.contains("scriptCode")) {
             d.isScript = true;
@@ -1194,6 +1200,14 @@ QJsonObject LibraryManager::toJson(const LibraryItem &d)
         if (record) root["observer4D"] = (double)d.observer4D;
     }
 
+    if (!record && !d.bgColor.isEmpty()
+        && QColor(d.bgColor).name() != defaultBackgroundColor().name()) {
+        // Shape: dello sfondo solo il colore (la texture di sfondo e' dei
+        // record), e solo se non e' il grigio di default.
+        QJsonObject bg;
+        bg["color"] = d.bgColor;
+        root["background"] = bg;
+    }
     if (record) {
         QJsonObject bg;
         bg["color"] = d.bgColor;

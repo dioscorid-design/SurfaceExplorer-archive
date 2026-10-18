@@ -1542,8 +1542,8 @@ void MainWindow::applySurfaceExample(LibraryItem d)
     exitMetricScriptMode();
 
     // Colori al default nel MOTORE (superficie verde); lo sfondo e' quello
-    // della scena del file -- grigio scuro: una superficie non ne porta --, che
-    // la testa di applyCommonData assegna allo stato.
+    // della scena del file -- il colore salvato con la Shape, o il grigio
+    // scuro di default --, che la testa di applyCommonData assegna allo stato.
     float defR = 0.20f, defG = 0.80f, defB = 0.20f;
     if (ui->glWidget) {
         ui->glWidget->setColor(defR, defG, defB);

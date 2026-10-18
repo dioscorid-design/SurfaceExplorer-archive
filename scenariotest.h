@@ -229,6 +229,10 @@ private:
     // (MainWindow::stepsLimit: punti della mesh in parametrico, tetto del
     // ciclo in Ray Marching). Da sola: --scenario-only steps.
     void runStepsScenarios();
+    // COLORE DI SFONDO NELLE SHAPE: si scrive solo se non e' il grigio di
+    // default, torna riaprendo la Shape, e una Shape senza riporta il grigio.
+    // Da sola: --scenario-only shape-background.
+    void runShapeBackgroundScenarios();
     // SUPERFICIE ANIMATA DA EQUAZIONI: il load (che svuota la mesh) e il Run
     // dopo un NEW devono sganciare il gate della scena vuota, cioe' lasciare
     // accesi i comandi del dock RENDERER. Il Run lo sganciava solo per le

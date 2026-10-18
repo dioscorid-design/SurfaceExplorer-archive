@@ -1885,6 +1885,11 @@ void ScenarioTest::run()
         finish();
         return;
     }
+    if (m_only == QLatin1String("shape-background")) {
+        runShapeBackgroundScenarios();
+        finish();
+        return;
+    }
     if (m_only == QLatin1String("load-order")) {
         runLoadOrderScenarios();
         finish();
@@ -3726,6 +3731,7 @@ void ScenarioTest::run()
     runBorderScenarios();
     runMeshCountScenarios();
     runStepsScenarios();
+    runShapeBackgroundScenarios();
     runAnimatedLoadScenarios();
     runLoadOrderScenarios();
 
@@ -5381,6 +5387,50 @@ void ScenarioTest::runStepsScenarios()
         check(m_mw->m_scene.steps == 400 && ui->stepSlider->maximum() == 1000,
               QStringLiteral("Ray Marching, campo Ray Steps 400 -> slider di nuovo fino a mille (%1)")
                   .arg(ui->stepSlider->maximum()));
+    }
+}
+
+void ScenarioTest::runShapeBackgroundScenarios()
+{
+    GLWidget *gl = m_mw->ui->glWidget;
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Shape: il colore di sfondo si salva e si riapre =="));
+    const QString kTorus = QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json");
+    const QColor custom(QStringLiteral("#335577"));
+    if (loadSurface(kTorus)) {
+        // Col grigio di default la chiave non si scrive: le Shape salvate
+        // prima restano identiche.
+        const QJsonObject plain = m_mw->m_presetSerializer->buildSurfaceJson(QStringLiteral("t"));
+        check(!plain.contains(QStringLiteral("background"))
+                  && m_mw->m_scene.bgColor.name() == defaultBackgroundColor().name(),
+              QStringLiteral("toro, sfondo di default -> nessuna chiave background nella Shape"));
+
+        // Un colore suo: va nella Shape e torna riaprendola (file nel report,
+        // mai nella libreria).
+        m_mw->m_scene.bgColor = custom;
+        gl->setBackgroundColor(custom);
+        const QJsonObject json = m_mw->m_presetSerializer->buildSurfaceJson(QStringLiteral("Shape Background"));
+        const QString saved = json.value(QStringLiteral("background")).toObject().value(QStringLiteral("color")).toString();
+        const QString path = m_outDir + QStringLiteral("/shape-background.json");
+        QFile f(path);
+        const bool written = f.open(QIODevice::WriteOnly) && f.write(QJsonDocument(json).toJson()) > 0;
+        f.close();
+        LibraryManager lm;
+        const LibraryItem item = lm.parseJson(path, LibraryType::Surface);
+        if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Sphere.json")) && written
+            && !item.name.isEmpty()) {
+            m_mw->applySurfaceExample(item);
+            wait(1200);
+        }
+        check(saved == custom.name() && m_mw->m_scene.bgColor.name() == custom.name(),
+              QStringLiteral("sfondo %1 -> salvato nella Shape (%2) e ritrovato riaprendola (%3)")
+                  .arg(custom.name(), saved, m_mw->m_scene.bgColor.name()));
+
+        // Una Shape senza la chiave riporta il grigio.
+        if (loadSurface(kTorus))
+            check(m_mw->m_scene.bgColor.name() == defaultBackgroundColor().name(),
+                  QStringLiteral("poi una Shape senza colore di sfondo -> grigio di default (%1)")
+                      .arg(m_mw->m_scene.bgColor.name()));
     }
 }
 

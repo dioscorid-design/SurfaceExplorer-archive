@@ -875,18 +875,19 @@ void MainWindow::textureTextsFromItem(const LibraryItem &d, bool isRecord,
         s->surfaceScriptText = d.scriptCode;
         s->surfaceScriptApplied = d.scriptCode;
     }
-    // Una superficie: niente texture ne' sfondo (colori di sfondo al default);
-    // il suono e' quello dello script (//MUSIC:, //SOUND_BEGIN..END), se ne ha
-    // uno.
+    // Una superficie: niente texture ne' texture di sfondo; il colore di sfondo
+    // il suo (grigio di default se non lo porta), i colori della texture di
+    // sfondo al default; il suono e' quello dello script (//MUSIC:,
+    // //SOUND_BEGIN..END), se ne ha uno.
     if (!isRecord) {
         s->soundScriptText = extractAudioDirectives(s->surfaceScriptApplied);
-        s->bgColor = QColor::fromRgbF(0.3f, 0.3f, 0.3f);
+        s->bgColor = d.bgColor.isEmpty() ? defaultBackgroundColor() : QColor(d.bgColor);
         s->bgTexColor1 = QColor::fromRgbF(0.2f, 0.2f, 0.8f);
         s->bgTexColor2 = Qt::black;
         return;
     }
     // Colori dello sfondo: senza la chiave, il grigio di default.
-    s->bgColor = d.bgColor.isEmpty() ? QColor::fromRgbF(0.3f, 0.3f, 0.3f) : QColor(d.bgColor);
+    s->bgColor = d.bgColor.isEmpty() ? defaultBackgroundColor() : QColor(d.bgColor);
     s->bgTexColor1 = QColor(d.bgCol1);
     s->bgTexColor2 = QColor(d.bgCol2);
 

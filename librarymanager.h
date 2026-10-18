@@ -217,6 +217,9 @@ struct LibraryItem {
     QString imagePath;
     bool hasCustomColors = false;
 
+    // Colore dello sfondo. Nei record sempre; nelle Shape solo se diverso da
+    // defaultBackgroundColor() (chiave "background" assente = grigio di
+    // default, cosi' le Shape salvate prima restano identiche).
     QString bgColor;
     QString color1;
     QString color2;
@@ -311,6 +314,10 @@ struct DeletionBackup {
     QString originalPath;
     QString backupPath;
 };
+
+// Lo sfondo di una scena nuova, di una Shape senza colore di sfondo e di un
+// record senza la chiave: grigio scuro.
+inline QColor defaultBackgroundColor() { return QColor::fromRgbF(0.3f, 0.3f, 0.3f); }
 
 // ==========================================================
 // MANAGER CLASS

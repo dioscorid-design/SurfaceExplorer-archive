@@ -718,6 +718,8 @@ LibraryItem PresetSerializer::captureSurfaceState(const QString &name)
     d.name = name;
     d.type = LibraryType::Surface;
     captureCommonState(d);
+    // Il colore di sfondo si salva anche nelle Shape (la texture di sfondo no).
+    d.bgColor = mw->m_scene.bgColor.name();
 
     // Chi comanda la geometria. Script metrico: i campi x/y/z/p non sono vuoti
     // (carta identita' o display map), ma la geometria la definisce lo script:
