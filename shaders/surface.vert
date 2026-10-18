@@ -17,6 +17,11 @@ layout(location = 5) out float v_borderSide;
 // Quanto il tubo prosegue oltre l'inizio di un tratto coperto, in frazione del
 // lato: tre quarti del raggio (vedi borderFragmentCovered).
 layout(location = 6) out float v_borderReach;
+// Punto e normale nella scena prima della rotazione col mouse: la texture
+// GLOBALE (multimesh in ambito All, u_globalTexture) li proietta sui tre piani
+// (surfaceTextureColor nel fragment), cosi' resta ferma sulla figura girandola.
+layout(location = 7) out vec3 v_objPos;
+layout(location = 8) out vec3 v_objNormal;
 
 layout(std140, binding = 0) uniform SceneUBO {
     mat4 u_mvpMatrix;
@@ -107,6 +112,9 @@ layout(std140, binding = 0) uniform SceneUBO {
     // 1 se u_sharedEdges e' valida in questo frame (borderEdgeShared).
     // Ultimo campo di UboData.
     float u_sharedEdgesOn;
+    // Texture globale (multimesh in ambito All): NON USATO QUI (lo legge il
+    // fragment), dichiarato per la regola Adreno. Ultimo campo di UboData.
+    float u_globalTexture;
 } ubuf;
 
 float sq(float x) { return x*x; }
@@ -629,6 +637,8 @@ void emitTubeVertex() {
 
     v_pos = vec3(ubuf.u_mvMatrix * vec4(pos, 1.0));
     v_normal = ubuf.u_mvMatrix * vec4(n, 0.0);
+    v_objPos = pos;
+    v_objNormal = n;
     // Texture (e taglio, che rilegge u da qui) sul parametro dove l'anello sta.
     float span = ubuf.u_max - ubuf.u_min;
     float s = texCoord.x + ((abs(span) > 1.0e-12) ? (uAt - u) / span : 0.0);
@@ -1057,6 +1067,8 @@ void emitBorderVertex() {
 void main() {
     v_borderSide = -1.0;
     v_borderReach = 0.0;
+    v_objPos = vec3(0.0);
+    v_objNormal = vec3(0.0, 0.0, 1.0);
     // --- BYPASS PER FLAT VIEW (TEXTURE PREVIEW) ---
     if (ubuf.u_isFlat != 0) {
         gl_Position = ubuf.u_mvpMatrix * vec4(vertex.xyz, 1.0);
@@ -1190,6 +1202,8 @@ void main() {
     v_pos = vec3(ubuf.u_mvMatrix * vec4(finalPos3D, 1.0));
     v_normal = ubuf.u_mvMatrix * vec4(finalNormal3D, 0.0);
     v_texCoord = vec2(texCoord.x, 1.0 - texCoord.y);
+    v_objPos = finalPos3D;
+    v_objNormal = finalNormal3D;
 
     vec4 pos = ubuf.u_mvpMatrix * vec4(finalPos3D, 1.0);
 

@@ -9,6 +9,10 @@ layout(location = 4) in float v_spec4D;
 // Lato del bordo (0-3), -1 per tutto il resto (vedi surface.vert).
 layout(location = 5) in float v_borderSide;
 layout(location = 6) in float v_borderReach;
+// Punto e normale nella scena prima della rotazione col mouse (texture
+// globale, surfaceTextureColor).
+layout(location = 7) in vec3 v_objPos;
+layout(location = 8) in vec3 v_objNormal;
 
 // --- OUTPUT ---
 layout(location = 0) out vec4 FragColor;
@@ -94,8 +98,12 @@ layout(std140, binding = 0) uniform SceneUBO {
     float u_tubeFramesOn;
     float u_tubeFrameBlend;
     // Lati del bordo in comune con un'altra mesh: NON USATO QUI (lo legge il
-    // vertex), dichiarato per la regola Adreno. Ultimo campo di UboData.
+    // vertex), dichiarato per la regola Adreno.
     float u_sharedEdgesOn;
+    // 1 nei blocchi delle parti di una multimesh in ambito All: la texture e'
+    // una sola su tutta la figura (surfaceTextureColor). Ultimo campo di
+    // UboData.
+    float u_globalTexture;
 } ubuf;
 
 // --- PLACEHOLDER PER CODICE TEXTURE CUSTOM ---
@@ -104,6 +112,39 @@ layout(std140, binding = 0) uniform SceneUBO {
 // --- PLACEHOLDER PER TAGLIO PARETI INTERNE (script dock, sezione CUTOUT) ---
 // Fallback: nessun taglio (retrocompatibile con ogni preset che non la definisce).
 %CUTOUT_CODE%
+
+// COLORE DELLA TEXTURE nel punto. Di solito la texture sulle coordinate (u, v)
+// della parte, 0..1 su ciascuna. TEXTURE GLOBALE (u_globalTexture: multimesh in
+// ambito All): una sola su tutta la figura, proiettata dalla scena sui tre
+// piani coordinati e mescolata secondo la normale (triplanare), alla scala del
+// triplanare delle immagini in Ray Marching (0.5: si ripete ogni 2 unita'; lo
+// zoom della vista 2D la regola). Il bordo resta sulle sue coordinate. Una sola
+// chiamata alla texture, dentro il ciclo: tre chiamate scritte triplicherebbero
+// il codice delle texture pesanti (Mali lo ricopia per ogni punto di chiamata).
+// Il peso alla quarta potenza stringe le transizioni: dove una proiezione pesa
+// quasi zero non si calcola.
+vec3 surfaceTextureColor() {
+    bool tri = ubuf.u_globalTexture > 0.5 && ubuf.u_isBorder == 0;
+    vec3 w = vec3(1.0, 0.0, 0.0);
+    if (tri) {
+        vec3 a = abs(v_objNormal);
+        a = a * a;
+        a = a * a;
+        float s = a.x + a.y + a.z;
+        w = (s > 1.0e-12) ? a / s : vec3(0.0, 0.0, 1.0);
+    }
+    vec3 c = vec3(0.0);
+    float sum = 0.0;
+    for (int k = 0; k < 3; ++k) {
+        float wk = (k == 0) ? w.x : ((k == 1) ? w.y : w.z);
+        if (wk < 0.02) continue;
+        vec2 uv = !tri ? v_texCoord
+                : 0.5 * ((k == 0) ? v_objPos.yz : ((k == 1) ? v_objPos.xz : v_objPos.xy));
+        c += wk * getCustomColor(uv);
+        sum += wk;
+    }
+    return c / max(sum, 1.0e-12);
+}
 
 #ifdef HAS_BORDER
 // TRATTI COPERTI DEL BORDO: dove l'orlo passa dentro un'altra mesh (le fasce
@@ -244,7 +285,7 @@ void main() {
     // --- 5. COMPOSIZIONE COLORE ---
     vec3 finalRGB = ubuf.color;
     if (ubuf.useTexture != 0) {
-        vec4 tex = vec4(getCustomColor(v_texCoord), 1.0);
+        vec4 tex = vec4(surfaceTextureColor(), 1.0);
         finalRGB *= tex.rgb;
     }
 

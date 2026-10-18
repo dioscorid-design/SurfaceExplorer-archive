@@ -181,7 +181,13 @@ struct UboData {
     // ENTRAMBI gli shader parametrici (regola Adreno, vedi CLAUDE.md); lo usa
     // solo il vertex.
     float u_sharedEdgesOn;
-    float _pad4[3];
+    // TEXTURE GLOBALE: 1 nei blocchi delle parti di una multimesh in ambito
+    // All (la texture e' una sola su tutta la figura, triplanare: vedi
+    // surfaceTextureColor in surface.frag). Primo posto di _pad4: il blocco
+    // resta di 496 byte. Dichiarato in ENTRAMBI gli shader parametrici (regola
+    // Adreno, vedi CLAUDE.md); lo usa solo il fragment.
+    float u_globalTexture;
+    float _pad4[2];
 };
 
 class GLWidget : public QRhiWidget
@@ -406,6 +412,10 @@ public:
     // visibile a questo punto dell'header.
     void setMeshAppearanceUniform(bool on);
     bool meshAppearanceUniform() const { return m_meshAppearanceUniform; }
+    // TEXTURE GLOBALE: su una multimesh in ambito All la texture e' una sola
+    // su tutta la figura (triplanare, u_globalTexture), non una copia sulle
+    // coordinate di ogni parte. Sulle superfici a mesh singola mai.
+    bool globalTextureActive() const;
     int activeMeshPart() const { return m_activeMeshPart; }
     int meshPartCount() const { return engine ? engine->getMeshPartCount() : 0; }
 

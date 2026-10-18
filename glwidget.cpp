@@ -2274,6 +2274,7 @@ void GLWidget::render(QRhiCommandBuffer *cb)
             partUbo.v_max = mp.vMax;
             partUbo.u_meshIndex = (float)mp.meshIndex;
             applyTubeFields(partUbo, &mp, mp.meshIndex);
+            partUbo.u_globalTexture = globalTextureActive() ? 1.0f : 0.0f;
 
             // ASPETTO PER-PARTE. Un valore negativo significa "eredita dallo
             // stato globale", che e' gia' in partUbo perche' copiato da
@@ -3781,7 +3782,8 @@ static_assert(offsetof(UboData, u_tubeRings) == 468, "UboData: u_tubeRings fuori
 static_assert(offsetof(UboData, u_tubeFramesOn) == 472, "UboData: u_tubeFramesOn fuori posto");
 static_assert(offsetof(UboData, u_tubeFrameBlend) == 476, "UboData: u_tubeFrameBlend fuori posto");
 static_assert(offsetof(UboData, u_sharedEdgesOn) == 480, "UboData: u_sharedEdgesOn fuori posto");
-static_assert(sizeof(UboData) == 496, "UboData: dopo u_sharedEdgesOn (e _pad4) il blocco e' di 496 byte");
+static_assert(offsetof(UboData, u_globalTexture) == 484, "UboData: u_globalTexture fuori posto");
+static_assert(sizeof(UboData) == 496, "UboData: dopo u_globalTexture (e _pad4) il blocco e' di 496 byte");
 static_assert(sizeof(UboData) % 16 == 0, "UboData: dimensione non multipla di 16 (std140)");
 
 bool GLWidget::setTubeCurve(const QString &xEq, const QString &yEq, const QString &zEq, const QString &wEq,
@@ -5195,6 +5197,11 @@ void GLWidget::adjustBorderWireStep(bool along, int delta) {
     else       m_borderWireAround = std::clamp(m_borderWireAround + delta, 1, kBorderWireAroundMax);
     m_borderUploaded = false;   // le linee si ricostruiscono al prossimo frame
     update();
+}
+
+bool GLWidget::globalTextureActive() const
+{
+    return m_meshAppearanceUniform && engine && engine->getMeshParts().size() > 1;
 }
 
 GLWidget::BorderStyle GLWidget::borderStyle() const {
@@ -8099,15 +8106,16 @@ QString GLWidget::createFragmentShaderSource(const QString &customLogic, bool fo
     // Il template chiama getCustomColor() direttamente (le vecchie
     // `texture(textureSampler, ...)` non esistono piu' nel .frag): quando ci
     // sono texture per-mesh dobbiamo dirottare quelle chiamate sul dispatcher.
-    // Si sostituisce SOLO la chiamata dentro main(), non la definizione delle
-    // funzioni appena generate, che vivono in codeToInject ed e' gia' stato
-    // inserito: il replace mirato sulle due forme letterali presenti nel
-    // template lascia intatte le definizioni.
+    // Si sostituiscono SOLO le chiamate del template (vista 2D in main(),
+    // superficie in surfaceTextureColor()), non la definizione delle funzioni
+    // appena generate, che vivono in codeToInject ed e' gia' stato inserito: il
+    // replace mirato sulle due forme letterali presenti nel template lascia
+    // intatte le definizioni.
     if (entryPoint != QLatin1String("getCustomColor")) {
         fullSource.replace("vec3 texColor = getCustomColor(v_texCoord);",
                            "vec3 texColor = " + entryPoint + "(v_texCoord);");
-        fullSource.replace("vec4 tex = vec4(getCustomColor(v_texCoord), 1.0);",
-                           "vec4 tex = vec4(" + entryPoint + "(v_texCoord), 1.0);");
+        fullSource.replace("c += wk * getCustomColor(uv);",
+                           "c += wk * " + entryPoint + "(uv);");
     }
 
     // Taglio pareti interne (sezione //CUTOUT_BEGIN..//CUTOUT_END dello script

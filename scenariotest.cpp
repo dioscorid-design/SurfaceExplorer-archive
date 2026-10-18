@@ -7188,6 +7188,33 @@ void ScenarioTest::runMeshCountScenarios()
         }
     }
 
+    // TEXTURE GLOBALE (chiesta dall'utente il 10-18): su una multimesh in
+    // ambito All la texture e' una sola su tutta la figura (triplanare), non
+    // una copia sulle coordinate di ogni parte; in Mesh e sulle superfici a
+    // mesh singola resta sulle coordinate. L'immagine resta nel report
+    // (meshes/global-texture-*.png), da guardare.
+    for (const QString &rel : { QStringLiteral("surfaces/Parametric/Surfaces/Multi Meshes/Calabi-Yau.json"),
+                                QStringLiteral("surfaces/Parametric/Surfaces/Multi Meshes/Torus Necklace.json") }) {
+        if (!loadSurface(rel)) continue;
+        click(ui->radioMeshAll);
+        if (!ui->chkBoxTexture->isChecked()) { ui->chkBoxTexture->click();  wait(600); }
+        const QString name = QFileInfo(rel).baseName();
+        const bool all = gl->globalTextureActive();
+        QDir().mkpath(m_outDir + QStringLiteral("/meshes"));
+        gl->grabFramebuffer().save(m_outDir + QStringLiteral("/meshes/global-texture-") + name + QStringLiteral(".png"));
+        click(ui->radioMeshOne);
+        const bool one = gl->globalTextureActive();
+        click(ui->radioMeshAll);
+        check(parts() > 1 && all && !one && gl->globalTextureActive(),
+              QStringLiteral("%1 (%2 mesh) con texture -> globale in All, sulle coordinate in Mesh, di nuovo globale in All")
+                  .arg(name).arg(parts()));
+    }
+    if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) {
+        if (!ui->chkBoxTexture->isChecked()) { ui->chkBoxTexture->click();  wait(600); }
+        check(parts() == 1 && !gl->globalTextureActive(),
+              QStringLiteral("toro (una mesh) con texture -> sulle coordinate u/v, non globale"));
+    }
+
     // RAY MARCHING: niente copie.
     ui->tabModeSelector->setCurrentIndex(1);  wait(1500);
     check(!ui->lineMeshCount->isEnabled(), QStringLiteral("Ray Marching -> campo Meshes spento"));
