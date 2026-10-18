@@ -37,7 +37,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>1.4</string>
 	<key>CFBundleVersion</key>
-	<string>56</string>
+	<string>62</string>
 
 	<!-- OBBLIGATORIA sul Mac App Store: senza, la distribuzione fallisce con
 	     "The product archive is invalid. The Info.plist must contain a
