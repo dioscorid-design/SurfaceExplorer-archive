@@ -1,0 +1,231 @@
+{
+    "activeMotion": "rotation",
+    "angles": {
+        "omega": 167.08241271972656,
+        "phi": 155.57118225097656,
+        "psi": 0.15000000596046448
+    },
+    "background": {
+        "code": "//IMG:/Users/dioscorid/Projects/C/presets/textures/Images/7.png",
+        "col1": "#33cc33",
+        "col2": "#000000",
+        "color": "#4d4d4d",
+        "enabled": true,
+        "libName": "7",
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "skyMode": "sphere",
+        "zoom": 1
+    },
+    "camera3D": {
+        "pitch": 0,
+        "roll": 0,
+        "rot_w": 0.39096909761428833,
+        "rot_x": 0.7561162710189819,
+        "rot_y": 0.481972873210907,
+        "rot_z": 0.20768627524375916,
+        "x": 0,
+        "y": 0,
+        "yaw": 0,
+        "z": 4
+    },
+    "cameraFov": 45,
+    "colors": {
+        "alpha": 1,
+        "surfColor": "#33cc33"
+    },
+    "constants": {
+        "A": 1,
+        "B": 1,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
+    },
+    "equations": {
+        "defU": "",
+        "defV": "",
+        "defW": "",
+        "explicitU": "",
+        "explicitV": "",
+        "explicitW": "",
+        "p": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "isImplicitMode": false,
+    "lightIntensity": 1.32,
+    "lightingMode": 0,
+    "limits": {
+        "uMax": 6.2831854820251465,
+        "uMin": 0,
+        "vMax": 6.283199787139893,
+        "vMin": 0,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshCount": "11",
+    "meshParts": [
+        {
+            "b": 0.29019609093666077,
+            "g": 0.6078431606292725,
+            "mode": 1,
+            "r": 0.9098039269447327
+        },
+        {
+            "b": 0.24313725531101227,
+            "g": 0.5607843399047852,
+            "mode": 1,
+            "r": 0.29019609093666077
+        },
+        {
+            "b": 0.7176470756530762,
+            "g": 0.5254902243614197,
+            "mode": 1,
+            "r": 0.9098039269447327
+        },
+        {
+            "b": 0.5098039507865906,
+            "g": 0.18431372940540314,
+            "mode": 1,
+            "r": 0.29019609093666077
+        },
+        {
+            "b": 0.29019609093666077,
+            "g": 0.34117648005485535,
+            "mode": 1,
+            "r": 0.5490196347236633
+        },
+        {
+            "b": 0.4941176474094391,
+            "g": 0.40392157435417175,
+            "mode": 1,
+            "r": 0.29019609093666077
+        },
+        {
+            "b": 0.5764706134796143,
+            "g": 0.34117648005485535,
+            "mode": 1,
+            "r": 0.11764705926179886
+        },
+        {
+            "b": 0.7450980544090271,
+            "g": 0.8666666746139526,
+            "mode": 1,
+            "r": 0
+        },
+        {
+            "b": 0.29019609093666077,
+            "g": 0.34117648005485535,
+            "mode": 1,
+            "r": 0.9098039269447327
+        },
+        {
+            "b": 0.9098039269447327,
+            "g": 0.5607843399047852,
+            "mode": 1,
+            "r": 0.29019609093666077
+        },
+        {
+            "b": 0.29019609093666077,
+            "g": 0.34117648005485535,
+            "mode": 1,
+            "r": 0.9098039269447327
+        },
+        {
+            "b": 0.9098039269447327,
+            "g": 0.5607843399047852,
+            "mode": 1,
+            "r": 0.29019609093666077
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        }
+    ],
+    "name": "Hopf Fibers",
+    "observer4D": 4,
+    "path3D": {
+        "roll": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "path4D": {
+        "alpha": "",
+        "beta": "",
+        "gamma": "",
+        "w": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "pathMode": 0,
+    "pathMode3D": 0,
+    "projectionMode": 2,
+    "renderMode": 1,
+    "scriptCode": "// --- HOPF FIBERS ---\n// Points of the 3-sphere: (cos(eta)*cos(u), cos(eta)*sin(u), sin(eta)*cos(u + a),\n// sin(eta)*sin(u + a)). For fixed eta and a this is a great circle, a FIBER of\n// the Hopf fibration; any two fibers are linked once. Even meshes lie on the\n// Clifford torus (eta = 45 degrees), odd meshes on a thinner torus; each family\n// is spread evenly by the angle a. The Meshes field sets how many fibers.\n// The curves live in 4D: the 4D rotations show them from new sides.\n//MESH_BEGIN\nu: 0, TAU, 200\nv: 0, TAU, 32\n//MESH_END\nbool clifford = mod(mesh, 2.0) < 0.5;\nfloat eta = clifford ? 0.78539816 : 0.42;\nfloat n = clifford ? ceil(meshes * 0.5) : max(floor(meshes * 0.5), 1.0);\nfloat a = floor(mesh * 0.5) * 6.28318531 / n;\nreturn vec4(cos(eta)*cos(u), cos(eta)*sin(u), sin(eta)*cos(u + a), sin(eta)*sin(u + a));\n",
+    "speeds": {
+        "nutation": 0.10000000149011612,
+        "omega": 0.10000000149011612,
+        "path3D": 10,
+        "path4D": 10,
+        "phi": 0.10000000149011612,
+        "precession": 0.20000000298023224,
+        "psi": 0,
+        "spin": 0.10000000149011612
+    },
+    "steps": 120,
+    "texture": {
+        "code": "",
+        "col1": "#33cc33",
+        "col2": "#000000",
+        "enabled": false,
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "zoom": 1
+    },
+    "tube": {
+        "p": "",
+        "thickness": "0.4",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "type": "motion",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}

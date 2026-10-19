@@ -4,6 +4,9 @@
         "phi": 0,
         "psi": 0
     },
+    "background": {
+        "color": "#6b9fc3"
+    },
     "camera3D": {
         "pitch": 0,
         "roll": 0,

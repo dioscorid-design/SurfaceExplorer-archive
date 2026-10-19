@@ -1,0 +1,98 @@
+{
+    "angles": {
+        "omega": 0,
+        "phi": 0,
+        "psi": 0
+    },
+    "border": {
+        "b": 1,
+        "g": 1,
+        "mode": 0,
+        "r": 0.38823530077934265,
+        "thickness": 0.04709978401660919,
+        "wireAlong": 8,
+        "wireAround": 2
+    },
+    "camera3D": {
+        "pitch": 0,
+        "roll": 0,
+        "rot_w": -0.17861850559711456,
+        "rot_x": 0.7944949269294739,
+        "rot_y": 0.5250298976898193,
+        "rot_z": -0.2474203258752823,
+        "x": 0,
+        "y": 0.11499999463558197,
+        "yaw": 0,
+        "z": 4
+    },
+    "cameraFov": 45,
+    "colors": {
+        "alpha": 0,
+        "b": 0.20000000298023224,
+        "g": 0.800000011920929,
+        "r": 0.21568627655506134
+    },
+    "constants": {
+        "A": 0.800000011920929,
+        "B": 1,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
+    },
+    "equations": {
+        "defU": "",
+        "defV": "",
+        "defW": "",
+        "explicitU": "",
+        "explicitV": "",
+        "explicitW": "",
+        "p": "0.0",
+        "x": "A*(u*cos(v)-(u*u*u)/3.0*cos(3*v))",
+        "y": "A*(-u*sin(v)-(u*u*u)/3.0*sin(3*v))",
+        "z": "A*u*u*cos(2*v)"
+    },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "hintSeconds": 6,
+    "hintText": "Slider A: size",
+    "isImplicitMode": false,
+    "lightIntensity": 1,
+    "lightingMode": 0,
+    "limits": {
+        "uMax": 1.2000000476837158,
+        "uMin": 0,
+        "vMax": 3.141590118408203,
+        "vMin": -3.141590118408203,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshScopeAll": true,
+    "name": "Enneper",
+    "projectionMode": 1,
+    "renderMode": 1,
+    "steps": 305,
+    "type": "surface",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}

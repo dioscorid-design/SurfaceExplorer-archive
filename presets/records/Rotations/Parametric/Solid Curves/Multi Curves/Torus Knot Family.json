@@ -1,0 +1,166 @@
+{
+    "activeMotion": "rotation",
+    "angles": {
+        "omega": 0,
+        "phi": 0,
+        "psi": 0
+    },
+    "background": {
+        "code": "float k = smoothstep(0.0, 1.0, v + 0.1 * sin(6.2831 * u + t));\nreturn mix(u_col1, u_col2, k);",
+        "col1": "#33cc33",
+        "col2": "#000000",
+        "color": "#4d4d4d",
+        "enabled": true,
+        "libName": "Wavy Gradient",
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 151.5,
+        "skyMode": "sphere",
+        "zoom": 1
+    },
+    "camera3D": {
+        "pitch": 0,
+        "roll": 0,
+        "rot_w": -0.351209819316864,
+        "rot_x": -0.4525788724422455,
+        "rot_y": -0.8139640092849731,
+        "rot_z": -0.09636756032705307,
+        "x": 0,
+        "y": 0,
+        "yaw": 0,
+        "z": 4.40000057220459
+    },
+    "cameraFov": 45,
+    "colors": {
+        "alpha": 1,
+        "surfColor": "#33cc33"
+    },
+    "constants": {
+        "A": 1,
+        "B": 1,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
+    },
+    "equations": {
+        "defU": "",
+        "defV": "",
+        "defW": "",
+        "explicitU": "",
+        "explicitV": "",
+        "explicitW": "",
+        "p": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "isImplicitMode": false,
+    "lightIntensity": 1,
+    "lightingMode": 0,
+    "limits": {
+        "uMax": 6.2831854820251465,
+        "uMin": 0,
+        "vMax": 6.2831854820251465,
+        "vMin": 0,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshCount": "3",
+    "meshParts": [
+        {
+            "b": 0.29019609093666077,
+            "g": 0.34117648005485535,
+            "mode": 1,
+            "r": 0.9098039269447327
+        },
+        {
+            "b": 0.250980406999588,
+            "g": 0.7529411911964417,
+            "mode": 1,
+            "r": 0.9411764740943909
+        },
+        {
+            "b": 0.9098039269447327,
+            "g": 0.5607843399047852,
+            "mode": 1,
+            "r": 0.29019609093666077
+        }
+    ],
+    "name": "Torus Knot Family",
+    "observer4D": 4,
+    "path3D": {
+        "roll": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "path4D": {
+        "alpha": "",
+        "beta": "",
+        "gamma": "",
+        "w": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "pathMode": 0,
+    "pathMode3D": 0,
+    "projectionMode": 1,
+    "renderMode": 1,
+    "speeds": {
+        "nutation": 0.20000000298023224,
+        "omega": 0,
+        "path3D": 10,
+        "path4D": 10,
+        "phi": 0,
+        "precession": 0.30000001192092896,
+        "psi": 0,
+        "spin": 0.10000000149011612
+    },
+    "steps": 240,
+    "texture": {
+        "code": "",
+        "col1": "#33cc33",
+        "col2": "#000000",
+        "enabled": false,
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "zoom": 1
+    },
+    "textureHintSeconds": 6,
+    "textureHintText": "Slider\nF: density of the grid (1 = default, higher = finer)",
+    "tube": {
+        "p": "",
+        "thickness": "0.5",
+        "x": "(0.6 + 0.35*mesh + 0.2*cos((3 + 2*mesh)*u))*cos(2*u)",
+        "y": "(0.6 + 0.35*mesh + 0.2*cos((3 + 2*mesh)*u))*sin(2*u)",
+        "z": "0.2*sin((3 + 2*mesh)*u)"
+    },
+    "type": "motion",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}

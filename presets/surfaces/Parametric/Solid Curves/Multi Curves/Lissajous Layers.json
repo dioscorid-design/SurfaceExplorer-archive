@@ -57,7 +57,7 @@
         "w0": ""
     },
     "hintSeconds": 6,
-    "hintText": "Sliders\nA, B: frequencies along x and y",
+    "hintText": "Sliders\nA, B: frequencies along x and y\nMeshes: how many layers",
     "isImplicitMode": false,
     "lightIntensity": 1,
     "lightingMode": 0,
@@ -75,6 +75,7 @@
         "zMax": 1000,
         "zMin": -1000
     },
+    "meshCount": "5",
     "meshParts": [
         {
             "b": 0.2901960784313726,
@@ -105,12 +106,54 @@
             "g": 0.5607843137254902,
             "mode": 1,
             "r": 0.2901960784313726
+        },
+        {
+            "b": 0.85,
+            "g": 0.4,
+            "mode": 1,
+            "r": 0.58
+        },
+        {
+            "b": 0.75,
+            "g": 0.35,
+            "mode": 1,
+            "r": 0.85
+        },
+        {
+            "b": 0.6,
+            "g": 0.45,
+            "mode": 1,
+            "r": 0.95
+        },
+        {
+            "b": 0.7,
+            "g": 0.7,
+            "mode": 1,
+            "r": 0.2
+        },
+        {
+            "b": 0.9,
+            "g": 0.8,
+            "mode": 1,
+            "r": 0.35
+        },
+        {
+            "b": 0.3,
+            "g": 0.85,
+            "mode": 1,
+            "r": 0.65
+        },
+        {
+            "b": 0.4,
+            "g": 0.75,
+            "mode": 1,
+            "r": 0.95
         }
     ],
     "name": "Lissajous Layers",
     "projectionMode": 1,
     "renderMode": 1,
-    "scriptCode": "// --- LISSAJOUS LAYERS ---\n// Five Lissajous figures, one above the other: the same frequencies A and B,\n// with the phase advancing by a tenth of a turn from layer to layer, so the\n// stack shows how the figure changes with the phase.\nA := int(1,9);\nB := int(1,9);\n//MESH_BEGIN\nu: 0, TAU, 200\nv: 0, TAU, 32\n//MESH_END\n//MESH_BEGIN\nu: 0, TAU, 200\nv: 0, TAU, 32\n//MESH_END\n//MESH_BEGIN\nu: 0, TAU, 200\nv: 0, TAU, 32\n//MESH_END\n//MESH_BEGIN\nu: 0, TAU, 200\nv: 0, TAU, 32\n//MESH_END\n//MESH_BEGIN\nu: 0, TAU, 200\nv: 0, TAU, 32\n//MESH_END\nfloat phase = mesh * 0.62831853;\nreturn vec4(sin(A*u + phase), sin(B*u), (mesh - 2.0) * 0.45, 0.0);\n",
+    "scriptCode": "// --- LISSAJOUS LAYERS ---\n// Lissajous figures, one above the other: the same frequencies A and B,\n// with the phase advancing from layer to layer over half a turn, so the\n// stack shows how the figure changes with the phase. The Meshes field sets\n// how many layers; the stack keeps its height.\nA := int(1,9);\nB := int(1,9);\n//MESH_BEGIN\nu: 0, TAU, 200\nv: 0, TAU, 32\n//MESH_END\nfloat phase = mesh * 3.14159265 / meshes;\nfloat z = (mesh - 0.5 * (meshes - 1.0)) * 1.8 / max(meshes - 1.0, 1.0);\nreturn vec4(sin(A*u + phase), sin(B*u), z, 0.0);\n",
     "steps": 200,
     "tube": {
         "p": "",

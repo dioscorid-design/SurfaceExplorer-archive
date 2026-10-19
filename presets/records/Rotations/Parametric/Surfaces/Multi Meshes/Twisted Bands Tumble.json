@@ -1,0 +1,162 @@
+{
+    "activeMotion": "rotation",
+    "angles": {
+        "omega": 0,
+        "phi": 0,
+        "psi": 0
+    },
+    "background": {
+        "code": "",
+        "col1": "#3333cc",
+        "col2": "#000000",
+        "color": "#4d4d4d",
+        "enabled": false,
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "skyMode": "fixed",
+        "zoom": 1
+    },
+    "camera3D": {
+        "pitch": 0,
+        "roll": 0,
+        "rot_w": 0.8035515546798706,
+        "rot_x": 0.11722743511199951,
+        "rot_y": -0.2163991928100586,
+        "rot_z": 0.5419723987579346,
+        "x": 0,
+        "y": 0,
+        "yaw": 0,
+        "z": 6
+    },
+    "cameraFov": 45,
+    "colors": {
+        "alpha": 1,
+        "surfColor": "#33cc33"
+    },
+    "constants": {
+        "A": 1,
+        "B": 1,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
+    },
+    "equations": {
+        "defU": "",
+        "defV": "",
+        "defW": "",
+        "explicitU": "",
+        "explicitV": "",
+        "explicitW": "",
+        "p": "0.0",
+        "x": "(0.6 + 0.45*mesh + (v/5)*cos((mesh + 1)*u/2))*cos(u)",
+        "y": "(0.6 + 0.45*mesh + (v/5)*cos((mesh + 1)*u/2))*sin(u)",
+        "z": "(v/5)*sin((mesh + 1)*u/2)"
+    },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "isImplicitMode": false,
+    "lightIntensity": 1,
+    "lightingMode": 0,
+    "limits": {
+        "uMax": 6.2831854820251465,
+        "uMin": 0,
+        "vMax": 1,
+        "vMin": -1,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshCount": "4",
+    "meshParts": [
+        {
+            "b": 0.4156862795352936,
+            "g": 0.7686274647712708,
+            "mode": 1,
+            "r": 0.37254902720451355
+        },
+        {
+            "b": 0.5803921818733215,
+            "g": 0.6980392336845398,
+            "mode": 1,
+            "r": 0.3450980484485626
+        },
+        {
+            "b": 0.7450980544090271,
+            "g": 0.6313725709915161,
+            "mode": 1,
+            "r": 0.3176470696926117
+        },
+        {
+            "b": 0.9098039269447327,
+            "g": 0.5607843399047852,
+            "mode": 1,
+            "r": 0.29019609093666077
+        }
+    ],
+    "name": "Twisted Bands Tumble",
+    "observer4D": 4,
+    "path3D": {
+        "roll": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "path4D": {
+        "alpha": "",
+        "beta": "",
+        "gamma": "",
+        "w": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "pathMode": 0,
+    "pathMode3D": 0,
+    "projectionMode": 1,
+    "renderMode": 0,
+    "speeds": {
+        "nutation": 0.11999999731779099,
+        "omega": 0,
+        "path3D": 10,
+        "path4D": 1,
+        "phi": 0,
+        "precession": 0.20000000298023224,
+        "psi": 0,
+        "spin": 0
+    },
+    "steps": 90,
+    "texture": {
+        "code": "",
+        "col1": "#ffffff",
+        "col2": "#000000",
+        "enabled": false,
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "zoom": 1
+    },
+    "type": "motion",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}

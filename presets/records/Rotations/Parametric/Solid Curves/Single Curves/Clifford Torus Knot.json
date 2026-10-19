@@ -1,0 +1,157 @@
+{
+    "activeMotion": "rotation",
+    "angles": {
+        "omega": 69.54141998291016,
+        "phi": 0.20000000298023224,
+        "psi": 0.10000000149011612
+    },
+    "background": {
+        "code": "// --- PARAMETRI ---\nfloat scale = 50.0; // Densità degli anelli (più alto = più cerchi)\nvec2 center = vec2(0.5, 0.5); // Center of the circles (0.5, 0.5 is the center of the texture)\n\n// --- LOGIC ---\n// 1. Computes the distance of the current pixel (u, v) from the center\nfloat dist = distance(vec2(u, v), center);\n\n// 2. Creates the sine wave based on the distance\n// We multiply by 'scale' to raise the frequency\nfloat val = sin(dist * scale);\n\n// 3. We map the result from -1..1 to 0..1 for the mix\nfloat tit = (val + 1.0) * 0.5;\n\n// 4. Mix finale\nreturn mix(u_col1, u_col2, tit);",
+        "col1": "#ff923b",
+        "col2": "#000000",
+        "color": "#4d4d4d",
+        "enabled": true,
+        "libName": "Rings",
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "skyMode": "sphere",
+        "zoom": 1
+    },
+    "camera3D": {
+        "pitch": 0,
+        "roll": 0,
+        "rot_w": -0.4929233193397522,
+        "rot_x": -0.3285026550292969,
+        "rot_y": -0.8027101755142212,
+        "rot_z": -0.06905756890773773,
+        "x": 0,
+        "y": 0,
+        "yaw": 0,
+        "z": 4.180001735687256
+    },
+    "cameraFov": 45,
+    "colors": {
+        "alpha": 1,
+        "surfColor": "#5fb0e8"
+    },
+    "constants": {
+        "A": 2,
+        "B": 3,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
+    },
+    "discreteConstants": {
+        "A": [
+            1,
+            9
+        ],
+        "B": [
+            1,
+            9
+        ]
+    },
+    "equations": {
+        "defU": "",
+        "defV": "",
+        "defW": "",
+        "explicitU": "",
+        "explicitV": "",
+        "explicitW": "",
+        "p": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "hintSeconds": 6,
+    "hintText": "Sliders\nA, B: turns in the two planes of R4",
+    "isImplicitMode": false,
+    "lightIntensity": 1.26,
+    "lightingMode": 0,
+    "limits": {
+        "uMax": 6.2831854820251465,
+        "uMin": 0,
+        "vMax": 6.283199787139893,
+        "vMin": 0,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshScopeAll": true,
+    "name": "Clifford Torus Knot",
+    "observer4D": 4,
+    "path3D": {
+        "roll": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "path4D": {
+        "alpha": "",
+        "beta": "",
+        "gamma": "",
+        "w": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "pathMode": 0,
+    "pathMode3D": 0,
+    "projectionMode": 0,
+    "renderMode": 1,
+    "speeds": {
+        "nutation": 0.10000000149011612,
+        "omega": 0.10000000149011612,
+        "path3D": 10,
+        "path4D": 10,
+        "phi": 0,
+        "precession": 0.20000000298023224,
+        "psi": 0,
+        "spin": 0.10000000149011612
+    },
+    "steps": 200,
+    "texture": {
+        "code": "// --- POST-PROCESSING 2D: MONITOR CRT ---\n\n// gl_FragCoord.xy gives us the physical pixels of the screen, regardless\n// of the rotation of the camera or of the 3D object!\n// We divide by an indicative value to normalize the coordinates.\nvec2 screenUV = gl_FragCoord.xy / 800.0;\n\n// 1. SCANLINES (horizontal lines)\n// We use slider 'A' to adjust the density of the lines on the fly (e.g. range 1-5)\nfloat scanlineDensity = 1500.0;   // edit this to change the scanline density\nfloat scanline = sin(screenUV.y * scanlineDensity) * 0.1 + 0.9;\n\n// 2. FLICKER (time-based flicker)\n// Slider 'B' sets the intensity of the flicker\nfloat flicker = 1.0 - (0.05 * sin(t * 50.0));   // raise 0.05 for a stronger flicker\n\n// 3. CHROMATIC ABERRATION ON THE PIXELS OF THE OBJECT\n// Instead of using a solid color, we offset u_col1 to create the separated RGB effect\nvec3 col;\ncol.r = u_col1.r * 1.1; \ncol.g = u_col1.g * 0.9;\ncol.b = u_col1.b * 1.5; // We raise the blue to give a hi-tech look\n\n// 4. ROLLING BANDS (vertical interference)\n// A dark band that scrolls from top to bottom\nfloat roll = fract(screenUV.y * 0.5 - t * 0.2);\nfloat distortionBand = smoothstep(0.4, 0.5, roll) - smoothstep(0.5, 0.6, roll);\n\n// We lower the brightness where the band passes\ncol *= 1.0 - (distortionBand * 0.3);\n\n// 5. APPLICAZIONE DEI FILTRI 2D\nvec3 finalColor = col * scanline * flicker;\n\nreturn finalColor;",
+        "col1": "#33cc33",
+        "col2": "#000000",
+        "enabled": true,
+        "libName": "Monitor CRT",
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "zoom": 1
+    },
+    "tube": {
+        "p": "sin(B*u)",
+        "thickness": "0.7",
+        "x": "cos(A*u)",
+        "y": "sin(A*u)",
+        "z": "cos(B*u)"
+    },
+    "type": "motion",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}

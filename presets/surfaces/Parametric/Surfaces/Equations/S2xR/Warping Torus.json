@@ -1,0 +1,89 @@
+{
+    "angles": {
+        "omega": 0.009999999776482582,
+        "phi": 0.009999999776482582,
+        "psi": 0.009999999776482582
+    },
+    "camera3D": {
+        "pitch": -82.07645416259766,
+        "roll": 0,
+        "rot_w": 0.4901820421218872,
+        "rot_x": 0.659160852432251,
+        "rot_y": -0.22150906920433044,
+        "rot_z": 0.5255113840103149,
+        "x": -0.06694173812866211,
+        "y": 1.8309000730514526,
+        "yaw": 91.87862396240234,
+        "z": -0.005000025499612093
+    },
+    "cameraFov": 77,
+    "colors": {
+        "alpha": 1,
+        "b": 0.20000000298023224,
+        "g": 0.800000011920929,
+        "r": 0.20000000298023224
+    },
+    "constants": {
+        "A": 0.7400000095367432,
+        "B": 0.800000011920929,
+        "C": 0.30000001192092896,
+        "D": 0.15000000596046448,
+        "E": 2,
+        "F": 1,
+        "S": 0
+    },
+    "equations": {
+        "defU": "u ",
+        "defV": "1.5708 + (C + D * sin(3*u + t*E)) * cos(v)",
+        "defW": "(C + D * sin(3*u + t*E)) * sin(v)",
+        "explicitU": "",
+        "explicitV": "",
+        "explicitW": "",
+        "p": "A * cos(V) * sin(t) + B * W * cos(t)",
+        "x": "A*sin(V)*cos(U)",
+        "y": "A*sin(V)*sin(U)",
+        "z": "A * cos(V) * cos(t) - B * W * sin(t)"
+    },
+    "fillLight": 0,
+    "fov3D": 77,
+    "fov4D": 77,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "hintSeconds": 7,
+    "hintText": "Sliders\nA: radius of the sphere\nB: height along R\nC: tube radius\nD: wave depth\nE: wave speed",
+    "isImplicitMode": false,
+    "lightIntensity": 1.01,
+    "lightingMode": 1,
+    "limits": {
+        "uMax": 6.28318977355957,
+        "uMin": 0,
+        "vMax": 6.28318977355957,
+        "vMin": 0,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshScopeAll": true,
+    "name": "Warping Torus",
+    "projectionMode": 2,
+    "renderMode": 1,
+    "steps": 100,
+    "type": "surface",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}

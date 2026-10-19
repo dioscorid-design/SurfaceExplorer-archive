@@ -1,0 +1,181 @@
+{
+    "angles": {
+        "omega": 66.65300750732422,
+        "phi": 66.65300750732422,
+        "psi": 0
+    },
+    "border": {
+        "b": 1,
+        "g": 0.8313725590705872,
+        "mode": 0,
+        "r": 0.772549033164978,
+        "thickness": 0.04709978401660919,
+        "wireAlong": 8,
+        "wireAround": 2
+    },
+    "camera3D": {
+        "pitch": 0,
+        "roll": 0,
+        "rot_w": 0.19039598107337952,
+        "rot_x": -0.12903043627738953,
+        "rot_y": 0.5622289180755615,
+        "rot_z": -0.7943545579910278,
+        "x": 0,
+        "y": 0,
+        "yaw": 0,
+        "z": 3.200000286102295
+    },
+    "cameraFov": 69,
+    "colors": {
+        "alpha": 0,
+        "b": 0.20000000298023224,
+        "g": 0.800000011920929,
+        "r": 0.20000000298023224
+    },
+    "constants": {
+        "A": 5,
+        "B": 6,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
+    },
+    "discreteConstants": {
+        "A": [
+            2,
+            7
+        ],
+        "B": [
+            2,
+            7
+        ]
+    },
+    "equations": {
+        "p": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "fillLight": 0,
+    "fov3D": 69,
+    "fov4D": 69,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "hintSeconds": 8,
+    "hintText": "Sliders\nA and B: the two exponents of the Brieskorn-Pham surface (2 to 7)\nC: fold of the fourth coordinate",
+    "isImplicitMode": false,
+    "lightIntensity": 1,
+    "lightingMode": 0,
+    "limits": {
+        "uMax": 0,
+        "uMin": 0,
+        "vMax": 0,
+        "vMin": 0,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshCount": "floor(A+0.5)*floor(B+0.5)",
+    "meshParts": [
+        {
+            "alpha": 0
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        },
+        {
+        }
+    ],
+    "meshScopeAll": true,
+    "name": "Brieskorn-Pham",
+    "projectionMode": 0,
+    "renderMode": 0,
+    "scriptCode": "//MESH_BEGIN\nu: 0, pi/2, 40\nv: -1, 1, 40\n//MESH_END\n\n// Brieskorn-Pham surface:  z1^a + z2^b = 1,  with z1,z2 complex.\n// Generalizes the Calabi-Yau section: there the two exponents were EQUAL (the\n// Fermat quintic, a = b = n), here they are INDEPENDENT and driven by two\n// separate sliders. With a != b the figure loses the swap symmetry between\n// the two complex coordinates and changes genus: it is a topologically\n// different family, not a deformation of the same shape.\n//\n// For each pair of roots (k1 of order a, k2 of order b) there is a patch:\n//   z1 = e^(2 pi i k1/a) * (cos w)^(2/a)\n//   z2 = e^(2 pi i k2/b) * (sin w)^(2/b)     with w = u + i v\n//\n// TRUE 4D SURFACE: Im(z2) comes out as the w component of the vec4, so the 4D\n// projection and rotations stay with the interface (as in the \"Calabi-Yau\"\n// preset, not in the \"3D\" variant that mixes the fourth coordinate inside the script).\n//\n// ONE MESH PER PATCH: a*b of them, set by the Meshes field of the Multi Mesh\n// panel (floor(A+0.5)*floor(B+0.5)). The indices are computed on the live grid\n// (k1 = mesh % a, k2 = mesh / a).\n\nA := int(2,7);          // esponente di z1: slider a scatti interi\nB := int(2,7);          // esponente di z2: slider a scatti interi\n\n// clamp: protects the geometry if the slider leaves the declared domain.\nfloat na = clamp(floor(A + 0.5), 2.0, 7.0);\nfloat nb = clamp(floor(B + 0.5), 2.0, 7.0);\n\n// COMPACT NUMBERING: patch `mesh` carries the pair (k1, k2) = (mesh % na, mesh / na).\nfloat k1 = mod(float(mesh), na);\nfloat k2 = floor(float(mesh) / na);\n\nfloat pa = 2.0 / na;\nfloat pb = 2.0 / nb;\n\n// w = u + i v;  cos(w) e sin(w) complessi\nvec2 cw = vec2( cos(u) * cosh(v), -sin(u) * sinh(v));\nvec2 sw = vec2( sin(u) * cosh(v),  cos(u) * sinh(v));\n\n// Complex power in polar form. On the declared domain Re(cos w) and\n// Re(sin w) stay POSITIVE: the argument lies in (-pi/2, pi/2), far from the\n// atan jump, so there is no branch cut and no seams between patches.\nfloat rc = safePow(length(cw), pa);\nfloat tc = pa * atan(cw.y, cw.x);\nfloat rs = safePow(length(sw), pb);\nfloat ts = pb * atan(sw.y, sw.x);\n\n// Radici dell'unita': e^(2 pi i k1/a) e e^(2 pi i k2/b) -- ordini DIVERSI.\nfloat t1 = 2.0 * pi * k1 / na;\nfloat t2 = 2.0 * pi * k2 / nb;\n\nvec2 z1 = rc * vec2(cos(tc + t1), sin(tc + t1));\nvec2 z2 = rs * vec2(cos(ts + t2), sin(ts + t2));\n\n// (Re z1, Re z2, Im z1) in R^3 + Im z2 as the fourth coordinate.\n// Slider C scales the fourth dimension: at C=0 the figure collapses into R^3\n// (useful to compare it with the 3D view), at C=1 it is the full 4D surface.\nreturn vec4(z1.x, z2.x, z1.y, C * z2.y);\n",
+    "steps": 160,
+    "type": "surface",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}

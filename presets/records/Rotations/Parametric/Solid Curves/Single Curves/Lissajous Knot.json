@@ -1,0 +1,144 @@
+{
+    "activeMotion": "rotation",
+    "angles": {
+        "omega": 35.06828689575195,
+        "phi": 0,
+        "psi": 0
+    },
+    "background": {
+        "code": "// --- 1. INPUT ---\nvec3 c1 = u_col1;\nvec3 c2 = u_col2;\n\n// --- 2. EDGE FIX (the secret) ---\n// We use the variable 'u_isFlat' created for this.\n// The black cut happens ONLY in the 2D preview.\nif (u_isFlat && (u < 0.0 || u > 1.0 || v < 0.0 || v > 1.0)) {\n    return vec3(0.0); \n}\n\n// --- 3. LOGICA GRADIENTE ---\nfloat pos = v;\n\n// clamp makes sure that on the 3D surface the colors extend\n// up to the edges instead of doing strange things or inverting the gradient.\npos = clamp(pos, 0.0, 1.0);\n\n// --- 4. OUTPUT ---\nreturn mix(c1, c2, pos);",
+        "col1": "#33cc33",
+        "col2": "#000000",
+        "color": "#4d4d4d",
+        "enabled": true,
+        "libName": "Linear Gradient",
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "skyMode": "fixed",
+        "zoom": 1
+    },
+    "camera3D": {
+        "pitch": 0,
+        "roll": 0,
+        "rot_w": 0.4392068088054657,
+        "rot_x": 0.7740576863288879,
+        "rot_y": 0.44830644130706787,
+        "rot_z": 0.08338642120361328,
+        "x": 0,
+        "y": 0,
+        "yaw": 0,
+        "z": 3.9800009727478027
+    },
+    "cameraFov": 45,
+    "colors": {
+        "alpha": 1,
+        "surfColor": "#d94f28"
+    },
+    "constants": {
+        "A": 1,
+        "B": 1,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
+    },
+    "equations": {
+        "defU": "",
+        "defV": "",
+        "defW": "",
+        "explicitU": "",
+        "explicitV": "",
+        "explicitW": "",
+        "p": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "isImplicitMode": false,
+    "lightIntensity": 1,
+    "lightingMode": 0,
+    "limits": {
+        "uMax": 6.2831854820251465,
+        "uMin": 0,
+        "vMax": 6.283199787139893,
+        "vMin": 0,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshScopeAll": true,
+    "name": "Lissajous Knot",
+    "observer4D": 4,
+    "path3D": {
+        "roll": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "path4D": {
+        "alpha": "",
+        "beta": "",
+        "gamma": "",
+        "w": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "pathMode": 0,
+    "pathMode3D": 0,
+    "projectionMode": 0,
+    "renderMode": 1,
+    "speeds": {
+        "nutation": 0.20000000298023224,
+        "omega": 0.10000000149011612,
+        "path3D": 10,
+        "path4D": 10,
+        "phi": 0,
+        "precession": 0.20000000298023224,
+        "psi": 0,
+        "spin": 0.20000000298023224
+    },
+    "steps": 240,
+    "texture": {
+        "code": "",
+        "col1": "#33cc33",
+        "col2": "#000000",
+        "enabled": false,
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "zoom": 1
+    },
+    "tube": {
+        "p": "",
+        "thickness": "0.59",
+        "x": "cos(3*u + 0.7)",
+        "y": "cos(2*u + 0.2)",
+        "z": "cos(7*u)"
+    },
+    "type": "motion",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}

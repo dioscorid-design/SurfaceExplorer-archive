@@ -1,0 +1,157 @@
+{
+    "activeMotion": "rotation",
+    "angles": {
+        "omega": 110.44841766357422,
+        "phi": 73.63417053222656,
+        "psi": 0.10000000149011612
+    },
+    "background": {
+        "code": "// =========================================================================\n// Title: Rotating Image  (ROTATION matrix)\n//\n// \"Animated Images\" family: the image of the strip this script is applied\n// to (or, if the strip has no image of its own, the surface image) is\n// sampled through iChannel0 and transformed by a 2x2 matrix that depends on\n// time. The matrix acts on the COORDINATES of the texture plane, which is\n// why it is 2x2: it maps (x,y) to (x',y').\n//\n// TWO CONSTRAINTS OF THIS ENGINE'S SHADERTOY BRANCH:\n//  1. the A..F sliders and t can NOT be used here: the engine declares them\n//     as LOCAL variables of getCustomColor(), while mainImage() is a\n//     separate function -> \"'A' : undeclared identifier\";\n//  2. no MODULE-level declarations (const, functions, #define): with two\n//     meshes using this script the fragment would contain two copies of\n//     them -> \"redefinition\", and the surface would disappear.\n// That is why the parameters live INSIDE mainImage: there the scope is per\n// function and each mesh has its own copy.\n// =========================================================================\n//\n// ROTATION MATRIX: the image turns around its own centre without deforming.\n// It is an ORTHOGONAL matrix (determinant 1, unit and perpendicular\n// columns): it preserves lengths and angles, so it stretches nothing.\n\nvoid mainImage(out vec4 Q, vec2 U)\n{\n    // --- PARAMETERS (edit here) ---\n    float speed = 0.12;   // rotation speed\n\n    // Centred coordinate: in the Shadertoy branch iResolution is 1024,\n    // so V runs roughly over [-0.5, 0.5].\n    vec2 V = U / iResolution.xy - 0.5;\n\n    // Rotation matrix of angle a.\n    float a = iTime * speed;\n    float c = cos(a), s = sin(a);\n    mat2 M = mat2( c, s,\n                  -s, c);\n    V = M * V;\n\n    // Direct sampling, no mip bias: the image stays sharp.\n    // +0.5 brings the coordinate back to [0,1].\n    Q = texture(iChannel0, V + 0.5);\n}",
+        "col1": "#33cc33",
+        "col2": "#000000",
+        "color": "#4d4d4d",
+        "enabled": true,
+        "libName": "Rotating Image",
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "skyMode": "sphere",
+        "zoom": 1
+    },
+    "camera3D": {
+        "pitch": 0,
+        "roll": 0,
+        "rot_w": -0.2750748097896576,
+        "rot_x": 0.5284598469734192,
+        "rot_y": 0.7860246896743774,
+        "rot_z": -0.16501256823539734,
+        "x": 0,
+        "y": 0,
+        "yaw": 0,
+        "z": 11.060015678405762
+    },
+    "cameraFov": 45,
+    "colors": {
+        "alpha": 1,
+        "surfColor": "#5fb0e8"
+    },
+    "constants": {
+        "A": 2,
+        "B": 3,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
+    },
+    "discreteConstants": {
+        "A": [
+            1,
+            9
+        ],
+        "B": [
+            1,
+            9
+        ]
+    },
+    "equations": {
+        "defU": "",
+        "defV": "",
+        "defW": "",
+        "explicitU": "",
+        "explicitV": "",
+        "explicitW": "",
+        "p": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "hintSeconds": 6,
+    "hintText": "Sliders\nA, B: turns in the two planes of R4",
+    "isImplicitMode": false,
+    "lightIntensity": 0.98,
+    "lightingMode": 0,
+    "limits": {
+        "uMax": 6.2831854820251465,
+        "uMin": 0,
+        "vMax": 4,
+        "vMin": -4,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshScopeAll": true,
+    "name": "Clifford Knot Rotating",
+    "observer4D": 4,
+    "path3D": {
+        "roll": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "path4D": {
+        "alpha": "",
+        "beta": "",
+        "gamma": "",
+        "w": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "pathMode": 0,
+    "pathMode3D": 0,
+    "projectionMode": 2,
+    "renderMode": 0,
+    "speeds": {
+        "nutation": 0.10000000149011612,
+        "omega": 0.15000000596046448,
+        "path3D": 10,
+        "path4D": 1,
+        "phi": 0.10000000149011612,
+        "precession": 0.10000000149011612,
+        "psi": 0,
+        "spin": 0.10000000149011612
+    },
+    "steps": 780,
+    "texture": {
+        "code": "void mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n    // Normalizzazione coordinate (0..1)\n    vec2 uv = fragCoord/iResolution.xy;\n\n    // --- 1. CONFIGURAZIONE COLORI ---\n    vec3 colBackground = vec3(0.0, 0.5, 0.9); // Sfondo Azzurro\n    \n    // Gradiente Verticale dei segmenti\n    vec3 colBasso      = vec3(1.0, 1.0, 0.0); // Giallo Intenso (Basso)\n    vec3 colAlto       = vec3(1.0, 0.4, 0.0); // Arancio Intenso (Alto)\n\n    // --- 2. GRADIENT COLOR COMPUTATION ---\n    // Blends the color from bottom to top based on the height (uv.y)\n    vec3 coloreSegmento = mix(colBasso, colAlto, uv.y);\n\n    // --- 3. GEOMETRIA (RIGHE) ---\n    float densita = 200.0; \n    float spessore = 0.5; \n\n    // Crea il pattern a righe\n    float pattern = sin(uv.x * densita);\n    float maskSegmenti = smoothstep(spessore, spessore + 0.02, pattern);\n\n    // --- 4. FINAL COMBINATION ---\n    // Where there is a segment (maskSegmenti = 1), uses 'coloreSegmento' (Yellow->Orange)\n    // Otherwise uses 'colBackground' (Light blue)\n    vec3 finalColor = mix(colBackground, coloreSegmento, maskSegmenti);\n\n    fragColor = vec4(finalColor, 1.0);\n}",
+        "col1": "#33cc33",
+        "col2": "#000000",
+        "enabled": true,
+        "libName": "Rows",
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "zoom": 1
+    },
+    "tube": {
+        "p": "sin(B*u)",
+        "thickness": "0.8",
+        "x": "cos(A*u)",
+        "y": "sin(A*u)",
+        "z": "cos(B*u)"
+    },
+    "type": "motion",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}
