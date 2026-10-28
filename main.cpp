@@ -3,11 +3,14 @@
 #include <QIcon>
 #include <QSettings>
 #include "mainwindow.h"
-// Test interni: compilati solo nelle build Debug desktop (vedi CMakeLists.txt).
+// Test interni: compilati solo nelle build Debug desktop e in build/Tests
+// (SE_SELF_TESTS, vedi CMakeLists.txt e ExC/Mac/Test/build-tests.sh).
 #ifdef SE_SELF_TESTS
 #include "presetroundtrip.h"
 #include "clocktest.h"
 #include "scenariotest.h"
+#include "imagetest.h"
+#include "testactivity.h"
 #endif
 
 int main(int argc, char *argv[])
@@ -126,6 +129,10 @@ int main(int argc, char *argv[])
     w.showNormal();
 
 #ifdef SE_SELF_TESTS
+    // Un test qualsiasi: niente App Nap per tutta la sua durata (testactivity.h).
+    if (PresetRoundTrip::requested(app.arguments()) || ClockTest::requested(app.arguments())
+        || ScenarioTest::requested(app.arguments()) || ImageTest::requested(app.arguments()))
+        beginTestActivity();
     // Test di andata e ritorno dei preset (--roundtrip-test): vedi presetroundtrip.h.
     if (PresetRoundTrip::requested(app.arguments()))
         PresetRoundTrip::start(&w, app.arguments());
@@ -135,6 +142,9 @@ int main(int argc, char *argv[])
     // Test degli scenari d'uso (--scenario-test): vedi scenariotest.h.
     if (ScenarioTest::requested(app.arguments()))
         ScenarioTest::start(&w, app.arguments());
+    // Test delle immagini dei preset (--image-test): vedi imagetest.h.
+    if (ImageTest::requested(app.arguments()))
+        ImageTest::start(&w, app.arguments());
 #endif // SE_SELF_TESTS
 #endif
 

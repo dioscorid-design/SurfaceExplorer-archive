@@ -62,6 +62,7 @@ class MainWindow : public QMainWindow
     friend class PresetRoundTrip;   // test di andata e ritorno dei preset
     friend class ClockTest;         // test degli orologi di animazione
     friend class ScenarioTest;      // test degli scenari d'uso
+    friend class ImageTest;         // test delle immagini dei preset
 
     // I TIPI DELLA SCENA vivono in scenestate.h (le classi estratte da
     // MainWindow li usano senza includere questa intestazione); qui i nomi

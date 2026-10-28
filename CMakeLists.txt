@@ -455,15 +455,20 @@ if(APPLE AND NOT IOS)
     )
 endif()
 
-# --- TEST INTERNI (round-trip dei preset, orologi, scenari d'uso) ---
+# --- TEST INTERNI (round-trip dei preset, orologi, scenari d'uso, immagini) ---
 # Solo nelle build Debug desktop: sono la rete di sicurezza di chi sviluppa
 # (ExC/Mac/Test/*.sh li lanciano sulla build Debug) e nei binari distribuiti
-# sarebbero solo peso, piu' tre opzioni da riga di comando che nessun utente
+# sarebbero solo peso, piu' quattro opzioni da riga di comando che nessun utente
 # deve avere. Le build di rilascio restano fuori da sole: Release di Qt Creator
 # e, per l'App Store, il generatore Xcode (multi-config: CMAKE_BUILD_TYPE e'
 # vuoto). Su iOS/Android main.cpp non li ha mai chiamati.
 # SE_SELF_TESTS e' cio' che main.cpp guarda per agganciarli.
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT ANDROID AND NOT IOS)
+# L'opzione omonima li mette anche in una build OTTIMIZZATA: e' build/Tests,
+# quella che usano gli script (piu' veloce della Debug, e separata dalle
+# cartelle Debug e Release di Qt Creator). Spenta di default: le build di
+# rilascio restano senza test.
+option(SE_SELF_TESTS "Test interni anche in una build non Debug (build/Tests)" OFF)
+if((CMAKE_BUILD_TYPE STREQUAL "Debug" OR SE_SELF_TESTS) AND NOT ANDROID AND NOT IOS)
     target_sources(SurfaceExplorer PRIVATE
         presetroundtrip.h
         presetroundtrip.cpp
@@ -471,8 +476,16 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT ANDROID AND NOT IOS)
         clocktest.cpp
         scenariotest.h
         scenariotest.cpp
+        imagetest.h
+        imagetest.cpp
+        testactivity.h
+        testactivity.mm
         shadercompilelog.h
     )
+    # Fuori da Apple il .mm e' il solo ripiego vuoto: va compilato come C++.
+    if(NOT APPLE)
+        set_source_files_properties(testactivity.mm PROPERTIES LANGUAGE CXX)
+    endif()
     target_compile_definitions(SurfaceExplorer PRIVATE SE_SELF_TESTS)
 endif()
 

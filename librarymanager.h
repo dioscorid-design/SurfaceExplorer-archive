@@ -329,6 +329,7 @@ class LibraryManager
     friend class PresetRoundTrip;
     friend class ClockTest;
     friend class ScenarioTest;
+    friend class ImageTest;
 
 public:
     LibraryManager();
