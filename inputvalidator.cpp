@@ -9,14 +9,20 @@ static bool geodesicWarningDisabledForCurrentLoad = false;
 bool InputValidator::s_boxActive = false;
 quint64 InputValidator::s_errorCount = 0;
 
-void InputValidator::notifyEmptyImplicitEquation(QWidget* parent, bool crossSection)
+void InputValidator::notifyEmptyImplicitEquation(QWidget* parent, bool crossSection, bool sceneEmpty)
 {
-    notify(parent, QMessageBox::Warning, "No Equation",
-           crossSection
-             ? "Type an equation in x, y, z and p before running.\n\n"
-               "The surface on screen is the previous one: use NEW to clear the scene."
-             : "Type an equation in x, y and z before running.\n\n"
-               "The surface on screen is the previous one: use NEW to clear the scene.");
+    QString text = crossSection ? "Type an equation in x, y, z and p before running."
+                                : "Type an equation in x, y and z before running.";
+    if (!sceneEmpty)
+        text += "\n\nThe surface on screen is the previous one: use NEW to clear the scene.";
+    notify(parent, QMessageBox::Warning, "No Equation", text);
+}
+
+void InputValidator::showEmptySceneNotice(QWidget* parent, const QString& nothingTo)
+{
+    notify(parent, QMessageBox::Information, "Empty Scene",
+           nothingTo + ": the scene is empty.\n\n"
+           "Load a preset from the Library, or type an equation and press Run.");
 }
 
 bool InputValidator::validateImplicitEquation(QWidget* parent, const QString& rawEq, bool allowP)

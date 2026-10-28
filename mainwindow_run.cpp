@@ -265,6 +265,37 @@ void MainWindow::runScene(RunOrigin origin, QPushButton *dockBtn)
     // ==========================================================
     ui->glWidget->setFocus();
 
+    // SUPERFICIE VUOTA DI PROPOSITO (NEW): il master START non ha nulla da
+    // costruire. Senza, la validazione qui sotto mostrava "servono tre campi" a
+    // ogni START, e in Ray Marching runSceneImplicit "la superficie a schermo e'
+    // la precedente". L'avviso resta a chi ha scritto uno o due campi, o a chi ha
+    // svuotato i campi di una superficie ancora a schermo. Il resto parte lo
+    // stesso: orologi di texture e sfondo, moto della camera, suono. Se non c'e'
+    // NIENT'ALTRO da avviare, lo START lo dice con lo stesso popup di RESET e
+    // Projection.
+    const bool noSurfaceInput = implicitMode()
+        ? (m_scene.rm.*(crossSectionTab() ? &ImplicitTexts::crossSection
+                                          : &ImplicitTexts::equation)).trimmed().isEmpty()
+        : (!tubesShown()
+           && m_scene.eq.x.trimmed().isEmpty() && m_scene.eq.y.trimmed().isEmpty()
+           && m_scene.eq.z.trimmed().isEmpty() && m_scene.eq.p.trimmed().isEmpty());
+    if (masterStart && noSurfaceInput
+        && m_scene.surfaceScriptApplied.trimmed().isEmpty()
+        && !ui->glWidget->getEngine()->isScriptModeActive()
+        && isSceneEmpty()) {
+        runOutcomeGuard.surfaceApplied = false;
+        const MasterActivity act = masterActivity();
+        if (isWholeSceneEmpty() && !act.texAvailable && !act.bgAvailable && !act.borderAvailable
+            && !act.cameraAvailable && !act.audioAvailable) {
+            InputValidator::showEmptySceneNotice(this, "Nothing to start");
+            return;
+        }
+        applyAnimationState(false);
+        applyStartSideEffects();
+        updateMasterButtonState();
+        return;
+    }
+
     if (!validateRunInputs(origin)) return;
 
     // Costanti a cascata (valida per entrambe le modalità): slider e motore.
@@ -533,7 +564,7 @@ void MainWindow::runSceneImplicit(RunOrigin origin, bool runDockOnly)
     // una superficie che nessuno aveva chiesto.
     // Per svuotare la scena c'e' NEW, che e' esplicito.
     if (rawEq.isEmpty()) {
-        InputValidator::notifyEmptyImplicitEquation(this, crossSectionActive);
+        InputValidator::notifyEmptyImplicitEquation(this, crossSectionActive, isSceneEmpty());
         return;
     }
 

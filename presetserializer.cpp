@@ -954,8 +954,62 @@ QJsonObject PresetSerializer::buildMotionJson(const QString &name, const MotionR
     return LibraryManager::toJson(captureMotionState(name, run, includeSound));
 }
 
+bool PresetSerializer::refuseEmptyShape()
+{
+    // Una Shape E' la superficie: da una scena vuota (NEW, o col solo sfondo)
+    // si scriveva un file con le equazioni vuote, che riaperto come Shape
+    // faceva validare al Run del load equazioni inesistenti ("exactly 2 or 3
+    // valid spatial variables"). Lo sfondo si tiene in un Record.
+    if (!m_mainWindow->isSceneEmpty()) return false;
+    QMessageBox::information(m_mainWindow, "Save Shape",
+                             "There is no surface to save as a Shape.\n\n"
+                             "To keep the background, save a Record.");
+    return true;
+}
+
+bool PresetSerializer::refuseEmptyTexture()
+{
+    // Il bersaglio senza texture (codice e immagine vuoti): si scriveva il
+    // segnaposto "// Texture Preset", che riaperto mostrava il gradiente di
+    // ripiego dello shader. E' la stessa condizione che spegne il Save della
+    // texture (hasSavableTexture); i comandi del menu della Library non la
+    // guardavano.
+    if (m_mainWindow->hasSavableTexture()) return false;
+    const QString target = m_mainWindow->editingBorder()     ? QStringLiteral("border")
+                         : m_mainWindow->editingBackground() ? QStringLiteral("background")
+                                                             : QStringLiteral("surface");
+    QMessageBox::information(m_mainWindow, "Save Texture",
+                             QStringLiteral("There is no %1 texture to save: the default one is built in.").arg(target));
+    return true;
+}
+
+bool PresetSerializer::refuseEmptyRecord()
+{
+    // Un Record tiene anche lo sfondo e il suono: e' vuota solo la scena senza
+    // superficie (NEW), senza sfondo e senza suono. Altrimenti si apriva il
+    // dialogo per salvare un file che non conteneva niente.
+    MainWindow *mw = m_mainWindow;
+    if (mw->isSceneEmpty()
+        && mw->m_scene.bgTextureCode.trimmed().isEmpty()
+        && mw->m_scene.soundScriptText.trimmed().isEmpty()) {
+        QMessageBox::information(mw, "Save Record",
+                                 "There is nothing to save as a Record: the scene is empty.");
+        return true;
+    }
+    return false;
+}
+
+bool PresetSerializer::refuseEmptySound()
+{
+    if (!m_mainWindow->m_scene.soundScriptText.trimmed().isEmpty()) return false;
+    QMessageBox::information(m_mainWindow, "Save Sound",
+                             "There is no sound to save: write one in the Sound editor or pick one from the Library.");
+    return true;
+}
+
 void PresetSerializer::saveSurface(const QString &suggestedPath)
 {
+    if (refuseEmptyShape()) return;
     bool wasAnimating = m_mainWindow->ui->glWidget->isAnimating();
     bool wasPath4D = m_mainWindow->pathRunning(CameraPaths::Path4D);
     bool wasPath3D = m_mainWindow->pathRunning(CameraPaths::Path3D);
@@ -1134,6 +1188,7 @@ void PresetSerializer::saveSurface(const QString &suggestedPath)
 
 void PresetSerializer::saveTexture(const QString &path)
 {
+    if (refuseEmptyTexture()) return;
     const LibraryFolders::Branch branch = LibraryFolders::branchOf(QFileInfo(path).absolutePath());
     if (branch == LibraryFolders::Branch::Surfaces ||
         branch == LibraryFolders::Branch::Records ||
@@ -1242,6 +1297,18 @@ void PresetSerializer::saveTexture(const QString &path)
         root["hasCustomColors"] = true;
         root["color1"] = b.texCol1.name();
         root["color2"] = b.texCol2.name();
+    } else if (isBg && gl) {
+        // Inquadratura e colori dello SFONDO (u_col1/u_col2 della sua copia
+        // dell'UBO, come nel blocco "background" dei record). Prima si
+        // scrivevano quelli della superficie: riaperto, uno sfondo che usa i
+        // colori (Mandelbrot) li cambiava.
+        root["pan_x"] = (double)gl->backgroundPan().x();
+        root["pan_y"] = (double)gl->backgroundPan().y();
+        root["zoom"] = (double)gl->backgroundZoom();
+        root["rotation"] = (double)gl->backgroundRotation();
+        root["hasCustomColors"] = true;
+        root["color1"] = m_mainWindow->m_scene.bgTexColor1.name();
+        root["color2"] = m_mainWindow->m_scene.bgTexColor2.name();
     } else if (m_mainWindow->ui->glWidget) {
         QVector2D pan = m_mainWindow->ui->glWidget->getFlatPan();
         root["pan_x"] = (double)pan.x();
@@ -1303,6 +1370,7 @@ void PresetSerializer::saveTexture(const QString &path)
 
 void PresetSerializer::saveMotion(const QString &suggestedPath)
 {
+    if (refuseEmptyRecord()) return;
     bool wasRotating = m_mainWindow->ui->glWidget->isAnimating();
     bool wasPath4D = m_mainWindow->pathRunning(CameraPaths::Path4D);
     bool wasPath3D = m_mainWindow->pathRunning(CameraPaths::Path3D);
@@ -1818,6 +1886,7 @@ void PresetSerializer::saveSound(const QString &filePath)
 
 void PresetSerializer::saveTextureAs(const QString &startDir, const QString &sourceFilePath)
 {
+    if (refuseEmptyTexture()) return;
     bool wasAnimating = m_mainWindow->ui->glWidget->isAnimating();
     bool wasPath4D = m_mainWindow->pathRunning(CameraPaths::Path4D);
     bool wasPath3D = m_mainWindow->pathRunning(CameraPaths::Path3D);
@@ -1874,6 +1943,7 @@ void PresetSerializer::saveTextureAs(const QString &startDir, const QString &sou
 
 void PresetSerializer::saveSurfaceAs(const QString &startDir, const QString &sourceFilePath)
 {
+    if (refuseEmptyShape()) return;
     bool wasAnimating = m_mainWindow->ui->glWidget->isAnimating();
     bool wasPath4D = m_mainWindow->pathRunning(CameraPaths::Path4D);
     bool wasPath3D = m_mainWindow->pathRunning(CameraPaths::Path3D);
@@ -1932,6 +2002,8 @@ void PresetSerializer::saveSurfaceAs(const QString &startDir, const QString &sou
 
 void PresetSerializer::saveSoundAs(const QString &startDir, const QString &sourceFilePath)
 {
+    // Con un file di partenza si copia quello della Library; senza, il suono in scena.
+    if (sourceFilePath.isEmpty() && refuseEmptySound()) return;
     // startDir puo' arrivare inesistente (tap sul NODO di categoria "Sounds":
     // rootPath+"/Sounds" con la S maiuscola / cartella mai creata su iOS) -> il
     // dialog aprirebbe una dir vuota e il salvataggio fallirebbe. Ricadiamo su

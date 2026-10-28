@@ -6486,6 +6486,16 @@ void GLWidget::resetTextureTime(bool background) {
     update();
 }
 
+bool GLWidget::anyClockAdvanced() const
+{
+    if (m_timeGeom != 0.0f || m_timeTex != 0.0f || m_timeBg != 0.0f || m_borderTimeTex != 0.0f)
+        return true;
+    if (engine)
+        for (const MeshPart &mp : engine->getMeshParts())
+            if (mp.timeTex != 0.0f) return true;
+    return false;
+}
+
 void GLWidget::resetAllClocks() {
     if (engine) {
         for (MeshPart &mp : engine->mutableMeshParts())
@@ -6602,11 +6612,25 @@ QImage GLWidget::getFrameForVideo(int targetW, int targetH, bool useFbo) {
     }
 
     // 3. In hi-res capture il buffer è GIÀ alla risoluzione di export: NON riscalare
-    //    (eviterebbe la nitidezza appena guadagnata). Negli altri casi adatta al
-    //    target con SmoothTransformation (di norma un downscale nitido).
+    //    (eviterebbe la nitidezza appena guadagnata). Negli altri casi (motore
+    //    Screen Upscale con risoluzione fissa) la vista entra TUTTA nel formato
+    //    del video, alla scala dello schermo, e le fasce che avanzano restano
+    //    nere: ai lati se la vista e' piu' stretta del video, sopra e sotto se
+    //    piu' larga. Stirandola (IgnoreAspectRatio) usciva deformata;
+    //    ritagliandola cambiava la scala (con la Library aperta, vista quasi
+    //    quadrata, il toro usciva ingrandito e tagliato). A riempire il formato
+    //    di scena vera e' il motore FBO, che ridisegna con l'aspetto del video.
+    //    Il video conta i PIXEL: grabFramebuffer porta il devicePixelRatio dello
+    //    schermo (2 su Retina) e drawImage disegnava la vista a meta' misura, in
+    //    un quarto del fotogramma.
     if (!m_hiResCapture && targetW > 0 && targetH > 0 &&
             (img.width() != targetW || img.height() != targetH)) {
-        img = img.scaled(targetW, targetH, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        QImage fitted = img.scaled(targetW, targetH, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        fitted.setDevicePixelRatio(1.0);
+        QImage framed(targetW, targetH, fitted.format());
+        framed.fill(Qt::black);
+        QPainter(&framed).drawImage((targetW - fitted.width()) / 2, (targetH - fitted.height()) / 2, fitted);
+        img = framed;
     }
 
     return img;

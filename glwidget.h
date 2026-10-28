@@ -1074,6 +1074,9 @@ public:
     // del record, riclic della texture). I flag di moto non si toccano: cio'
     // che gira riparte dall'inizio, cio' che e' fermo resta fermo a t = 0.
     void resetAllClocks();
+    // Almeno un orologio di animazione (geometria, texture, sfondo, bordo, fasce)
+    // non e' all'origine: serve a sapere se il RESET dei moti cambierebbe qualcosa.
+    bool anyClockAdvanced() const;
     void setSurfaceAnimating(bool animating);
     bool isSurfaceAnimating() const { return m_surfaceAnimating; }
 

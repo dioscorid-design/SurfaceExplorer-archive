@@ -288,9 +288,30 @@ void MainWindow::stopRotationMotion()
 
 void MainWindow::onResetClicked()
 {
+    // SCENA VUOTA DI NEW: niente da rimettere, e lo si dice come START e
+    // Projection (prima non succedeva nulla, senza una parola). Resta il
+    // RESET di uno sfondo che si muove: animato (Motions ne azzera
+    // l'orologio) o a cielo (View ne rimette la direzione).
+    if (isWholeSceneEmpty()
+        && !masterActivity().bgAvailable
+        && !(ui->glWidget->isBackgroundTextureEnabled()
+             && ui->glWidget->backgroundSkyMode() != GLWidget::BgFixed)) {
+        InputValidator::showEmptySceneNotice(this, "Nothing to reset");
+        return;
+    }
     // Il path che ha la camera si guarda PRIMA di resettare la vista, che da
     // fermo gliela toglie: e' quello che i moti rimettono al punto di partenza.
     const std::optional<CameraPaths::Path> camPath = cameraPath();
+
+    // LA CAMERA E' DI UN PATH, in corsa o fermo: il RESET e' quello dei moti,
+    // senza domande. Camera al punto di partenza del path, t = 0. View la
+    // porterebbe alla vista libera e alla ripartenza il path la riprenderebbe di
+    // colpo dal tempo a cui era arrivato; a path in corsa era spento, e il popup
+    // offriva una scelta sola.
+    if (camPath) {
+        resetMotions(camPath);
+        return;
+    }
 
     // Se niente si muove -- ne' rotazioni, ne' path, ne' animazioni in t -- la
     // domanda non ha senso: si rimette tutto (anche l'orientamento girato col
@@ -303,10 +324,18 @@ void MainWindow::onResetClicked()
         return;
     }
 
-    // Con un path IN CORSA la camera e' del path: View non la sposterebbe
-    // (resetView la rimette subito al suo tempo), e Both farebbe solo Motions.
-    // Si spengono, invece di offrire scelte che non fanno nulla.
-    const bool pathMoving = pathRunning(CameraPaths::Path4D) || pathRunning(CameraPaths::Path3D);
+    // Se una delle due parti non ha niente da rimettere la scelta e' una sola:
+    // la camera gia' all'inquadratura d'apertura (un record di rotazioni: gira la
+    // superficie, non la camera) -> i moti; i moti gia' all'inizio (dopo un
+    // Motions a moti fermi) -> la vista. Il popup solo se tutte e due hanno
+    // qualcosa da rimettere.
+    const bool viewChanges = viewResetChangesSomething();
+    const bool motionsChange = motionsResetChangesSomething();
+    if (!viewChanges || !motionsChange) {
+        if (viewChanges) resetView();
+        if (motionsChange || !viewChanges) resetMotions(camPath);
+        return;
+    }
 
     QMessageBox box(this);
     box.setIcon(QMessageBox::Question);
@@ -314,20 +343,46 @@ void MainWindow::onResetClicked()
     box.setText("What do you want to reset?");
     box.setInformativeText(QString("View: camera, zoom and field of view.\n"
                                    "Motions: rotations, camera paths and everything that moves "
-                                   "with t go back to the start.")
-                           + (pathMoving ? QString("\n\nA camera path is running: the view follows it.") : QString()));
+                                   "with t go back to the start."));
     QPushButton *viewBtn   = box.addButton("View",    QMessageBox::ActionRole);
     QPushButton *motionBtn = box.addButton("Motions", QMessageBox::ActionRole);
     QPushButton *bothBtn   = box.addButton("Both",    QMessageBox::AcceptRole);
     box.addButton("Cancel", QMessageBox::RejectRole);
-    box.setDefaultButton(pathMoving ? motionBtn : bothBtn);
-    viewBtn->setEnabled(!pathMoving);
-    bothBtn->setEnabled(!pathMoving);
+    box.setDefaultButton(bothBtn);
     box.exec();
 
     const QAbstractButton *choice = box.clickedButton();
     if (choice == viewBtn   || choice == bothBtn) resetView();
     if (choice == motionBtn || choice == bothBtn) resetMotions(camPath);
+}
+
+bool MainWindow::viewResetChangesSomething() const
+{
+    const GLWidget::Framing target = m_startFraming;
+    const GLWidget::Framing now = ui->glWidget->framing();
+    auto near = [](float a, float b) { return std::abs(a - b) < 1e-3f; };
+    const bool same = (now.cameraPos - target.cameraPos).length() < 1e-3f
+                      && near(now.yaw, target.yaw) && near(now.pitch, target.pitch)
+                      && near(now.roll, target.roll)
+                      && (now.observerPos - target.observerPos).length() < 1e-3f
+                      && near(now.crossSectionP, target.crossSectionP)
+                      && near(m_scene.fov, m_startFov);
+    return !same;
+}
+
+bool MainWindow::motionsResetChangesSomething() const
+{
+    GLWidget *gl = ui->glWidget;
+    if (m_paths->time(CameraPaths::Path4D) != 0.0f || m_paths->time(CameraPaths::Path3D) != 0.0f)
+        return true;
+    const GLWidget::Orientation a = gl->orientation();
+    const GLWidget::Orientation &b = m_startOrientation;
+    if (std::abs(QQuaternion::dotProduct(a.rotation, b.rotation)) < 0.999999f
+        || std::abs(a.omega - b.omega) > 1e-4f || std::abs(a.phi - b.phi) > 1e-4f
+        || std::abs(a.psi - b.psi) > 1e-4f)
+        return true;
+    if (gl->anyClockAdvanced()) return true;
+    return m_geoTime != 0.0;
 }
 
 void MainWindow::captureStartPose()
@@ -1062,6 +1117,14 @@ void MainWindow::applyCameraFov(float deg)
 
 void MainWindow::toggleProjection()
 {
+    // SCENA VUOTA DI NEW: la proiezione non ha niente da mostrare (lo sfondo
+    // non ne dipende: il suo campo visivo e' virtuale). Prima cambiava lo
+    // stesso, e al preset successivo la scena risultava da salvare.
+    if (isWholeSceneEmpty()) {
+        InputValidator::showEmptySceneNotice(this, "Nothing to project");
+        return;
+    }
+
     // Leggi modo attuale forzandolo a intero (0=Ortho, 1=Persp, 2=Wide)
     int current = (int)ui->glWidget->projectionMode;
 

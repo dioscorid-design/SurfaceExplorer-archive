@@ -29,7 +29,13 @@ public:
     static bool validateImplicitEquation(QWidget* parent, const QString& rawEq, bool allowP = false);
     // Campo equazione vuoto al Run/Invio: avvisa invece di uscire in silenzio
     // lasciando a schermo la superficie precedente. Per svuotare c'e' NEW.
-    static void notifyEmptyImplicitEquation(QWidget* parent, bool crossSection);
+    // sceneEmpty: la scena e' gia' vuota (dopo NEW), non c'e' nessuna
+    // superficie precedente a schermo di cui parlare.
+    static void notifyEmptyImplicitEquation(QWidget* parent, bool crossSection, bool sceneEmpty);
+    // Scena vuota di NEW: START, RESET e Projection non hanno niente su cui
+    // agire e lo dicono (nothingTo = "Nothing to start", ...). Information:
+    // non e' un errore, e non conta per l'esito del Run.
+    static void showEmptySceneNotice(QWidget* parent, const QString& nothingTo);
     static bool validateImplicitScriptContext(QWidget* parent, const QString& texCode);
 
     // Controlli per la modalità Parametrica

@@ -2171,11 +2171,15 @@ void MainWindow::updateBorderControlsGate()
     GLWidget *gl = ui->glWidget;
     const bool closed = !rayMarching && gl
                         && gl->borderAvailability() == GLWidget::BorderAvailability::None;
-    const bool usable = !rayMarching && !closed;
+    // Senza superficie (dopo NEW) non c'e' un bordo a cui applicare niente:
+    // acceso, il radio sporcherebbe la scena.
+    const bool empty = isSceneEmpty();
+    const bool usable = !rayMarching && !closed && !empty;
     if (ui->radioBorder) {
         ui->radioBorder->setEnabled(usable);
         // Da spento deve dire PERCHE' (regola dei controlli inerti).
         ui->radioBorder->setToolTip(usable ? tr("Edit the border: its color with the sliders below, its thickness with Border Thickness.")
+                                    : empty ? tr("There is no surface: the border follows the edges of a parametric surface.")
                                     : rayMarching ? tr("The border follows the edges of a parametric surface: not available in ray marching.")
                                                   : tr("This surface is closed: every edge is a seam, a pole or lies on another "
                                                        "part of the surface, so there is no border to draw."));
@@ -2398,6 +2402,11 @@ bool MainWindow::ensureSurfaceForTexture()
 
     resetScene(implicitMode() ? 1 : 0, /*loadDefaultSurface=*/true);
     return true;
+}
+
+bool MainWindow::isWholeSceneEmpty() const
+{
+    return ui->glWidget && isSceneEmpty();
 }
 
 bool MainWindow::isSceneEmpty() const

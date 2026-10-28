@@ -188,6 +188,9 @@ private slots:
     // tasto NEW). Guarda il MOTORE, non i campi della UI: l'utente puo' aver
     // gia' ricominciato a scrivere senza aver ancora premuto Run.
     bool isSceneEmpty() const;
+    // La scena vuota di NEW per intero (con una sola superficie e' isSceneEmpty;
+    // nome gemello della 2.0, dove conta anche l'assenza di altri oggetti).
+    bool isWholeSceneEmpty() const;
     // Le costanti A..F/S che la SUPERFICIE non usa (equazioni, geodetica,
     // script, limiti, path): quelle che un caricamento di texture puo'
     // riportare al default senza cambiare la forma a schermo.
@@ -270,6 +273,10 @@ private slots:
     // prima di un eventuale reset della vista, che a path fermo gliela toglie.
     void resetMotions(std::optional<CameraPaths::Path> camPath);
     void resetMotions() { resetMotions(cameraPath()); }
+    // Cosa rimetterebbero View e Motions: il RESET chiede solo quando entrambi
+    // hanno qualcosa da fare (se uno solo cambia, fa quello senza domande).
+    bool viewResetChangesSomething() const;
+    bool motionsResetChangesSomething() const;
     // Il path che ha la camera: quello in corsa, o l'ultimo partito se la
     // camera lo segue ancora da fermo (la modalita' path persiste dopo lo stop).
     std::optional<CameraPaths::Path> cameraPath() const;

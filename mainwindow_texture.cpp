@@ -2059,12 +2059,13 @@ bool MainWindow::hasSavableTexture() const
         return !code.trimmed().isEmpty();
     }
 
-    // Un'immagine caricata è salvabile anche con i box di codice vuoti.
-    if (surfaceHasImage())
-        return true;
-
     const bool isBg = editingBackground();
     const bool isImplicit = (implicitMode());
+
+    // Un'immagine caricata è salvabile anche con i box di codice vuoti: quella
+    // del bersaglio (prima si guardava la superficie anche salvando lo sfondo).
+    if (isBg ? !backgroundImagePath().isEmpty() : surfaceHasImage())
+        return true;
 
     // Ray Marching (non sfondo): contenuto = colore (lineTexture) + displacement
     // (lineVariations), gli stessi campi salvati da saveTexture().

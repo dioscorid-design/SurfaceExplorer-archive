@@ -55,6 +55,14 @@ public:
                                    bool includeSound);
 
 private:
+    // NIENTE DA SALVARE: una Shape da una scena senza superficie, una texture dal
+    // bersaglio senza texture, un record da una scena vuota, un suono senza
+    // suono. Lo dicono con un messaggio e ritornano true (il chiamante esce
+    // prima del dialogo).
+    bool refuseEmptyShape();
+    bool refuseEmptyTexture();
+    bool refuseEmptyRecord();
+    bool refuseEmptySound();
     // Scrive i sei limiti parametrici in `limits`: sempre la chiave numerica
     // (uMin/uMax/...), piu' la gemella "...Expr" con il testo grezzo quando
     // l'utente ha scritto una formula anziche' un numero. Per il Save degli

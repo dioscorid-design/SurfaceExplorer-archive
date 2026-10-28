@@ -5432,6 +5432,101 @@ void ScenarioTest::runShapeBackgroundScenarios()
                   QStringLiteral("poi una Shape senza colore di sfondo -> grigio di default (%1)")
                       .arg(m_mw->m_scene.bgColor.name()));
     }
+    // NIENTE DA SALVARE, e la texture dello SFONDO coi SUOI colori. Da una
+    // scena vuota la Shape si scriveva con le equazioni vuote (riaperta, il
+    // Run del load mostrava un popup); dallo sfondo di default la texture si
+    // scriveva col segnaposto "// Texture Preset" (riaperta, il gradiente di
+    // ripiego); e la texture di sfondo prendeva i colori della superficie.
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Save: niente da salvare; la texture dello sfondo coi suoi colori =="));
+    Ui::MainWindow *ui = m_mw->ui;
+    auto click = [this](QAbstractButton *b) { b->click(); wait(200); };
+    m_discardOnPrompt = true;
+    m_mw->onNewSceneClicked();
+    m_discardOnPrompt = false;
+    wait(500);
+    const QString emptyShape = m_outDir + QStringLiteral("/empty-shape.json");
+    QFile::remove(emptyShape);
+    m_lastPopup.clear();
+    m_mw->m_presetSerializer->saveSurface(emptyShape);
+    wait(300);
+    check(!QFile::exists(emptyShape) && m_lastPopup.contains(QLatin1String("no surface")),
+          QStringLiteral("scena vuota -> Save Shape rifiutato (%1)").arg(m_lastPopup));
+    check(!ui->radioBorder->isEnabled() && !m_mw->editingBorder(),
+          QStringLiteral("scena vuota (NEW): il radio Border e' spento (nessuna superficie)"));
+    // Stessa regola per Record e Suono: avviso, non il dialogo di salvataggio.
+    {
+        const QString emptyRec = m_outDir + QStringLiteral("/empty-record.json");
+        QFile::remove(emptyRec);
+        m_lastPopup.clear();
+        m_mw->m_presetSerializer->saveMotion(emptyRec);
+        wait(300);
+        check(!QFile::exists(emptyRec) && m_lastPopup.contains(QLatin1String("nothing to save")),
+              QStringLiteral("scena vuota -> Save Record rifiutato (%1)").arg(m_lastPopup));
+        m_lastPopup.clear();
+        m_mw->m_presetSerializer->saveSoundAs(m_outDir, QString());
+        wait(300);
+        check(m_lastPopup.contains(QLatin1String("no sound to save")),
+              QStringLiteral("senza suono -> Save Sound rifiutato (%1)").arg(m_lastPopup));
+    }
+    click(ui->radioBackground);
+    if (!ui->chkBoxTexture->isChecked()) click(ui->chkBoxTexture);   // lo sfondo di default
+    const QString defaultBg = m_outDir + QStringLiteral("/default-background.json");
+    QFile::remove(defaultBg);
+    m_lastPopup.clear();
+    m_mw->m_presetSerializer->saveTexture(defaultBg);
+    wait(300);
+    check(!QFile::exists(defaultBg) && m_lastPopup.contains(QLatin1String("no background texture")),
+          QStringLiteral("sfondo di default -> Save Texture rifiutato (%1)").arg(m_lastPopup));
+    if (selectTexture(QStringLiteral("textures/Procedurals/Mandelbrot.json"))) {
+        const QColor c1(QStringLiteral("#aa3311")), c2(QStringLiteral("#113355"));
+        m_mw->m_scene.bgTexColor1 = c1;
+        m_mw->m_scene.bgTexColor2 = c2;
+        gl->setBackgroundTexColors(c1, c2);
+        const QString bgPath = m_outDir + QStringLiteral("/background-mandelbrot.json");
+        QFile::remove(bgPath);
+        m_acceptNextDialog = true;   // il messaggio della texture
+        m_mw->m_presetSerializer->saveTexture(bgPath);
+        m_acceptNextDialog = false;
+        wait(300);
+        QFile f(bgPath);
+        const QJsonObject json = f.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(f.readAll()).object() : QJsonObject();
+        f.close();
+        check(json.value(QStringLiteral("color1")).toString() == c1.name()
+                  && json.value(QStringLiteral("color2")).toString() == c2.name(),
+              QStringLiteral("texture di sfondo salvata coi colori dello sfondo (%1, %2)")
+                  .arg(json.value(QStringLiteral("color1")).toString(), json.value(QStringLiteral("color2")).toString()));
+        // Riaperta sullo sfondo: gli stessi colori.
+        m_mw->m_scene.bgTexColor1 = Qt::white;
+        LibraryManager lm;
+        const LibraryItem item = lm.parseJson(bgPath, LibraryType::Texture);
+        if (!item.name.isEmpty()) m_mw->applyLibraryTextureToBackground(item);
+        wait(300);
+        check(m_mw->m_scene.bgTexColor1.name() == c1.name() && m_mw->m_scene.bgTexColor2.name() == c2.name(),
+              QStringLiteral("riaperta sullo sfondo: gli stessi colori (%1, %2)")
+                  .arg(m_mw->m_scene.bgTexColor1.name(), m_mw->m_scene.bgTexColor2.name()));
+    }
+    click(ui->radioSurface);
+
+    // Il clic su un suono GIA' in scena lo toglie; un altro clic lo ricarica.
+    {
+        const QString kAlps = QStringLiteral("sounds/procedural/Alps.json");
+        m_discardOnPrompt = true;
+        const bool first = selectSound(kAlps);
+        const bool loaded = !m_mw->m_scene.soundScriptText.trimmed().isEmpty();
+        selectSound(kAlps);   // secondo clic: lo toglie
+        const bool removed = m_mw->m_scene.soundScriptText.trimmed().isEmpty()
+                             && m_mw->m_scene.soundLibName.isEmpty()
+                             && !(m_mw->m_audioController && m_mw->m_audioController->isPlaying());
+        selectSound(kAlps);   // terzo clic: lo ricarica
+        const bool again = !m_mw->m_scene.soundScriptText.trimmed().isEmpty();
+        m_discardOnPrompt = false;
+        if (m_mw->m_audioController) m_mw->m_audioController->stopAll();
+        if (first)
+            check(loaded && removed && again,
+                  QStringLiteral("suono dalla Library: il secondo clic lo toglie, il terzo lo ricarica "
+                                 "(caricato %1, tolto %2, ricaricato %3)").arg(loaded).arg(removed).arg(again));
+    }
 }
 
 void ScenarioTest::runBorderAuditScenarios()
@@ -5517,7 +5612,22 @@ void ScenarioTest::runResetButtonScenarios()
     }
 
     if (loadRecord(kAnim)) {
-        // Annulla: niente cambia, l'animazione prosegue.
+        // Camera all'apertura: View non farebbe nulla, quindi niente domanda e
+        // i moti ripartono (t dall'origine).
+        {
+            const int popups = m_popupsClosed;
+            wait(400);
+            const float gBefore = gl->clockTimes().geom;
+            m_mw->onResetClicked();
+            const float gAfter = gl->clockTimes().geom;
+            check(m_popupsClosed == popups && gBefore > 0.2f && gAfter < 0.2f,
+                  QStringLiteral("record animato, camera all'apertura -> Motions senza popup (t %1 -> %2)")
+                      .arg(gBefore).arg(gAfter));
+        }
+        // Annulla: niente cambia, l'animazione prosegue. Con la camera mossa,
+        // perche' View abbia qualcosa da fare e il popup compaia.
+        gl->zoomCamera(0.5f);
+        wait(300);   // l'animazione va avanti: anche i moti hanno da rimettere
         const int popups = m_popupsClosed;
         const float g0 = gl->clockTimes().geom;
         m_mw->onResetClicked();  wait(300);
@@ -5540,8 +5650,10 @@ void ScenarioTest::runResetButtonScenarios()
         checkDirty(QStringLiteral("View dopo zoom e FOV"), false, false, false);
 
         // Moti in corso: t riparte dall'origine e prosegue.
+        // (Camera all'apertura dopo View: nessun popup, i moti direttamente.)
         m_popupAnswer = QStringLiteral("Motions");
         m_mw->onResetClicked();
+        m_popupAnswer.clear();
         const float g2 = gl->clockTimes().geom;
         wait(500);
         const float g3 = gl->clockTimes().geom;
@@ -5556,24 +5668,37 @@ void ScenarioTest::runResetButtonScenarios()
         m_mw->m_btnStart->click();  wait(300);
         m_popupAnswer = QStringLiteral("Both");
         m_mw->onResetClicked();  wait(500);
+        m_popupAnswer.clear();
         const GLWidget::ClockTimes c = gl->clockTimes();
         check(c.geom == o && c.tex == o && c.bg == o && !gl->isSurfaceAnimating()
                   && m_mw->m_btnStart->text() == QLatin1String("START"),
               QStringLiteral("Both, master fermo -> orologi all'origine e fermi (%1, %2, %3; master %4)")
                   .arg(c.geom).arg(c.tex).arg(c.bg).arg(m_mw->m_btnStart->text()));
+        // Moti gia' all'inizio (fermi), resta solo la vista: niente popup, View.
+        {
+            gl->zoomCamera(1.0f);
+            const int popups = m_popupsClosed;
+            m_mw->onResetClicked();  wait(300);
+            const GLWidget::ClockTimes c2 = gl->clockTimes();
+            check(m_popupsClosed == popups && sameCamera() && c2.geom == o,
+                  QStringLiteral("moti gia' all'inizio, camera mossa -> View senza popup (popup %1, t %2)")
+                      .arg(m_popupsClosed - popups).arg(c2.geom));
+        }
         m_mw->m_btnStart->click();  wait(300);
     }
 
     // Rotazioni: Motions le rimette alla posa d'apertura e il GO prosegue da li'.
     if (loadRecord(kRot)) {
+        // La camera e' all'apertura (gira la superficie): View non farebbe
+        // nulla, il RESET rimette i moti senza chiedere.
         const bool turned = !sameOrientation();
-        m_popupAnswer = QStringLiteral("Motions");
+        const int popups = m_popupsClosed;
         m_mw->onResetClicked();
         const bool back = sameOrientation();
         wait(500);
-        check(turned && back && gl->isAnimating() && !sameOrientation(),
-              QStringLiteral("rotazioni -> Motions le rimette alla posa d'apertura, il GO prosegue "
-                             "(girato %1, rimesso %2, gira %3)")
+        check(m_popupsClosed == popups && turned && back && gl->isAnimating() && !sameOrientation(),
+              QStringLiteral("rotazioni, camera all'apertura -> Motions senza popup: posa d'apertura, il GO "
+                             "prosegue (girato %1, rimesso %2, gira %3)")
                   .arg(turned).arg(back).arg(gl->isAnimating()));
     }
 
@@ -5591,51 +5716,37 @@ void ScenarioTest::runResetButtonScenarios()
         check(running && kept, QStringLiteral("path in corsa, View -> la camera resta al path (in corsa %1, ferma %2)")
                                    .arg(running).arg(kept));
 
-        // In corsa, il popup: View e Both spenti (la vista segue il path).
-        m_popupAnswer = QStringLiteral("View");
-        m_mw->onResetClicked();  wait(200);
-        QStringList disabled = m_lastPopupDisabled;
-        disabled.sort();
-        check(disabled == QStringList({ QStringLiteral("Both"), QStringLiteral("View") })
-                  && m_mw->pathRunning(CameraPaths::Path3D),
-              QStringLiteral("path in corsa, popup del RESET -> View e Both spenti (spenti: %1)")
-                  .arg(disabled.join(QStringLiteral(", "))));
-
-        // In corsa, Motions: riparte da capo e prosegue.
+        // La camera e' del path, in corsa come da fermo: il RESET fa i moti
+        // senza popup (decisione dell'utente, 2026-10-21). In corsa: riparte
+        // da capo e prosegue.
         wait(300);
-        m_popupAnswer = QStringLiteral("Motions");
+        int popups = m_popupsClosed;
+        m_lastPopup.clear();
         m_mw->onResetClicked();
         const bool runStart = atStart() && m_mw->m_paths->time(CameraPaths::Path3D) == 0.0f;
         wait(300);
-        check(runStart && m_mw->pathRunning(CameraPaths::Path3D) && !atStart(),
-              QStringLiteral("path in corsa, Motions -> camera al punto di partenza, poi prosegue (%1)")
+        check(m_lastPopup.isEmpty() && m_popupsClosed == popups && runStart
+                  && m_mw->pathRunning(CameraPaths::Path3D) && !atStart(),
+              QStringLiteral("path in corsa, RESET -> nessun popup, camera al punto di partenza, poi prosegue (%1)")
                   .arg(runStart));
 
-        // Fermo, Motions: camera al punto di partenza, t = 0, resta fermo; al
-        // Departure riparte dall'inizio.
+        // Fermo: camera al punto di partenza, t = 0, resta fermo; al Departure
+        // riparte dall'inizio, senza salti.
         wait(300);
         ui->btnDeparture3D->click();  wait(200);
         const float t0 = m_mw->m_paths->time(CameraPaths::Path3D);
         const bool movedAway = !atStart();
-        m_popupAnswer = QStringLiteral("Motions");
+        m_lastPopup.clear();
         m_mw->onResetClicked();  wait(200);
         const float t1 = m_mw->m_paths->time(CameraPaths::Path3D);
         const bool still = !m_mw->pathRunning(CameraPaths::Path3D);
-        const bool back = atStart();
+        const bool back = atStart() && gl->isPathFollowing();
         ui->btnDeparture3D->click();  wait(300);
         const float t2 = m_mw->m_paths->time(CameraPaths::Path3D);
-        check(t0 > 0.0f && movedAway && t1 == 0.0f && still && back && t2 < t0,
-              QStringLiteral("path fermo, Motions -> t %1 -> %2, camera al punto di partenza (%3), resta fermo; "
-                             "al Departure riparte dall'inizio (%4)")
+        check(m_lastPopup.isEmpty() && t0 > 0.0f && movedAway && t1 == 0.0f && still && back && t2 < t0,
+              QStringLiteral("path fermo, RESET -> nessun popup, t %1 -> %2, camera al punto di partenza (%3), "
+                             "resta fermo; al Departure riparte dall'inizio (%4)")
                   .arg(t0).arg(t1).arg(back).arg(t2));
-
-        // Fermo, Both: anche qui la camera e' del path, al punto di partenza.
-        wait(300);
-        ui->btnDeparture3D->click();  wait(200);
-        m_popupAnswer = QStringLiteral("Both");
-        m_mw->onResetClicked();  wait(200);
-        check(atStart() && gl->isPathFollowing() && !m_mw->pathRunning(CameraPaths::Path3D),
-              QStringLiteral("path fermo, Both -> camera al punto di partenza del path, fermo"));
     }
 
     // Fasce: anche gli orologi per-mesh tornano all'origine.
@@ -5662,6 +5773,42 @@ void ScenarioTest::runResetButtonScenarios()
                   .arg(before).arg(after).arg(m_mw->m_geoTime)
                   .arg(flowing ? QStringLiteral("in moto") : QStringLiteral("fermo")));
     }
+
+    // SCENA VUOTA DI NEW, nei due modi: START, RESET e Projection lo dicono con
+    // lo stesso popup. La proiezione non cambia e la scena resta pulita (prima
+    // cambiava, e al preset successivo usciva "vuoi salvare?"); in Ray Marching
+    // START diceva che la superficie a schermo era la precedente.
+    for (int mode = 0; mode < 2; ++mode) {
+        m_discardOnPrompt = true;
+        ui->tabModeSelector->setCurrentIndex(mode);
+        wait(1500);
+        m_discardOnPrompt = false;
+        pressNew();
+        auto notice = [this](QAbstractButton *b, const char *what) {
+            m_lastPopup.clear();
+            b->click();
+            wait(400);
+            return m_lastPopup.contains(QLatin1String(what));
+        };
+        const int projection = int(gl->projectionMode);
+        const bool start = notice(m_mw->m_btnStart, "Nothing to start");
+        const bool reset = notice(m_mw->m_btnResetView, "Nothing to reset");
+        const bool project = notice(m_mw->m_btnProjection, "Nothing to project");
+        const QStringList unsaved = m_mw->unsavedKeys();
+        check(start && reset && project && int(gl->projectionMode) == projection && unsaved.isEmpty()
+                  && m_mw->m_btnStart->text() == QLatin1String("START"),
+              QStringLiteral("%1, scena vuota di NEW -> START %2, RESET %3, Projection %4 col popup; "
+                             "proiezione invariata, niente da salvare%5")
+                  .arg(mode == 0 ? QStringLiteral("Parametric") : QStringLiteral("Ray Marching"))
+                  .arg(start).arg(reset).arg(project)
+                  .arg(unsaved.isEmpty() ? QString() : QStringLiteral(" (") + unsaved.join(QStringLiteral(", ")) + QLatin1Char(')')));
+    }
+    m_discardOnPrompt = true;
+    ui->tabModeSelector->setCurrentIndex(0);
+    wait(1500);
+    m_discardOnPrompt = false;
+    m_popupAnswer.clear();   // una risposta senza popup non deve restare in sospeso
+    m_popupAnswer.clear();   // una risposta senza popup non deve restare in sospeso
 }
 
 void ScenarioTest::runResetSceneScenarios()
