@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.16)
 # mainwindow.cpp e restava indietro a ogni bump (bump-version.sh non poteva
 # raggiungerlo e si limitava a stampare un promemoria).
 # Info.plist resta un file a parte, aggiornato da ExC/Mac/bump-version.sh.
-project(SurfaceExplorer VERSION 1.4 LANGUAGES CXX)
+project(SurfaceExplorer VERSION 1.5 LANGUAGES CXX)
 
 if(WIN32)
     enable_language(RC)
