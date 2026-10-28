@@ -233,6 +233,11 @@ private:
     // default, torna riaprendo la Shape, e una Shape senza riporta il grigio.
     // Da sola: --scenario-only shape-background.
     void runShapeBackgroundScenarios();
+    // Il fotogramma del video con Screen Upscale e una risoluzione fissa
+    // (getFrameForVideo, senza FBO): dimensione del video, vista INTERA con fasce
+    // nere (non stirata, non a meta' misura su Retina). Da sola: --scenario-only
+    // video-frame.
+    void runVideoFrameScenarios();
     // SUPERFICIE ANIMATA DA EQUAZIONI: il load (che svuota la mesh) e il Run
     // dopo un NEW devono sganciare il gate della scena vuota, cioe' lasciare
     // accesi i comandi del dock RENDERER. Il Run lo sganciava solo per le

@@ -1885,6 +1885,11 @@ void ScenarioTest::run()
         finish();
         return;
     }
+    if (m_only == QLatin1String("video-frame")) {
+        runVideoFrameScenarios();
+        finish();
+        return;
+    }
     if (m_only == QLatin1String("shape-background")) {
         runShapeBackgroundScenarios();
         finish();
@@ -3732,6 +3737,7 @@ void ScenarioTest::run()
     runMeshCountScenarios();
     runStepsScenarios();
     runShapeBackgroundScenarios();
+    runVideoFrameScenarios();
     runAnimatedLoadScenarios();
     runLoadOrderScenarios();
 
@@ -5388,6 +5394,55 @@ void ScenarioTest::runStepsScenarios()
               QStringLiteral("Ray Marching, campo Ray Steps 400 -> slider di nuovo fino a mille (%1)")
                   .arg(ui->stepSlider->maximum()));
     }
+}
+
+void ScenarioTest::runVideoFrameScenarios()
+{
+    GLWidget *gl = m_mw->ui->glWidget;
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Video: fotogramma con Screen Upscale e risoluzione fissa =="));
+    if (!loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) return;
+    gl->stopAllTimers();
+    gl->setClocksDrivenByRecorder(true);
+    wait(500);
+    const double viewAspect = double(gl->width()) / double(std::max(1, gl->height()));
+    auto isBlack = [](const QImage &img, int x, int y) { return (img.pixel(x, y) & 0x00ffffff) == 0; };
+    // Due formati: 16:9 e quasi quadrato. Il fotogramma deve avere la dimensione
+    // chiesta, la vista intera nel mezzo (non a meta' misura: su Retina
+    // grabFramebuffer porta devicePixelRatio 2) e le fasce nere dalla parte in cui
+    // la vista e' piu' stretta del formato.
+    for (const QSize &target : { QSize(1920, 1080), QSize(1200, 1000) }) {
+        const QImage img = gl->getFrameForVideo(target.width(), target.height(), false);
+        const QString label = QStringLiteral("%1x%2").arg(target.width()).arg(target.height());
+        check(img.size() == target && qFuzzyCompare(img.devicePixelRatio(), 1.0),
+              QStringLiteral("%1: dimensione del video, devicePixelRatio 1 (%2x%3, dpr %4)")
+                  .arg(label).arg(img.width()).arg(img.height()).arg(img.devicePixelRatio()));
+        if (img.size() != target) continue;
+        const double targetAspect = double(target.width()) / double(target.height());
+        const int w = img.width(), h = img.height();
+        // La vista intera riempie il lato in cui entra tutta: al centro non e' nero
+        // e, dal lato pieno, arriva ai bordi (con la vista a meta' misura no).
+        check(!isBlack(img, w / 2, h / 2), QStringLiteral("%1: il centro non e' nero").arg(label));
+        if (viewAspect < targetAspect - 0.02) {
+            check(isBlack(img, 2, h / 2) && isBlack(img, w - 3, h / 2)
+                      && !isBlack(img, w / 2, 2) && !isBlack(img, w / 2, h - 3),
+                  QStringLiteral("%1: vista piu' stretta del formato -> fasce nere ai lati, piena in altezza").arg(label));
+        } else if (viewAspect > targetAspect + 0.02) {
+            check(isBlack(img, w / 2, 2) && isBlack(img, w / 2, h - 3)
+                      && !isBlack(img, 2, h / 2) && !isBlack(img, w - 3, h / 2),
+                  QStringLiteral("%1: vista piu' larga del formato -> fasce nere sopra e sotto, piena in larghezza").arg(label));
+        } else {
+            check(!isBlack(img, 2, h / 2) && !isBlack(img, w / 2, 2),
+                  QStringLiteral("%1: stesso formato della vista -> nessuna fascia").arg(label));
+        }
+    }
+    // Risoluzione nativa (target non positivo): nessun adattamento, immagine intera.
+    {
+        const QImage img = gl->getFrameForVideo(-1, -1, false);
+        check(!img.isNull() && !isBlack(img, img.width() / 2, img.height() / 2),
+              QStringLiteral("dimensione nativa: immagine intera (%1x%2)").arg(img.width()).arg(img.height()));
+    }
+    gl->setClocksDrivenByRecorder(false);
 }
 
 void ScenarioTest::runShapeBackgroundScenarios()
