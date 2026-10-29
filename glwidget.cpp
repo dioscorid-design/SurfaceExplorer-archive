@@ -6571,21 +6571,21 @@ GLWidget::ClockTimes GLWidget::clockTimes() const {
 
 void GLWidget::setCaptureLineWidth(int pixels)
 {
-    m_captureLineWidth = qBound(1, pixels, 8);
+    m_captureLineWidth = qBound(1, pixels, 12);
 }
 
 // Gli spostamenti (in pixel) della finestra con cui si ridisegna il wireframe per
-// dargli lo spessore chiesto: i punti di un disco, centrati sull'origine.
+// dargli lo spessore chiesto: una croce centrata sull'origine (2n-1 punti contro
+// i ~0.8 n^2 di un disco). Una linea orizzontale prende lo spessore dai punti
+// verticali e una verticale da quelli orizzontali; in diagonale resta almeno 0.7 n.
 QVector<QPoint> GLWidget::wireframeOffsets() const
 {
     QVector<QPoint> offs;
     const int n = m_captureLineWidth;
-    const double c = (n - 1) / 2.0;
-    for (int j = 0; j < n; ++j)
-        for (int i = 0; i < n; ++i)
-            if (std::hypot(i - c, j - c) <= n / 2.0)
-                offs.append(QPoint(int(std::floor(i - c)), int(std::floor(j - c))));
-    if (offs.isEmpty()) offs.append(QPoint(0, 0));
+    const int lo = -((n - 1) / 2);
+    offs.append(QPoint(0, 0));
+    for (int k = lo; k < lo + n; ++k)
+        if (k != 0) { offs.append(QPoint(k, 0)); offs.append(QPoint(0, k)); }
     return offs;
 }
 

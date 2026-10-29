@@ -83,19 +83,13 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
                                               : size.width() / std::max(1.0, gl->width() * dpr);
     // Ogni ridisegno costa tutto il wireframe: su una scena fitta troppi ridisegni
     // in un solo fotogramma fanno fallire la GPU (immagine tutta magenta). Si limita
-    // lo spessore al costo (indici x ridisegni) e, se l'immagine esce comunque
+    // lo spessore al costo (indici x ridisegni, al massimo 20 milioni) e, se l'immagine esce comunque
     // di un solo colore, si riprova con meno.
-    auto drawsFor = [](int w) {
-        int n = 0;
-        for (int j = 0; j < w; ++j)
-            for (int i = 0; i < w; ++i)
-                if (std::hypot(i - (w - 1) / 2.0, j - (w - 1) / 2.0) <= w / 2.0) ++n;
-        return std::max(1, n);
-    };
+    auto drawsFor = [](int w) { return std::max(1, 2 * w - 1); };   // la croce di wireframeOffsets
     int lineWidth = int(std::lround(scale));
     const qint64 wireIndices = gl->wireframeIndexTotal();
     if (wireIndices > 0)
-        while (lineWidth > 1 && qint64(drawsFor(lineWidth)) * wireIndices > 15000000) --lineWidth;
+        while (lineWidth > 1 && qint64(drawsFor(lineWidth)) * wireIndices > 20000000) --lineWidth;
     QImage img;
     for (;;) {
         gl->setCaptureLineWidth(lineWidth);
