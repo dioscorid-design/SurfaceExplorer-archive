@@ -703,6 +703,7 @@ void MainWindow::resetTextureAndSoundForNewScene()
 
 void MainWindow::resetAppearanceForNewScene()
 {
+    resetAntialiasing();
     // (Colore e colori 1/2 dello sfondo: scena di default, in testa.) Il verde
     // della superficie vive solo nel motore.
     const QColor defaultGreen = QColor::fromRgbF(0.20f, 0.80f, 0.20f);
@@ -1453,6 +1454,7 @@ void MainWindow::warnSharedConstantsOnRecordLoad(const QString &recordPath)
 
 void MainWindow::applySurfaceExample(LibraryItem d)
 {
+    resetAntialiasing();
     // All'uscita la scena e' quella del file: e' il momento pulito.
     SceneCleanGuard sceneCleanGuard{this};
     discardPendingLimitEdits();
@@ -1960,6 +1962,7 @@ void MainWindow::stopMotionForRecordLoad()
 
 void MainWindow::applyRecordMode(const LibraryItem &data, const SceneState &file)
 {
+    resetAntialiasing();
     const bool isImplicit = data.isImplicitMode;
     // Le superfici implicite da script sono gestite da applyCommonData: non sovrascrivere.
     const bool isImplicitScript = isImplicit && !data.scriptCode.isEmpty();

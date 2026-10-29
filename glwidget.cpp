@@ -2245,6 +2245,10 @@ void GLWidget::render(QRhiCommandBuffer *cb)
     };
     applyTubeFields(m_uboData, uboParts.empty() ? nullptr : &uboParts[0], 0);
     m_uboData.u_meshCount = (float)std::max(1, uboPartCount);
+    // Strisce del wireframe (catture di immagini): meta' spessore e dimensione, in pixel.
+    m_uboData.u_wireHalfWidth = 0.5f * float(m_captureLineWidth);
+    m_uboData.u_wireViewW = float(renderTarget()->pixelSize().width());
+    m_uboData.u_wireViewH = float(renderTarget()->pixelSize().height());
     // Col bordo acceso i blocchi raddoppiano: dopo quelli delle parti, uno di
     // bordo per parte (vedi sotto).
     const bool borderOn = (m_borderRadius > 0.0f && m_engineMode == ModeParametric);
@@ -2777,7 +2781,9 @@ void GLWidget::render(QRhiCommandBuffer *cb)
             }
             resourceUpdates->updateDynamicBuffer(m_wireframeIbo, 0, iSize, m_wireframeIndices.data());
             wireframeNeedsUpdate = false;
+            m_wireQuadSerial = -1;   // le strisce dipendono dagli indici
         }
+        prepareWireQuads(resourceUpdates);
 
         // SEZIONE TRASPORTATA DEI TUBI: prima del disegno, fuori dal render
         // pass. La passata consuma gli aggiornamenti in coda (i blocchi UBO di
@@ -3234,7 +3240,29 @@ void GLWidget::render(QRhiCommandBuffer *cb)
 
             // WIREFRAME, dopo il solido (vedi la nota sull'ordine sopra).
             if (anyWireframe) {
-                if (m_wireframePipeline && m_wireframeIndexCount > 0) {
+                if (m_captureLineWidth > 1 && m_wireQuadPipeline && m_wireQuadVbo && m_wireQuadSerial == m_captureSerial
+                    && m_wireframeIndexCount > 0) {
+                    // Cattura di un'immagine: strisce di triangoli, una istanza per segmento.
+                    cb->setGraphicsPipeline(m_wireQuadPipeline);
+                    cb->setViewport(QRhiViewport(0, 0, outputSize.width(), outputSize.height()));
+                    auto drawSegments = [&](int firstSegment, int segments, int meshIndex) {
+                        const QRhiCommandBuffer::DynamicOffset ofs(0, meshIndex * m_uboBlockStride);
+                        cb->setShaderResources(srb, 1, &ofs);
+                        const QRhiCommandBuffer::VertexInput inst(m_wireQuadVbo, quint32(firstSegment) * 8 * sizeof(float));
+                        cb->setVertexInput(0, 1, &inst);
+                        cb->draw(6, segments);
+                    };
+                    if (m_wireframeRanges.size() <= 1) {
+                        drawSegments(0, m_wireframeIndexCount / 2, 0);
+                    } else {
+                        for (const WireframeRange &r : m_wireframeRanges) {
+                            if (r.indexCount <= 0) continue;
+                            if (r.meshIndex >= 0 && r.meshIndex < (int)parts.size()
+                                && !partIsWireframe(parts[r.meshIndex])) continue;
+                            drawSegments(r.indexOffset / 2, r.indexCount / 2, r.meshIndex);
+                        }
+                    }
+                } else if (m_wireframePipeline && m_wireframeIndexCount > 0) {
                     cb->setGraphicsPipeline(m_wireframePipeline);
                     const QRhiCommandBuffer::VertexInput vbufBinding(m_vbo, 0);
 
@@ -3458,6 +3486,15 @@ void GLWidget::releaseResources()
         delete m_wireframePipeline;
         m_wireframePipeline = nullptr;
     }
+    if (m_wireQuadPipeline) {
+        delete m_wireQuadPipeline;
+        m_wireQuadPipeline = nullptr;
+    }
+    if (m_wireQuadVbo) {
+        delete m_wireQuadVbo;
+        m_wireQuadVbo = nullptr;
+    }
+    m_wireQuadSerial = -1;
     if (m_surfaceTexture) {
         m_surfaceTexture->destroy();
         delete m_surfaceTexture;
@@ -3789,7 +3826,8 @@ static_assert(offsetof(UboData, u_tubeFramesOn) == 472, "UboData: u_tubeFramesOn
 static_assert(offsetof(UboData, u_tubeFrameBlend) == 476, "UboData: u_tubeFrameBlend fuori posto");
 static_assert(offsetof(UboData, u_sharedEdgesOn) == 480, "UboData: u_sharedEdgesOn fuori posto");
 static_assert(offsetof(UboData, u_globalTexture) == 484, "UboData: u_globalTexture fuori posto");
-static_assert(sizeof(UboData) == 496, "UboData: dopo u_globalTexture (e _pad4) il blocco e' di 496 byte");
+static_assert(offsetof(UboData, u_wireHalfWidth) == 488, "UboData: u_wireHalfWidth fuori posto");
+static_assert(sizeof(UboData) == 512, "UboData: dopo u_globalTexture, i tre campi del wireframe e _pad4 il blocco e' di 512 byte");
 static_assert(sizeof(UboData) % 16 == 0, "UboData: dimensione non multipla di 16 (std140)");
 
 bool GLWidget::setTubeCurve(const QString &xEq, const QString &yEq, const QString &zEq, const QString &wEq,
@@ -6571,7 +6609,129 @@ GLWidget::ClockTimes GLWidget::clockTimes() const {
 
 void GLWidget::setCaptureLineWidth(int pixels)
 {
-    m_captureLineWidth = qBound(1, pixels, 12);
+    m_captureLineWidth = qBound(1, pixels, 64);
+    ++m_captureSerial;   // nuova cattura: le strisce si ricostruiscono
+}
+
+bool GLWidget::wireframeQuadsEligible() const
+{
+    if (m_isFlatView) return false;
+    if (m_wireframeIndexCount <= 0) return true;
+    if (m_engineMode != ModeParametric || m_isCustomMesh || !engine) return false;
+    if (engine->isTubeModeActive() && !engine->isScriptModeActive()) return false;
+    return true;
+}
+
+QList<int> GLWidget::supportedMsaaSamples()
+{
+    QList<int> s = rhi() ? rhi()->supportedSampleCounts() : QList<int>();
+    if (!s.contains(1)) s.prepend(1);
+    std::sort(s.begin(), s.end());
+    return s;
+}
+
+bool GLWidget::setMsaaSamples(int samples)
+{
+    samples = std::max(1, samples);
+    if (!supportedMsaaSamples().contains(samples)) return false;
+    if (sampleCount() == samples) return true;
+    setSampleCount(samples);
+    invalidateSampleDependentPipelines();
+    update();
+    return true;
+}
+
+// Le pipeline nascono con i campioni del render target di allora: al cambio vanno
+// rifatte. Si liberano qui e si ricostruiscono dal loro posto di sempre (la
+// prima volta che servono).
+void GLWidget::invalidateSampleDependentPipelines()
+{
+    rebuildShader();   // libera la pipeline opaca e quella ray marching
+    if (m_bgPipeline) {
+        delete m_bgPipeline;
+        m_bgPipeline = nullptr;
+        if (m_isFlatView || m_useBackgroundTexture)
+            rebuildBackgroundShader(!m_bgIsScript, m_bgScriptCode);
+    }
+}
+
+// WIREFRAME A STRISCE DI TRIANGOLI (solo catture di immagini con spessore > 1).
+// Le linee della GPU sono sempre larghe un pixel e senza bordo sfumato; qui ogni
+// segmento diventa una striscia di due triangoli larga a piacere, con la
+// copertura calcolata nel fragment. I vertici della superficie li valuta la GPU:
+// per questo l'istanza porta i due estremi (come stanno nel buffer della
+// superficie) e il vertex shader (HAS_WIRE_QUAD) valuta tutti e due.
+// Non adatto a tubi e mesh custom: quelli restano sulle linee native.
+void GLWidget::prepareWireQuads(QRhiResourceUpdateBatch *resourceUpdates)
+{
+    if (m_captureLineWidth <= 1 || m_wireQuadSerial == m_captureSerial) return;
+    m_wireQuadSerial = m_captureSerial;
+    if (!wireframeQuadsEligible() || !m_wireframePipeline || m_wireframeIndices.size() < 2) return;
+
+    if (!m_wireQuadPipeline) {
+        QString vsSource = createVertexShaderSource(m_eqX, m_eqY, m_eqZ, m_eqW);
+        if (vsSource.contains(QLatin1String("#define IS_TUBE")) || vsSource.contains(QLatin1String("#define CUSTOM_MESH")))
+            return;
+        QString fsSource = createFragmentShaderSource(m_customFragmentCode);
+        const QString define = QStringLiteral("#version 450\n#define HAS_WIRE_QUAD\n");
+        vsSource.replace(QStringLiteral("#version 450"), define);
+        fsSource.replace(QStringLiteral("#version 450"), define);
+        const QShader vs = bakeShader(vsSource.toUtf8(), QShader::VertexStage);
+        const QShader fs = bakeShader(fsSource.toUtf8(), QShader::FragmentStage);
+        if (!vs.isValid() || !fs.isValid()) return;
+
+        QRhiVertexInputLayout layout;
+        layout.setBindings({ QRhiVertexInputBinding(8 * sizeof(float), QRhiVertexInputBinding::PerInstance, 1) });
+        layout.setAttributes({
+            { 0, 0, QRhiVertexInputAttribute::Float4, 0 },
+            { 0, 1, QRhiVertexInputAttribute::Float4, 4 * sizeof(float) }
+        });
+        QRhiGraphicsPipeline::TargetBlend blend;
+        blend.enable   = true;
+        blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+        blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+        blend.srcAlpha = QRhiGraphicsPipeline::One;
+        blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+        ensureDynamicBindings(m_surfaceTexture ? m_surfaceTexture : m_dummyTexture);
+        QRhiGraphicsPipeline *p = rhi()->newGraphicsPipeline();
+        p->setTopology(QRhiGraphicsPipeline::Triangles);
+        p->setVertexInputLayout(layout);
+        p->setShaderStages({ { QRhiShaderStage::Vertex, vs }, { QRhiShaderStage::Fragment, fs } });
+        p->setSampleCount(renderTarget()->sampleCount());
+        p->setDepthTest(true);
+        p->setDepthWrite(false);   // i bordi sfumati non devono coprire le linee vicine
+        p->setDepthOp(QRhiGraphicsPipeline::LessOrEqual);
+        p->setCullMode(QRhiGraphicsPipeline::None);
+        p->setTargetBlends({ blend });
+        p->setShaderResourceBindings(m_bindingsDyn ? m_bindingsDyn : m_bindings);
+        p->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
+        if (!p->create()) {
+            qWarning() << "prepareWireQuads: create() fallita, si ricade sulle linee native.";
+            delete p;
+            return;
+        }
+        m_wireQuadPipeline = p;
+    }
+
+    // Le istanze: i due estremi di ogni segmento.
+    const std::vector<Vertex> &vertices = engine->getVertices();
+    const size_t segments = m_wireframeIndices.size() / 2;
+    std::vector<float> data;
+    data.reserve(segments * 8);
+    for (size_t k = 0; k < segments; ++k) {
+        for (int e = 0; e < 2; ++e) {
+            const unsigned int i = m_wireframeIndices[2 * k + e];
+            const QVector4D p = i < vertices.size() ? vertices[i].position : QVector4D();
+            data.insert(data.end(), { p.x(), p.y(), p.z(), p.w() });
+        }
+    }
+    const quint32 bytes = quint32(data.size() * sizeof(float));
+    if (!m_wireQuadVbo || m_wireQuadVbo->size() < bytes) {
+        delete m_wireQuadVbo;
+        m_wireQuadVbo = rhi()->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, bytes);
+        m_wireQuadVbo->create();
+    }
+    resourceUpdates->updateDynamicBuffer(m_wireQuadVbo, 0, bytes, data.data());
 }
 
 // Gli spostamenti (in pixel) della finestra con cui si ridisegna il wireframe per
@@ -6609,6 +6769,12 @@ float GLWidget::effectiveCameraFov() const
 void GLWidget::beginHiResCapture(int w, int h) {
     if (w <= 0 || h <= 0) return;
     m_hiResCapture = true;
+    // I campioni MSAA moltiplicano la memoria del buffer: oltre un budget (circa un
+    // 8K a 4 campioni) la cattura si fa senza e si rimettono dopo.
+    if (sampleCount() > 1 && qint64(w) * h * sampleCount() > 100000000) {
+        m_msaaBeforeCapture = sampleCount();
+        setMsaaSamples(1);
+    }
     // Fissa il color buffer offscreen di QRhiWidget alla risoluzione di export:
     // d'ora in poi render() disegna NATIVAMENTE a w x h (renderTarget()->pixelSize()
     // diventa questa) e grabFramebuffer() restituisce pixel nitidi a quella misura.
@@ -6621,6 +6787,10 @@ void GLWidget::beginHiResCapture(int w, int h) {
 void GLWidget::endHiResCapture() {
     if (!m_hiResCapture) return;
     m_hiResCapture = false;
+    if (m_msaaBeforeCapture > 1) {
+        setMsaaSamples(m_msaaBeforeCapture);
+        m_msaaBeforeCapture = 0;
+    }
     // Torna a seguire la dimensione a schermo del widget (QSize() = dinamica).
     setFixedColorBufferSize(QSize());
     this->repaint();
@@ -8493,6 +8663,11 @@ void GLWidget::buildPipeline() {
     if (m_wireframePipeline) {
         delete m_wireframePipeline;
         m_wireframePipeline = nullptr;
+    }
+    if (m_wireQuadPipeline) {   // nasce dagli stessi sorgenti: si rifa' con loro
+        delete m_wireQuadPipeline;
+        m_wireQuadPipeline = nullptr;
+        m_wireQuadSerial = -1;
     }
     m_wireframePipeline = rhi()->newGraphicsPipeline();
     m_wireframePipeline->setTopology(QRhiGraphicsPipeline::Lines);

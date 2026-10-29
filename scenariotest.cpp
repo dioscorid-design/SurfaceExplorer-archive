@@ -1894,6 +1894,11 @@ void ScenarioTest::run()
         finish();
         return;
     }
+    if (m_only == QLatin1String("antialiasing")) {
+        runAntialiasingScenarios();
+        finish();
+        return;
+    }
     if (m_only == QLatin1String("image-capture")) {
         runImageCaptureScenarios();
         finish();
@@ -5457,6 +5462,85 @@ void ScenarioTest::runHiResProbeScenarios()
     }
 }
 
+void ScenarioTest::runAntialiasingScenarios()
+{
+    GLWidget *gl = m_mw->ui->glWidget;
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Antialiasing (MSAA) del display =="));
+    const QList<int> sup = gl->supportedMsaaSamples();
+    QStringList names;
+    for (int n : sup) names << QString::number(n);
+    m_lines.append(QStringLiteral("campioni supportati: %1").arg(names.join(QStringLiteral(", "))));
+    check(sup.contains(1), QStringLiteral("l'elenco dei campioni comprende sempre 1 (spento)"));
+    check(!gl->setMsaaSamples(3) || sup.contains(3), QStringLiteral("un numero di campioni non supportato (3) e' rifiutato"));
+    const int samples = sup.contains(4) ? 4 : (sup.contains(2) ? 2 : 1);
+    if (samples == 1) { m_lines.append(QStringLiteral("la GPU non supporta MSAA: resto del test saltato")); return; }
+
+    auto distinctColors = [](const QImage &im) {
+        QSet<QRgb> set;
+        for (int y = 0; y < im.height(); y += 1)
+            for (int x = 0; x < im.width(); x += 1) set.insert(im.pixel(x, y) & 0xffffff);
+        return set.size();
+    };
+    auto shot = [&]() { wait(500); return gl->grabFramebuffer(); };
+
+    if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) {
+        gl->stopAllTimers();
+        gl->setClocksDrivenByRecorder(true);
+        gl->setMsaaSamples(1);
+        const QImage off = shot();
+        check(gl->setMsaaSamples(samples) && gl->msaaSamples() == samples,
+              QStringLiteral("si attiva %1 campioni").arg(samples));
+        const QImage on = shot();
+        on.save(m_outDir + QStringLiteral("/antialiasing-on.png"));
+        off.save(m_outDir + QStringLiteral("/antialiasing-off.png"));
+        check(!on.isNull() && distinctColors(on) > distinctColors(off) + 50,
+              QStringLiteral("superficie parametrica: i bordi hanno piu' sfumature con l'antialiasing (%1 colori contro %2)")
+                  .arg(distinctColors(on)).arg(distinctColors(off)));
+        // Wireframe: pipeline a linee rifatta coi campioni giusti.
+        gl->setGlobalRenderMode(2);
+        const QImage wire = shot();
+        wire.save(m_outDir + QStringLiteral("/antialiasing-wire.png"));
+        check(!wire.isNull() && distinctColors(wire) > 3,
+              QStringLiteral("wireframe con antialiasing: l'immagine ha contenuto (%1 colori)").arg(distinctColors(wire)));
+        gl->setGlobalRenderMode(0);
+        // Una cattura grande sospende l'MSAA e lo rimette a fine cattura.
+        const QSize big = ImageCapture::sizeFor(double(on.width()) / on.height(), 12000);
+        QString err;
+        const QImage hi = ImageCapture::render(gl, big, double(on.width()) / on.height(), &err);
+        check(!hi.isNull() && hi.size() == big, QStringLiteral("scatto grande con antialiasing attivo (%1x%2) %3")
+                                                    .arg(big.width()).arg(big.height()).arg(err));
+        wait(500);
+        check(gl->msaaSamples() == samples, QStringLiteral("a fine scatto l'antialiasing e' tornato a %1 campioni (%2)")
+                                                .arg(samples).arg(gl->msaaSamples()));
+        gl->setClocksDrivenByRecorder(false);
+    }
+    // Ray marching e trasparenza: pipeline proprie, rifatte al cambio.
+    if (loadSurface(QStringLiteral("surfaces/Implicit/3D/Chmutov.json"))) {
+        gl->stopAllTimers();
+        gl->setClocksDrivenByRecorder(true);
+        const QImage rm = shot();
+        check(!rm.isNull() && distinctColors(rm) > 50, QStringLiteral("ray marching con antialiasing: l'immagine ha contenuto"));
+        gl->setAlpha(0.5f);
+        const QImage rmT = shot();
+        check(!rmT.isNull() && distinctColors(rmT) > 50, QStringLiteral("ray marching trasparente con antialiasing: l'immagine ha contenuto"));
+        gl->setClocksDrivenByRecorder(false);
+    }
+    check(gl->setMsaaSamples(1) && gl->msaaSamples() == 1, QStringLiteral("si torna a spento"));
+    shot();
+    // Lo slider si azzera uscendo dal preset.
+    QSlider *slider = m_mw->ui->antialiasSlider;
+    slider->setValue(1);
+    check(gl->msaaSamples() == 2, QStringLiteral("lo slider a 1 accende 2 campioni (%1)").arg(gl->msaaSamples()));
+    if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) {
+        wait(300);
+        check(slider->value() == 0 && gl->msaaSamples() == 1,
+              QStringLiteral("caricando un altro preset l'antialiasing torna a Off (slider %1, campioni %2)")
+                  .arg(slider->value()).arg(gl->msaaSamples()));
+        check(m_mw->ui->lblValAntialias->text() == QStringLiteral("Off"), QStringLiteral("l'etichetta dice Off"));
+    }
+}
+
 void ScenarioTest::runImageCaptureScenarios()
 {
     GLWidget *gl = m_mw->ui->glWidget;
@@ -5546,6 +5630,8 @@ void ScenarioTest::runImageCaptureScenarios()
         gl->endHiResCapture();
         if (!thick.isNull() && !thin.isNull()) {
             const qint64 a1 = inkOf(thin), a2 = inkOf(thick);
+            check(gl->wireframeQuadsActive() && gl->wireframeQuadsEligible(),
+                  QStringLiteral("wireframe parametrico: nella cattura si disegna a strisce di triangoli"));
             check(a2 > a1 * 1.5, QStringLiteral("wireframe in un'immagine grande: pixel di linea %1 con spessore, %2 senza").arg(a2).arg(a1));
             thick.save(m_outDir + QStringLiteral("/image-capture-wire-thick.png"));
             thin.save(m_outDir + QStringLiteral("/image-capture-wire-thin.png"));

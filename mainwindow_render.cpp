@@ -1190,6 +1190,42 @@ void MainWindow::setupRendererDock()
         applyCameraFov((float)val);
     });
 
+    // ANTIALIASING (MSAA) del display: 0 = spento (di default), 1..3 = 2x, 4x, 8x.
+    // Non e' della scena: non sporca nulla e non finisce nei preset. Torna a Off
+    // quando si esce dal preset (resetAntialiasing). Se la GPU non supporta il
+    // livello scelto, un avviso lo dice e lo slider torna al piu' alto che supporta.
+    {
+        static const int kSamples[] = { 1, 2, 4, 8 };
+        auto labelFor = [](int level) {
+            return level <= 0 ? tr("Off") : QStringLiteral("%1x").arg(kSamples[level]);
+        };
+        ui->antialiasSlider->setRange(0, 3);
+        ui->antialiasSlider->setSingleStep(1);
+        ui->antialiasSlider->setPageStep(1);
+        UiStyleManager::setupBigSliders(nullptr, nullptr, nullptr, nullptr, ui->antialiasSlider);
+        ui->lblValAntialias->setText(labelFor(0));
+        connect(ui->antialiasSlider, &QSlider::valueChanged, this, [this, labelFor](int level) {
+            level = qBound(0, level, 3);
+            if (!ui->glWidget->setMsaaSamples(kSamples[level])) {
+                const QList<int> ok = ui->glWidget->supportedMsaaSamples();
+                int best = 0;
+                for (int i = 1; i <= 3; ++i) if (ok.contains(kSamples[i])) best = i;
+                QStringList names;
+                for (int n : ok) if (n > 1) names << QStringLiteral("%1x").arg(n);
+                QMessageBox::warning(this, tr("Antialiasing"),
+                    tr("This device's GPU does not support %1x antialiasing.\n\n%2")
+                        .arg(kSamples[level])
+                        .arg(names.isEmpty() ? tr("It supports no antialiasing.")
+                                             : tr("Supported: %1.").arg(names.join(QStringLiteral(", ")))));
+                level = best;
+                const QSignalBlocker block(ui->antialiasSlider);
+                ui->antialiasSlider->setValue(level);
+                ui->glWidget->setMsaaSamples(kSamples[level]);
+            }
+            ui->lblValAntialias->setText(labelFor(level));
+        });
+    }
+
     // ASPETTO PER-MESH: lo spinbox sceglie su quale parte agiscono i controlli
     // gia' esistenti (colore, trasparenza, Light, Solid/Wireframe). Il valore 0
     // mostra "All" e li riporta sullo stato globale, cioe' il comportamento di
@@ -2433,6 +2469,12 @@ bool MainWindow::isSceneEmpty() const
 // ==========================================================
 // RENDERING & VISUALS
 // ==========================================================
+
+void MainWindow::resetAntialiasing()
+{
+    if (ui->antialiasSlider && ui->antialiasSlider->value() != 0)
+        ui->antialiasSlider->setValue(0);   // valueChanged spegne l'MSAA e aggiorna l'etichetta
+}
 
 void MainWindow::resetTransparency()
 {

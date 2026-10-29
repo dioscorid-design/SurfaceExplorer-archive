@@ -187,7 +187,14 @@ struct UboData {
     // resta di 496 byte. Dichiarato in ENTRAMBI gli shader parametrici (regola
     // Adreno, vedi CLAUDE.md); lo usa solo il fragment.
     float u_globalTexture;
-    float _pad4[2];
+    // WIREFRAME A STRISCE DI TRIANGOLI (HAS_WIRE_QUAD, solo nelle catture di
+    // immagini): meta' spessore della linea e dimensione dell'immagine, in pixel.
+    // Il blocco cresce di una riga (512 byte). Dichiarati in ENTRAMBI gli shader
+    // parametrici (regola Adreno, vedi CLAUDE.md); li usa solo il vertex.
+    float u_wireHalfWidth;
+    float u_wireViewW;
+    float u_wireViewH;
+    float _pad4[3];
 };
 
 class GLWidget : public QRhiWidget
@@ -1133,9 +1140,21 @@ public:
     // sparirebbero. Si ottiene ridisegnandole con la finestra spostata di qualche
     // pixel. Si rimette a 1 a cattura finita.
     void setCaptureLineWidth(int pixels);
-    // Quanti indici di linea ha il wireframe in scena (0 = nessun wireframe): il
-    // costo di un ridisegno. Serve a limitare lo spessore di una cattura.
+    // True se il wireframe si disegna a strisce di triangoli (spessore libero, bordo
+    // sfumato); false se ricade sulle linee native ridisegnate (tubi, mesh custom).
+    bool wireframeQuadsActive() const { return m_wireframeIndexCount <= 0 || m_wireQuadPipeline; }
+    // Prima della cattura: il wireframe PUO' andare a strisce?
+    bool wireframeQuadsEligible() const;
+    // Quanti indici di linea ha il wireframe (0 = nessuno): il costo di un ridisegno.
     qint64 wireframeIndexTotal() const { return m_wireframeIndexCount; }
+    // ANTIALIASING (MSAA) del display. I campioni che il dispositivo supporta
+    // (sempre compreso 1 = spento) e il cambio: false se `samples` non e' fra
+    // quelli supportati (nulla cambia). Il cambio rifa' tutte le pipeline: dipendono
+    // dai campioni del render target. Una cattura molto grande (beginHiResCapture)
+    // lo sospende da sola, perche' i campioni moltiplicano la memoria del buffer.
+    QList<int> supportedMsaaSamples();
+    bool setMsaaSamples(int samples);
+    int msaaSamples() const { return sampleCount(); }
     // Il lato massimo di una texture / buffer della GPU (QRhi::TextureSizeMax).
     int maxTextureSize();
     void endHiResCapture();
@@ -1328,6 +1347,17 @@ private:
     QRhiBuffer *m_borderWireIbo = nullptr;
     bool m_borderUploaded = false;
     QRhiGraphicsPipeline *m_wireframePipeline = nullptr;
+    // WIREFRAME A STRISCE DI TRIANGOLI, solo per le catture di immagini (vedi
+    // GLWidget::prepareWireQuads): un'istanza per segmento (i due estremi, 32
+    // byte) e la pipeline che le espande. m_wireQuadSerial = la cattura per cui
+    // sono pronti.
+    QRhiBuffer *m_wireQuadVbo = nullptr;
+    QRhiGraphicsPipeline *m_wireQuadPipeline = nullptr;
+    int m_wireQuadSerial = -1;
+    int m_captureSerial = 0;
+    int m_msaaBeforeCapture = 0;           // campioni da rimettere a fine cattura
+    void prepareWireQuads(QRhiResourceUpdateBatch *resourceUpdates);
+    void invalidateSampleDependentPipelines();
     std::vector<unsigned int> m_wireframeIndices;
     bool wireframeNeedsUpdate = true;
     int m_wireframeIndexCount = 0;

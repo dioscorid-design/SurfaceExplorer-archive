@@ -13,6 +13,10 @@ layout(location = 6) in float v_borderReach;
 // globale, surfaceTextureColor).
 layout(location = 7) in vec3 v_objPos;
 layout(location = 8) in vec3 v_objNormal;
+#ifdef HAS_WIRE_QUAD
+// Distanza in pixel dal centro della linea e meta' spessore (vedi surface.vert).
+layout(location = 9) in vec2 v_wireDist;
+#endif
 
 // --- OUTPUT ---
 layout(location = 0) out vec4 FragColor;
@@ -104,6 +108,12 @@ layout(std140, binding = 0) uniform SceneUBO {
     // una sola su tutta la figura (surfaceTextureColor). Ultimo campo di
     // UboData.
     float u_globalTexture;
+    // NON USATI QUI (il vertex li usa per le strisce del wireframe), ma il blocco
+    // deve combaciare col vertex campo per campo (regola Adreno). Ultimi campi di
+    // UboData.
+    float u_wireHalfWidth;
+    float u_wireViewW;
+    float u_wireViewH;
 } ubuf;
 
 // --- PLACEHOLDER PER CODICE TEXTURE CUSTOM ---
@@ -214,7 +224,14 @@ void main() {
 
     // Se siamo in modalità Wireframe (2) o Bordi (5), usa colore piatto senza luci
     if (ubuf.u_renderMode == 2 || ubuf.u_renderMode == 5) {
+#ifdef HAS_WIRE_QUAD
+        // Striscia del wireframe: copertura del pixel dalla distanza dal centro, che
+        // da' il bordo sfumato (antialiasing della linea).
+        const float coverage = clamp(v_wireDist.y - abs(v_wireDist.x) + 0.5, 0.0, 1.0);
+        FragColor = vec4(ubuf.color, ubuf.alpha * coverage);
+#else
         FragColor = vec4(ubuf.color, ubuf.alpha);
+#endif
         return;
     }
 

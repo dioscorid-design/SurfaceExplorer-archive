@@ -242,6 +242,7 @@ private:
     // rapporto, riquadro guida, e che il riquadro dica la verita'. Da sola:
     // --scenario-only image-capture.
     void runImageCaptureScenarios();
+    void runAntialiasingScenarios();
     void runHiResProbeScenarios();
     // SUPERFICIE ANIMATA DA EQUAZIONI: il load (che svuota la mesh) e il Run
     // dopo un NEW devono sganciare il gate della scena vuota, cioe' lasciare

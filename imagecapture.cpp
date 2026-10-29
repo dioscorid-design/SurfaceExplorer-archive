@@ -86,10 +86,19 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
     // lo spessore al costo (indici x ridisegni, al massimo 30 milioni) e, se l'immagine esce comunque
     // di un solo colore, si riprova con meno.
     auto drawsFor = [](int w) { return std::max(1, 2 * w - 1); };   // la croce di wireframeOffsets
-    int lineWidth = int(std::lround(scale));
+    // Strisce di triangoli con bordo sfumato: un po' piu' spesse della linea a schermo
+    // (x1.5) per leggersi bene anche a un poster ridotto; con le linee native
+    // ridisegnate si resta alla proporzione esatta.
+    const bool quads = gl->wireframeQuadsEligible();
+    int lineWidth = int(std::lround(quads ? scale * 1.5 : scale));
     const qint64 wireIndices = gl->wireframeIndexTotal();
-    if (wireIndices > 0)
+    // Con le strisce di triangoli (parametriche) lo spessore e' libero: un solo
+    // disegno, qualunque sia. Le linee native ridisegnate (tubi, mesh custom)
+    // restano col tetto di costo.
+    if (wireIndices > 0 && !gl->wireframeQuadsEligible()) {
+        lineWidth = std::min(lineWidth, 12);
         while (lineWidth > 1 && qint64(drawsFor(lineWidth)) * wireIndices > 30000000) --lineWidth;
+    }
     QImage img;
     for (;;) {
         gl->setCaptureVerticalScale(verticalScale);

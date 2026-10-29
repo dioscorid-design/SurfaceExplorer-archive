@@ -1,9 +1,21 @@
 #version 440
 
 // INPUT
+#ifdef HAS_WIRE_QUAD
+// WIREFRAME A STRISCE DI TRIANGOLI (solo nelle catture di immagini): ogni segmento
+// e' una istanza con i due estremi (i vertici della griglia, come nel buffer della
+// superficie) e il vertice li legge da qui. Gli altri attributi non servono al
+// wireframe: restano variabili locali, cosi' il resto dello shader non cambia.
+layout(location = 0) in vec4 wireA;
+layout(location = 1) in vec4 wireB;
+vec4 vertex;
+vec4 normal;
+vec2 texCoord;
+#else
 layout(location = 0) in vec4 vertex;
 layout(location = 1) in vec4 normal;
 layout(location = 2) in vec2 texCoord;
+#endif
 
 // OUTPUT
 layout(location = 0) out vec3 v_pos;
@@ -22,6 +34,11 @@ layout(location = 6) out float v_borderReach;
 // (surfaceTextureColor nel fragment), cosi' resta ferma sulla figura girandola.
 layout(location = 7) out vec3 v_objPos;
 layout(location = 8) out vec3 v_objNormal;
+#ifdef HAS_WIRE_QUAD
+// Distanza in pixel dal centro della linea (con segno) e meta' spessore: il
+// fragment ne ricava la copertura (bordo sfumato).
+layout(location = 9) out vec2 v_wireDist;
+#endif
 
 layout(std140, binding = 0) uniform SceneUBO {
     mat4 u_mvpMatrix;
@@ -115,6 +132,14 @@ layout(std140, binding = 0) uniform SceneUBO {
     // Texture globale (multimesh in ambito All): NON USATO QUI (lo legge il
     // fragment), dichiarato per la regola Adreno. Ultimo campo di UboData.
     float u_globalTexture;
+    // Wireframe a strisce di triangoli (HAS_WIRE_QUAD, solo nelle catture di
+    // immagini): meta' spessore della linea in pixel e dimensione dell'immagine in
+    // pixel. NON USATI DAL FRAGMENT (che riceve la distanza dal varying), ma il
+    // blocco deve combaciare col vertex campo per campo (regola Adreno, vedi
+    // CLAUDE.md). In coda: il blocco cresce di una riga (512 byte).
+    float u_wireHalfWidth;
+    float u_wireViewW;
+    float u_wireViewH;
 } ubuf;
 
 float sq(float x) { return x*x; }
@@ -1064,7 +1089,33 @@ void emitBorderVertex() {
 }
 #endif
 
+#ifdef HAS_WIRE_QUAD
+// La posizione sullo schermo (clip) di un vertice: la stessa formula di main(),
+// per l'altro estremo del segmento.
+vec4 wireClipPosition() {
+    float u = vertex.x;
+    float v = vertex.y;
+    vec4 pRot = getRotatedPoint4D(u, v);
+    vec3 finalPos3D = projectToScene(pRot);
+    vec4 pos = ubuf.u_mvpMatrix * vec4(finalPos3D, 1.0);
+    pos.z -= clamp(pRot.w, -1.0, 1.0) * 0.0005 * pos.w;
+    pos += ubuf.u_dummyZero * 0.000001;
+    return pos;
+}
+#endif
+
 void main() {
+#ifdef HAS_WIRE_QUAD
+    // Due triangoli per segmento: (A-, A+, B-) e (B-, A+, B+).
+    const int cid = gl_VertexIndex % 6;
+    const int along = (cid == 2 || cid == 3 || cid == 5) ? 1 : 0;
+    const float side = (cid == 0 || cid == 2 || cid == 3) ? -1.0 : 1.0;
+    vertex = (along == 0) ? wireA : wireB;
+    const vec4 otherVertex = (along == 0) ? wireB : wireA;
+    normal = vec4(0.0, 0.0, 1.0, 0.0);
+    texCoord = vec2(0.0);
+    v_wireDist = vec2(0.0);
+#endif
     v_borderSide = -1.0;
     v_borderReach = 0.0;
     v_objPos = vec3(0.0);
@@ -1211,5 +1262,32 @@ void main() {
     pos.z -= clamp(pRot.w, -1.0, 1.0) * 0.0005 * pos.w;
 
     pos += ubuf.u_dummyZero * 0.000001;
+#ifdef HAS_WIRE_QUAD
+    {
+        const vec4 here = vertex;
+        vertex = otherVertex;
+        const vec4 posOther = wireClipPosition();
+        vertex = here;
+        if (pos.w <= 0.0001 || posOther.w <= 0.0001) {
+            gl_Position = vec4(2.0, 2.0, 2.0, 1.0);   // dietro la camera: il segmento sparisce
+            return;
+        }
+        const vec2 view = vec2(ubuf.u_wireViewW, ubuf.u_wireViewH);
+        const vec2 a = pos.xy / pos.w * view * 0.5;
+        const vec2 b = posOther.xy / posOther.w * view * 0.5;
+        vec2 dir = b - a;
+        const float len = length(dir);
+        dir = (len > 0.0001) ? dir / len : vec2(1.0, 0.0);
+        const vec2 nrm = vec2(-dir.y, dir.x);
+        const float hw = ubuf.u_wireHalfWidth;
+        const float e = hw + 1.0;   // un pixel in piu' per il bordo sfumato
+        // L'estremo si sposta di lato e un po' in fuori: i segmenti che si incontrano
+        // in un vertice si sovrappongono invece di lasciare una tacca.
+        const vec2 offsetPx = nrm * side * e - dir * hw;
+        gl_Position = vec4(pos.xy + offsetPx * 2.0 / view * pos.w, pos.z, pos.w);
+        v_wireDist = vec2(side * e, hw);
+        return;
+    }
+#endif
     gl_Position = pos;
 }
