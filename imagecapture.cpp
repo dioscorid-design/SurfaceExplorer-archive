@@ -73,7 +73,7 @@ static bool isSingleColor(const QImage &im)
 QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QString *error)
 {
     const double viewRatio = double(gl->width()) / double(std::max(1, gl->height()));
-    gl->setCaptureVerticalScale(verticalScaleFor(ratio, viewRatio));
+    const float verticalScale = verticalScaleFor(ratio, viewRatio);
     // Le linee del wireframe sono larghe un pixel qualunque sia la dimensione:
     // si ispessiscono in proporzione a quanto l'immagine e' piu' grande della vista
     // (nel verso che resta fisso: l'altezza se si taglia ai lati, la larghezza se
@@ -83,24 +83,29 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
                                               : size.width() / std::max(1.0, gl->width() * dpr);
     // Ogni ridisegno costa tutto il wireframe: su una scena fitta troppi ridisegni
     // in un solo fotogramma fanno fallire la GPU (immagine tutta magenta). Si limita
-    // lo spessore al costo (indici x ridisegni, al massimo 20 milioni) e, se l'immagine esce comunque
+    // lo spessore al costo (indici x ridisegni, al massimo 30 milioni) e, se l'immagine esce comunque
     // di un solo colore, si riprova con meno.
     auto drawsFor = [](int w) { return std::max(1, 2 * w - 1); };   // la croce di wireframeOffsets
     int lineWidth = int(std::lround(scale));
     const qint64 wireIndices = gl->wireframeIndexTotal();
     if (wireIndices > 0)
-        while (lineWidth > 1 && qint64(drawsFor(lineWidth)) * wireIndices > 20000000) --lineWidth;
+        while (lineWidth > 1 && qint64(drawsFor(lineWidth)) * wireIndices > 30000000) --lineWidth;
     QImage img;
     for (;;) {
+        gl->setCaptureVerticalScale(verticalScale);
         gl->setCaptureLineWidth(lineWidth);
         gl->beginHiResCapture(size.width(), size.height());
         img = gl->getFrameForVideo(size.width(), size.height(), true);
+        // Campo visivo e spessore tornano normali PRIMA di chiudere la cattura:
+        // endHiResCapture ridisegna subito la vista, e con i valori della cattura
+        // restava a schermo un wireframe fitto fino al primo click.
+        gl->setCaptureVerticalScale(1.0f);
+        gl->setCaptureLineWidth(1);
         gl->endHiResCapture();
         if (lineWidth <= 1 || img.isNull() || !isSingleColor(img)) break;
         lineWidth = std::max(1, lineWidth - 1);
     }
-    gl->setCaptureVerticalScale(1.0f);
-    gl->setCaptureLineWidth(1);
+    gl->update();
     if (img.isNull() || img.size() != size) {
         if (error) *error = QObject::tr("The GPU could not render an image of %1 x %2 pixels.")
                                 .arg(size.width()).arg(size.height());
