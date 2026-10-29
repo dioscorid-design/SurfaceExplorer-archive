@@ -3236,9 +3236,12 @@ void GLWidget::render(QRhiCommandBuffer *cb)
             if (anyWireframe) {
                 if (m_wireframePipeline && m_wireframeIndexCount > 0) {
                     cb->setGraphicsPipeline(m_wireframePipeline);
-                    cb->setViewport(QRhiViewport(0, 0, outputSize.width(), outputSize.height()));
                     const QRhiCommandBuffer::VertexInput vbufBinding(m_vbo, 0);
 
+                    // Con uno spessore > 1 (cattura di immagini) il wireframe si ridisegna con
+                    // la finestra spostata: vedi setCaptureLineWidth.
+                    for (const QPoint &off : wireframeOffsets()) {
+                    cb->setViewport(QRhiViewport(off.x(), off.y(), outputSize.width(), outputSize.height()));
                     if (m_wireframeRanges.size() <= 1) {
                         const QRhiCommandBuffer::DynamicOffset ofs(0, 0);
                         cb->setShaderResources(srb, 1, &ofs);
@@ -3264,6 +3267,7 @@ void GLWidget::render(QRhiCommandBuffer *cb)
                             cb->drawIndexed(r.indexCount);
                         }
                     }
+                    }
                 }
             }
 
@@ -3274,8 +3278,9 @@ void GLWidget::render(QRhiCommandBuffer *cb)
                 && m_wireframePipeline && m_borderVbo && m_borderWireIbo && m_borderUploaded) {
                 const int partSlots = std::max(1, (int)parts.size());
                 cb->setGraphicsPipeline(m_borderPipelineWire ? m_borderPipelineWire : m_wireframePipeline);
-                cb->setViewport(QRhiViewport(0, 0, outputSize.width(), outputSize.height()));
                 const QRhiCommandBuffer::VertexInput borderBinding(m_borderVbo, 0);
+                for (const QPoint &off : wireframeOffsets()) {
+                cb->setViewport(QRhiViewport(off.x(), off.y(), outputSize.width(), outputSize.height()));
                 for (const SurfaceEngine::BorderRange &r : engine->getBorderRanges()) {
                     if (r.wireIndexCount <= 0) continue;
                     const int slot = partSlots + std::clamp(r.meshIndex, 0, partSlots - 1);
@@ -3285,6 +3290,7 @@ void GLWidget::render(QRhiCommandBuffer *cb)
                                        r.wireIndexOffset * sizeof(unsigned int),
                                        QRhiCommandBuffer::IndexUInt32);
                     cb->drawIndexed(r.wireIndexCount, 1, 0, r.vertexOffset);
+                }
                 }
             }
 
@@ -6562,6 +6568,26 @@ GLWidget::ClockTimes GLWidget::clockTimes() const {
 // ==========================================================
 // UTILITIES
 // ==========================================================
+
+void GLWidget::setCaptureLineWidth(int pixels)
+{
+    m_captureLineWidth = qBound(1, pixels, 8);
+}
+
+// Gli spostamenti (in pixel) della finestra con cui si ridisegna il wireframe per
+// dargli lo spessore chiesto: i punti di un disco, centrati sull'origine.
+QVector<QPoint> GLWidget::wireframeOffsets() const
+{
+    QVector<QPoint> offs;
+    const int n = m_captureLineWidth;
+    const double c = (n - 1) / 2.0;
+    for (int j = 0; j < n; ++j)
+        for (int i = 0; i < n; ++i)
+            if (std::hypot(i - c, j - c) <= n / 2.0)
+                offs.append(QPoint(int(std::floor(i - c)), int(std::floor(j - c))));
+    if (offs.isEmpty()) offs.append(QPoint(0, 0));
+    return offs;
+}
 
 void GLWidget::setCaptureVerticalScale(float scale)
 {

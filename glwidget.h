@@ -1127,6 +1127,15 @@ public:
     // quello della vista e il riquadro guida (la parte della vista che entra
     // nell'immagine) dice la verita'. Si rimette a 1 a cattura finita.
     void setCaptureVerticalScale(float scale);
+    // Spessore, in pixel dell'immagine, con cui si disegnano le linee dei wireframe
+    // durante una cattura (1 = linea nativa della GPU). Le linee della GPU sono
+    // sempre larghe un pixel: in un'immagine molto piu' grande della vista
+    // sparirebbero. Si ottiene ridisegnandole con la finestra spostata di qualche
+    // pixel. Si rimette a 1 a cattura finita.
+    void setCaptureLineWidth(int pixels);
+    // Quanti indici di linea ha il wireframe in scena (0 = nessun wireframe): il
+    // costo di un ridisegno. Serve a limitare lo spessore di una cattura.
+    qint64 wireframeIndexTotal() const { return m_wireframeIndexCount; }
     // Il lato massimo di una texture / buffer della GPU (QRhi::TextureSizeMax).
     int maxTextureSize();
     void endHiResCapture();
@@ -1747,6 +1756,8 @@ private:
     float m_cameraPitch;
     float m_cameraRoll = 0.0f;
     float m_cameraFov = 45.0f; // gradi, vedi setCameraFov()
+    int m_captureLineWidth = 1;            // vedi setCaptureLineWidth
+    QVector<QPoint> wireframeOffsets() const;
     float m_captureVerticalScale = 1.0f;   // vedi setCaptureVerticalScale
     // Il campo visivo verticale con cui si disegna: m_cameraFov, scalato in
     // tangente durante una cattura d'immagine.

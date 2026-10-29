@@ -60,14 +60,53 @@ QRect ImageCapture::guideRect(const QSize &view, double ratio)
     return QRect((view.width() - w) / 2, (view.height() - h) / 2, w, h);
 }
 
+// Un'immagine di un solo colore: sintomo di un fotogramma fallito sulla GPU.
+static bool isSingleColor(const QImage &im)
+{
+    if (im.isNull()) return false;
+    const QRgb first = im.pixel(0, 0);
+    for (int k = 1; k <= 64; ++k)
+        if (im.pixel(im.width() * k / 65, im.height() * (k * 7 % 64 + 1) / 65) != first) return false;
+    return true;
+}
+
 QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QString *error)
 {
     const double viewRatio = double(gl->width()) / double(std::max(1, gl->height()));
     gl->setCaptureVerticalScale(verticalScaleFor(ratio, viewRatio));
-    gl->beginHiResCapture(size.width(), size.height());
-    QImage img = gl->getFrameForVideo(size.width(), size.height(), true);
-    gl->endHiResCapture();
+    // Le linee del wireframe sono larghe un pixel qualunque sia la dimensione:
+    // si ispessiscono in proporzione a quanto l'immagine e' piu' grande della vista
+    // (nel verso che resta fisso: l'altezza se si taglia ai lati, la larghezza se
+    // il campo verticale si riduce).
+    const double dpr = gl->devicePixelRatioF();
+    const double scale = (ratio <= viewRatio) ? size.height() / std::max(1.0, gl->height() * dpr)
+                                              : size.width() / std::max(1.0, gl->width() * dpr);
+    // Ogni ridisegno costa tutto il wireframe: su una scena fitta troppi ridisegni
+    // in un solo fotogramma fanno fallire la GPU (immagine tutta magenta). Si limita
+    // lo spessore al costo (indici x ridisegni) e, se l'immagine esce comunque
+    // di un solo colore, si riprova con meno.
+    auto drawsFor = [](int w) {
+        int n = 0;
+        for (int j = 0; j < w; ++j)
+            for (int i = 0; i < w; ++i)
+                if (std::hypot(i - (w - 1) / 2.0, j - (w - 1) / 2.0) <= w / 2.0) ++n;
+        return std::max(1, n);
+    };
+    int lineWidth = int(std::lround(scale));
+    const qint64 wireIndices = gl->wireframeIndexTotal();
+    if (wireIndices > 0)
+        while (lineWidth > 1 && qint64(drawsFor(lineWidth)) * wireIndices > 15000000) --lineWidth;
+    QImage img;
+    for (;;) {
+        gl->setCaptureLineWidth(lineWidth);
+        gl->beginHiResCapture(size.width(), size.height());
+        img = gl->getFrameForVideo(size.width(), size.height(), true);
+        gl->endHiResCapture();
+        if (lineWidth <= 1 || img.isNull() || !isSingleColor(img)) break;
+        lineWidth = std::max(1, lineWidth - 1);
+    }
     gl->setCaptureVerticalScale(1.0f);
+    gl->setCaptureLineWidth(1);
     if (img.isNull() || img.size() != size) {
         if (error) *error = QObject::tr("The GPU could not render an image of %1 x %2 pixels.")
                                 .arg(size.width()).arg(size.height());
@@ -289,11 +328,15 @@ public:
         connect(m_modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, update);
         connect(m_customW, QOverload<int>::of(&QSpinBox::valueChanged), this, update);
         connect(m_customH, QOverload<int>::of(&QSpinBox::valueChanged), this, update);
-        connect(m_longSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this]() {
-            // Il menu mostra il preset che corrisponde al valore, "Preset..." se nessuno.
+        // Il menu mostra il preset che corrisponde al valore, "Preset..." (il titolo,
+        // non una misura) se nessuno.
+        auto syncPreset = [this]() {
             const QSignalBlocker b(m_presetCombo);
             const int at = m_presetCombo->findData(m_longSpin->value());
             m_presetCombo->setCurrentIndex(at > 0 ? at : 0);
+        };
+        connect(m_longSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this, syncPreset]() {
+            syncPreset();
             refresh();
         });
         connect(m_presetCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int i) {
@@ -303,6 +346,7 @@ public:
         connect(m_printLen, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, update);
         connect(m_unitCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, update);
         connect(m_dpiSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, update);
+        syncPreset();   // il valore salvato dall'ultima volta
         refresh();
     }
 

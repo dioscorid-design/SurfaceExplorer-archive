@@ -1889,6 +1889,11 @@ void ScenarioTest::run()
         finish();
         return;
     }
+    if (m_only == QLatin1String("hires-probe")) {
+        runHiResProbeScenarios();
+        finish();
+        return;
+    }
     if (m_only == QLatin1String("image-capture")) {
         runImageCaptureScenarios();
         finish();
@@ -5406,6 +5411,52 @@ void ScenarioTest::runStepsScenarios()
     }
 }
 
+void ScenarioTest::runHiResProbeScenarios()
+{
+    GLWidget *gl = m_mw->ui->glWidget;
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Sonda: rendering fuori schermo a dimensioni crescenti =="));
+    if (QRhi *rhi = gl->getRhi())
+        m_lines.append(QStringLiteral("limite di texture della GPU: %1 pixel per lato (backend %2)")
+                           .arg(rhi->resourceLimit(QRhi::TextureSizeMax)).arg(rhi->backendName()));
+    // Una sola tinta su tutta l'immagine = rendering fallito (e' il sintomo visto su GPU reali).
+    auto uniform = [](const QImage &im) {
+        const QRgb a = im.pixel(0, 0);
+        for (int k = 1; k <= 64; ++k)
+            if (im.pixel(im.width() * k / 65, im.height() * (k * 7 % 64 + 1) / 65) != a) return false;
+        return true;
+    };
+    const QList<QSize> sizes = { QSize(3840, 2160), QSize(7680, 4320), QSize(8192, 8192),
+                                 QSize(12288, 6912), QSize(16384, 9216), QSize(16384, 16384) };
+    const QStringList scenes = { QStringLiteral("records/Static/Hopf Tori.json"),
+                                 QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"),
+                                 QStringLiteral("surfaces/Implicit/3D/Chmutov.json") };
+    for (const QString &scene : scenes) {
+        if (!(scene.startsWith(QLatin1String("records/")) ? loadRecord(scene) : loadSurface(scene))) continue;
+        gl->stopAllTimers();
+        gl->setClocksDrivenByRecorder(true);
+        wait(500);
+        for (const QSize &sz : sizes) {
+            QElapsedTimer t;
+            t.start();
+            QString renderError;
+            const QImage img = ImageCapture::render(gl, sz, double(sz.width()) / sz.height(), &renderError);
+            const qint64 ms = t.elapsed();
+            const bool ok = !img.isNull() && img.size() == sz;
+            const bool flat = ok && uniform(img);
+            const QString line = QStringLiteral("%1 %2x%3: %4, %5 ms%6")
+                .arg(scene.section(QLatin1Char('/'), -1)).arg(sz.width()).arg(sz.height())
+                .arg(ok ? QStringLiteral("OK") : QStringLiteral("NON RIUSCITO")).arg(ms)
+                .arg(flat ? QStringLiteral(", IMMAGINE UNIFORME (colore %1)").arg(QColor(img.pixel(0, 0)).name()) : QString());
+            m_lines.append(line);
+            qInfo().noquote() << "HIRES" << line;
+            wait(300);
+            if (!ok) break;
+        }
+        gl->setClocksDrivenByRecorder(false);
+    }
+}
+
 void ScenarioTest::runImageCaptureScenarios()
 {
     GLWidget *gl = m_mw->ui->glWidget;
@@ -5472,6 +5523,38 @@ void ScenarioTest::runImageCaptureScenarios()
                   .arg(f1, 0, 'f', 3).arg(f2, 0, 'f', 3));
     }
 
+    // WIREFRAME: le linee native sono larghe un pixel, in un'immagine grande
+    // sparirebbero. Con lo spessore in proporzione l'immagine ha piu' pixel di linea.
+    {
+        const int prevMode = gl->globalRenderMode();
+        gl->setGlobalRenderMode(2);
+        auto inkOf = [](const QImage &im) {
+            const QRgb bg = im.pixel(1, 1);
+            qint64 n = 0;
+            for (int y = 0; y < im.height(); ++y)
+                for (int x = 0; x < im.width(); ++x) {
+                    const QRgb p = im.pixel(x, y);
+                    if (std::abs(qRed(p) - qRed(bg)) + std::abs(qGreen(p) - qGreen(bg)) + std::abs(qBlue(p) - qBlue(bg)) > 30) ++n;
+                }
+            return n;
+        };
+        const QSize sw = ImageCapture::sizeFor(viewRatio, 3200);
+        const QImage thick = ImageCapture::render(gl, sw, viewRatio, &err);
+        gl->setCaptureLineWidth(1);
+        gl->beginHiResCapture(sw.width(), sw.height());
+        const QImage thin = gl->getFrameForVideo(sw.width(), sw.height(), true);
+        gl->endHiResCapture();
+        if (!thick.isNull() && !thin.isNull()) {
+            const qint64 a1 = inkOf(thin), a2 = inkOf(thick);
+            check(a2 > a1 * 1.5, QStringLiteral("wireframe in un'immagine grande: pixel di linea %1 con spessore, %2 senza").arg(a2).arg(a1));
+            thick.save(m_outDir + QStringLiteral("/image-capture-wire-thick.png"));
+            thin.save(m_outDir + QStringLiteral("/image-capture-wire-thin.png"));
+        } else {
+            check(false, QStringLiteral("wireframe: immagine vuota"));
+        }
+        gl->setGlobalRenderMode(prevMode);
+    }
+
     // Piu' stretta della vista: il campo verticale non cambia, si taglia ai lati.
     const double narrowRatio = viewRatio * 0.5;
     const QSize s3 = ImageCapture::sizeFor(narrowRatio, 1600);
@@ -5481,6 +5564,31 @@ void ScenarioTest::runImageCaptureScenarios()
     // Dopo lo scatto il campo visivo e' quello di prima (stessa immagine di prima).
     const QImage again = ImageCapture::render(gl, s1, viewRatio, &err);
     check(!again.isNull() && again == img1, QStringLiteral("dopo uno scatto largo, il campo visivo e' tornato quello della vista"));
+    {
+        auto inkOf = [](const QImage &im) {
+            const QRgb bg = im.pixel(1, 1);
+            qint64 n = 0;
+            for (int y = 0; y < im.height(); ++y)
+                for (int x = 0; x < im.width(); ++x) {
+                    const QRgb p = im.pixel(x, y);
+                    if (std::abs(qRed(p) - qRed(bg)) + std::abs(qGreen(p) - qGreen(bg)) + std::abs(qBlue(p) - qBlue(bg)) > 30) ++n;
+                }
+            return n;
+        };
+        // Scena fitta in wireframe a una dimensione grande: troppi ridisegni per lo
+        // spessore facevano fallire la GPU (immagine tutta magenta).
+        if (loadRecord(QStringLiteral("records/Static/Hopf Tori.json"))) {
+            gl->stopAllTimers();
+            gl->setClocksDrivenByRecorder(true);
+            wait(400);
+            const QSize sb = ImageCapture::sizeFor(viewRatio, 7680);
+            const QImage dense = ImageCapture::render(gl, sb, viewRatio, &err);
+            check(!dense.isNull() && inkOf(dense) > 5000,
+                  QStringLiteral("wireframe fitto a 7680 px: l'immagine non e' di un solo colore (%1 pixel di linea)")
+                      .arg(dense.isNull() ? 0 : inkOf(dense)));
+            gl->setClocksDrivenByRecorder(false);
+        }
+    }
     // IL FLUSSO INTERO, col dialogo vero: lo si accetta da un timer dopo averne
     // fatto uno screenshot, il file va in un percorso di prova.
     {
