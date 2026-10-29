@@ -238,6 +238,10 @@ private:
     // nere (non stirata, non a meta' misura su Retina). Da sola: --scenario-only
     // video-frame.
     void runVideoFrameScenarios();
+    // Lo scatto di un'immagine a risoluzione libera (ImageCapture): dimensioni dal
+    // rapporto, riquadro guida, e che il riquadro dica la verita'. Da sola:
+    // --scenario-only image-capture.
+    void runImageCaptureScenarios();
     // SUPERFICIE ANIMATA DA EQUAZIONI: il load (che svuota la mesh) e il Run
     // dopo un NEW devono sganciare il gate della scena vuota, cioe' lasciare
     // accesi i comandi del dock RENDERER. Il Run lo sganciava solo per le

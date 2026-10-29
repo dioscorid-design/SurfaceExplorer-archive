@@ -145,6 +145,8 @@ qt_add_executable(SurfaceExplorer
     glsltranslator.cpp
     videorecorder.h
     videorecorder.cpp
+    imagecapture.h
+    imagecapture.cpp
     librarymenucontroller.h
     librarymenucontroller.cpp
     presetserializer.h

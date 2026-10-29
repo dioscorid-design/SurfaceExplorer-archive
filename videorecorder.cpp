@@ -1,4 +1,5 @@
 #include "videorecorder.h"
+#include "imagecapture.h"
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "glwidget.h"
@@ -439,6 +440,26 @@ void VideoRecorder::toggleRecord()
     QString defaultVideoDir = rootPath + "/renders";
     QDir().mkpath(defaultVideoDir);
     QString userSelectedFile;
+
+    // VIDEO O IMMAGINE. La scena e' gia' ferma (qui sopra, come per ogni dialogo
+    // del REC); l'immagine la scatta ImageCapture a una risoluzione libera, fuori
+    // schermo, e restoreState rimette in moto cio' che girava.
+    {
+        QMessageBox choice(m_mainWindow);
+        choice.setWindowTitle("Capture");
+        choice.setText("What do you want to capture?");
+        QPushButton *videoBtn = choice.addButton("Video", QMessageBox::AcceptRole);
+        QPushButton *imageBtn = choice.addButton("Image", QMessageBox::ActionRole);
+        choice.addButton("Cancel", QMessageBox::RejectRole);
+        choice.setDefaultButton(videoBtn);
+        choice.exec();
+        if (choice.clickedButton() == imageBtn) {
+            ImageCapture::run(m_mainWindow->ui->glWidget, m_mainWindow, defaultVideoDir);
+            restoreState();
+            return;
+        }
+        if (choice.clickedButton() != videoBtn) { restoreState(); return; }
+    }
 
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     // --- ANDROID e IOS: FINESTRA UNIFICATA MOBILE ---

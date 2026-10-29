@@ -1120,6 +1120,15 @@ public:
     // restituisce pixel nitidi senza upscale (fix wireframe sfocato nei video).
     // begin va chiamata una volta prima del loop di registrazione, end alla fine.
     void beginHiResCapture(int w, int h);
+    // Cattura di un'IMMAGINE (vedi ImageCapture): il campo visivo VERTICALE e' quello
+    // della vista moltiplicato per questa scala (1 = invariato, mai oltre). Serve a
+    // un'immagine piu' LARGA della vista: col campo verticale fisso mostrerebbe di
+    // piu' ai lati di cio' che si vede a schermo; scalandolo, l'orizzontale resta
+    // quello della vista e il riquadro guida (la parte della vista che entra
+    // nell'immagine) dice la verita'. Si rimette a 1 a cattura finita.
+    void setCaptureVerticalScale(float scale);
+    // Il lato massimo di una texture / buffer della GPU (QRhi::TextureSizeMax).
+    int maxTextureSize();
     void endHiResCapture();
     QString getShaderError() const { return m_lastCompilationError; }
     bool validateAndApplyParametricShader(const QString &customLogic);
@@ -1738,6 +1747,10 @@ private:
     float m_cameraPitch;
     float m_cameraRoll = 0.0f;
     float m_cameraFov = 45.0f; // gradi, vedi setCameraFov()
+    float m_captureVerticalScale = 1.0f;   // vedi setCaptureVerticalScale
+    // Il campo visivo verticale con cui si disegna: m_cameraFov, scalato in
+    // tangente durante una cattura d'immagine.
+    float effectiveCameraFov() const;
     bool m_externalClockActive = false; // vedi setExternalClockActive()
 
     bool m_isPathFollowing = false;   // MODALITA' camera tangent (persiste dopo stop)

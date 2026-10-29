@@ -35,6 +35,7 @@ HEADERS += audiocontroller.h \
            synthesizer.h \
            uistylemanager.h \
            videorecorder.h \
+           imagecapture.h \
            build/SurfaceExplorer_autogen/include/ui_mainwindow.h \
            build/Desktop_Qt_6_10-Debug/SurfaceExplorer_autogen/include/ui_mainwindow.h \
            build/Qt_6_10_1_for_Android_arm64_v8a-Debug/SurfaceExplorer_autogen/include/ui_mainwindow.h \
@@ -63,6 +64,7 @@ SOURCES += audiocontroller.cpp \
            synthesizer.cpp \
            uistylemanager.cpp \
            videorecorder.cpp \
+           imagecapture.cpp \
            build/SurfaceExplorer_autogen/mocs_compilation.cpp \
            build/Desktop_Qt_6_10-Debug/SurfaceExplorer_autogen/mocs_compilation.cpp \
            build/Qt_6_10_1_for_Android_arm64_v8a-Debug/SurfaceExplorer_autogen/mocs_compilation.cpp \

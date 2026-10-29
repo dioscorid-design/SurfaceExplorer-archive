@@ -2042,7 +2042,7 @@ void GLWidget::render(QRhiCommandBuffer *cb)
         const float nearPlane = camDist * 0.0025f;
         const float farPlane  = camDist * 25.0f;
         if (projectionMode == Ortho4D) {
-            float halfHeight = camDist * std::tan(m_cameraFov * 0.5f * M_PI / 180.0f);
+            float halfHeight = camDist * std::tan(effectiveCameraFov() * 0.5f * M_PI / 180.0f);
             float halfWidth = halfHeight * aspect;
             // NEAR SIMMETRICO IN ORTOGONALE (-far invece di nearPlane).
             // In prospettiva la camera e' un punto e il cono si stringe verso di
@@ -2064,7 +2064,7 @@ void GLWidget::render(QRhiCommandBuffer *cb)
             // ampio; il ramo prospettico resta invariato.
             m_projection.ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, -farPlane, farPlane);
         } else {
-            m_projection.perspective(m_cameraFov, aspect, nearPlane, farPlane);
+            m_projection.perspective(effectiveCameraFov(), aspect, nearPlane, farPlane);
         }
 
         m_view.setToIdentity();
@@ -2628,7 +2628,7 @@ void GLWidget::render(QRhiCommandBuffer *cb)
                 QMatrix4x4 viewRotInv = m_view;
                 viewRotInv.setColumn(3, QVector4D(0.0f, 0.0f, 0.0f, 1.0f));
                 viewRotInv = viewRotInv.transposed();   // rotazione: inversa = trasposta
-                const float tanHalf = std::tan(m_cameraFov * 0.5f * float(M_PI) / 180.0f);
+                const float tanHalf = std::tan(effectiveCameraFov() * 0.5f * float(M_PI) / 180.0f);
                 QMatrix4x4 eyeFromNdc;                  // pixel (ndc.x, ndc.y, 1) -> raggio in camera
                 eyeFromNdc.setToIdentity();
                 eyeFromNdc(0, 0) = tanHalf * aspect;
@@ -6562,6 +6562,23 @@ GLWidget::ClockTimes GLWidget::clockTimes() const {
 // ==========================================================
 // UTILITIES
 // ==========================================================
+
+void GLWidget::setCaptureVerticalScale(float scale)
+{
+    m_captureVerticalScale = qBound(0.05f, scale, 1.0f);
+}
+
+int GLWidget::maxTextureSize()
+{
+    return rhi() ? rhi()->resourceLimit(QRhi::TextureSizeMax) : 4096;
+}
+
+float GLWidget::effectiveCameraFov() const
+{
+    if (m_captureVerticalScale >= 0.9999f) return m_cameraFov;
+    const float halfRad = m_cameraFov * 0.5f * float(M_PI) / 180.0f;
+    return 2.0f * std::atan(std::tan(halfRad) * m_captureVerticalScale) * 180.0f / float(M_PI);
+}
 
 void GLWidget::beginHiResCapture(int w, int h) {
     if (w <= 0 || h <= 0) return;
