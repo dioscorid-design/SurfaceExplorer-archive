@@ -202,9 +202,6 @@ private slots:
     // Applica (o toglie) il blocco dei controlli di resa sulla scena vuota.
     // Sede unica: la chiamano updateRenderState e updateMasterButtonState.
     void applyEmptySceneGating();
-    // L'antialiasing del display torna a Off (slider a 0): lo chiamano il load di un
-    // preset e il cambio di scena, cosi' non resta acceso sul preset successivo.
-    void resetAntialiasing();
     void checkParametricDependency();
     void updateConstraintState();
     void updateConstantsUIState();

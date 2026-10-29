@@ -6622,39 +6622,6 @@ bool GLWidget::wireframeQuadsEligible() const
     return true;
 }
 
-QList<int> GLWidget::supportedMsaaSamples()
-{
-    QList<int> s = rhi() ? rhi()->supportedSampleCounts() : QList<int>();
-    if (!s.contains(1)) s.prepend(1);
-    std::sort(s.begin(), s.end());
-    return s;
-}
-
-bool GLWidget::setMsaaSamples(int samples)
-{
-    samples = std::max(1, samples);
-    if (!supportedMsaaSamples().contains(samples)) return false;
-    if (sampleCount() == samples) return true;
-    setSampleCount(samples);
-    invalidateSampleDependentPipelines();
-    update();
-    return true;
-}
-
-// Le pipeline nascono con i campioni del render target di allora: al cambio vanno
-// rifatte. Si liberano qui e si ricostruiscono dal loro posto di sempre (la
-// prima volta che servono).
-void GLWidget::invalidateSampleDependentPipelines()
-{
-    rebuildShader();   // libera la pipeline opaca e quella ray marching
-    if (m_bgPipeline) {
-        delete m_bgPipeline;
-        m_bgPipeline = nullptr;
-        if (m_isFlatView || m_useBackgroundTexture)
-            rebuildBackgroundShader(!m_bgIsScript, m_bgScriptCode);
-    }
-}
-
 // WIREFRAME A STRISCE DI TRIANGOLI (solo catture di immagini con spessore > 1).
 // Le linee della GPU sono sempre larghe un pixel e senza bordo sfumato; qui ogni
 // segmento diventa una striscia di due triangoli larga a piacere, con la
@@ -6769,12 +6736,6 @@ float GLWidget::effectiveCameraFov() const
 void GLWidget::beginHiResCapture(int w, int h) {
     if (w <= 0 || h <= 0) return;
     m_hiResCapture = true;
-    // I campioni MSAA moltiplicano la memoria del buffer: oltre un budget (circa un
-    // 8K a 4 campioni) la cattura si fa senza e si rimettono dopo.
-    if (sampleCount() > 1 && qint64(w) * h * sampleCount() > 100000000) {
-        m_msaaBeforeCapture = sampleCount();
-        setMsaaSamples(1);
-    }
     // Fissa il color buffer offscreen di QRhiWidget alla risoluzione di export:
     // d'ora in poi render() disegna NATIVAMENTE a w x h (renderTarget()->pixelSize()
     // diventa questa) e grabFramebuffer() restituisce pixel nitidi a quella misura.
@@ -6787,10 +6748,6 @@ void GLWidget::beginHiResCapture(int w, int h) {
 void GLWidget::endHiResCapture() {
     if (!m_hiResCapture) return;
     m_hiResCapture = false;
-    if (m_msaaBeforeCapture > 1) {
-        setMsaaSamples(m_msaaBeforeCapture);
-        m_msaaBeforeCapture = 0;
-    }
     // Torna a seguire la dimensione a schermo del widget (QSize() = dinamica).
     setFixedColorBufferSize(QSize());
     this->repaint();

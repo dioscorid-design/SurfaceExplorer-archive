@@ -696,42 +696,6 @@ QFrame#panelBackgroundTarget QRadioButton { background: transparent; }</string>
              </layout>
             </widget>
            </item>
-           <item>
-            <widget class="QLabel" name="lblAntialias">
-             <property name="text">
-              <string>Antialiasing</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignmentFlag::AlignCenter</set>
-             </property>
-             <property name="toolTip">
-              <string>Smooths the edges of surfaces and wireframe lines (MSAA). It costs memory and speed; the saved Image turns it off when it would not fit in the GPU.</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QWidget" name="widgetAntialias" native="true">
-             <layout class="QHBoxLayout" name="horizontalLayoutAntialias">
-              <item>
-               <widget class="QLabel" name="lblValAntialias">
-                <property name="text">
-                 <string>Off</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QSlider" name="antialiasSlider">
-                <property name="orientation">
-                 <enum>Qt::Orientation::Horizontal</enum>
-                </property>
-                <property name="toolTip">
-                 <string>Smooths the edges of surfaces and wireframe lines (MSAA). It costs memory and speed; the saved Image turns it off when it would not fit in the GPU.</string>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </widget>
-           </item>
           </layout>
          </widget>
         </item>

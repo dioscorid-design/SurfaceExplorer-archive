@@ -1147,14 +1147,6 @@ public:
     bool wireframeQuadsEligible() const;
     // Quanti indici di linea ha il wireframe (0 = nessuno): il costo di un ridisegno.
     qint64 wireframeIndexTotal() const { return m_wireframeIndexCount; }
-    // ANTIALIASING (MSAA) del display. I campioni che il dispositivo supporta
-    // (sempre compreso 1 = spento) e il cambio: false se `samples` non e' fra
-    // quelli supportati (nulla cambia). Il cambio rifa' tutte le pipeline: dipendono
-    // dai campioni del render target. Una cattura molto grande (beginHiResCapture)
-    // lo sospende da sola, perche' i campioni moltiplicano la memoria del buffer.
-    QList<int> supportedMsaaSamples();
-    bool setMsaaSamples(int samples);
-    int msaaSamples() const { return sampleCount(); }
     // Il lato massimo di una texture / buffer della GPU (QRhi::TextureSizeMax).
     int maxTextureSize();
     void endHiResCapture();
@@ -1355,9 +1347,7 @@ private:
     QRhiGraphicsPipeline *m_wireQuadPipeline = nullptr;
     int m_wireQuadSerial = -1;
     int m_captureSerial = 0;
-    int m_msaaBeforeCapture = 0;           // campioni da rimettere a fine cattura
     void prepareWireQuads(QRhiResourceUpdateBatch *resourceUpdates);
-    void invalidateSampleDependentPipelines();
     std::vector<unsigned int> m_wireframeIndices;
     bool wireframeNeedsUpdate = true;
     int m_wireframeIndexCount = 0;
