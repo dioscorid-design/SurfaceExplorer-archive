@@ -72,6 +72,32 @@ static bool isSingleColor(const QImage &im)
 
 namespace { bool isPhone(); }
 
+// Limiti del wireframe a strisce su telefono e tablet: una striscia larga su un wireframe
+// fitto sovrappone milioni di pixel, con blending, in un solo fotogramma, e il sistema
+// ferma la GPU (visto su iPhone a 7984x4491 con "Thick"). Si limitano spessore massimo e
+// costo (segmenti x spessore); al dialogo conviene ridurre la DIMENSIONE dell'immagine
+// piuttosto che sbiadire le linee (a spessore proporzionale, meno pixel = meno spessore).
+// Valori prudenti, non misurati. maxWidth 0 = nessun limite (desktop).
+struct WireLimits { int maxWidth; qint64 budget; };
+static WireLimits wireLimitsForDevice()
+{
+#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+    return isPhone() ? WireLimits{ 6, 6000000 } : WireLimits{ 32, 80000000 };
+#else
+    return WireLimits{ 0, 0 };
+#endif
+}
+
+// Quanto l'immagine e' piu' grande della vista, nel verso che resta fisso (l'altezza se si
+// taglia ai lati, la larghezza se il campo verticale si riduce): e' la scala dello spessore.
+static double wireScaleFor(GLWidget *gl, const QSize &size, double ratio)
+{
+    const double viewRatio = double(gl->width()) / double(std::max(1, gl->height()));
+    const double dpr = gl->devicePixelRatioF();
+    return (ratio <= viewRatio) ? size.height() / std::max(1.0, gl->height() * dpr)
+                                : size.width() / std::max(1.0, gl->width() * dpr);
+}
+
 QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QString *error, double wireFactor)
 {
     const double viewRatio = double(gl->width()) / double(std::max(1, gl->height()));
@@ -80,9 +106,7 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
     // si ispessiscono in proporzione a quanto l'immagine e' piu' grande della vista
     // (nel verso che resta fisso: l'altezza se si taglia ai lati, la larghezza se
     // il campo verticale si riduce).
-    const double dpr = gl->devicePixelRatioF();
-    const double scale = (ratio <= viewRatio) ? size.height() / std::max(1.0, gl->height() * dpr)
-                                              : size.width() / std::max(1.0, gl->width() * dpr);
+    const double scale = wireScaleFor(gl, size, ratio);
     // Ogni ridisegno costa tutto il wireframe: su una scena fitta troppi ridisegni
     // in un solo fotogramma fanno fallire la GPU (immagine tutta magenta). Si limita
     // lo spessore al costo (indici x ridisegni, al massimo 30 milioni) e, se l'immagine esce comunque
@@ -100,19 +124,14 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
         lineWidth = std::min(lineWidth, 12);
         while (lineWidth > 1 && qint64(drawsFor(lineWidth)) * wireIndices > 30000000) --lineWidth;
     }
-#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
-    // Sui telefoni e sui tablet una striscia larga su un wireframe fitto sovrappone
-    // milioni di pixel, con blending, in un solo fotogramma: il sistema ferma la GPU e
-    // l'app resta bloccata (visto su iPhone a 7984x4491 con "Thick"). Tetto allo
-    // spessore e al costo (segmenti x spessore); valori prudenti, non misurati.
-    if (wireIndices > 0) {
-        const bool phone = isPhone();
-        lineWidth = std::min(lineWidth, phone ? 4 : 8);
+    // Rete di sicurezza: il dialogo riduce gia' la dimensione perche' lo spessore chiesto
+    // stia nei limiti del dispositivo; qui si impedisce comunque di superarli.
+    const WireLimits wl = wireLimitsForDevice();
+    if (wl.maxWidth > 0 && wireIndices > 0) {
+        lineWidth = std::min(lineWidth, wl.maxWidth);
         const qint64 segments = wireIndices / 2;
-        const qint64 budget = phone ? 6000000 : 20000000;
-        while (lineWidth > 1 && segments * lineWidth > budget) --lineWidth;
+        while (lineWidth > 1 && segments * lineWidth > wl.budget) --lineWidth;
     }
-#endif
     QImage img;
     for (;;) {
         gl->setCaptureVerticalScale(verticalScale);
@@ -362,6 +381,7 @@ public:
         auto update = [this]() { refresh(); };
         connect(m_ratioCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, update);
         connect(m_modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, update);
+        connect(m_wireCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, update);
         connect(m_customW, QOverload<int>::of(&QSpinBox::valueChanged), this, update);
         connect(m_customH, QOverload<int>::of(&QSpinBox::valueChanged), this, update);
         // Il menu mostra il preset che corrisponde al valore, "Preset..." (il titolo,
@@ -435,6 +455,22 @@ private:
             m_size = ImageCapture::sizeFor(m_ratio, int(longSide));
             memLimited = true;
         }
+        // Wireframe sul telefono/tablet: si riduce la dimensione, non lo spessore.
+        bool wireLimited = false;
+        const WireLimits wl = wireLimitsForDevice();
+        if (wl.maxWidth > 0 && m_gl->hasVisibleWireframe()) {
+            const qint64 segments = m_gl->wireframeIndexTotal() / 2;
+            const double factor = m_wireCombo->currentData().toDouble();
+            auto fits = [&]() {
+                const int w = int(std::lround(wireScaleFor(m_gl, m_size, m_ratio) * factor));
+                return w <= wl.maxWidth && segments * std::max(1, w) <= wl.budget;
+            };
+            while (!fits() && longSide > 16) {
+                longSide = longSide * 95 / 100;
+                m_size = ImageCapture::sizeFor(m_ratio, int(longSide));
+                wireLimited = true;
+            }
+        }
         if (m_guide) m_guide->setRatio(m_ratio);
 
         const double mp = double(m_size.width()) * m_size.height() / 1e6;
@@ -446,6 +482,9 @@ private:
             text += tr("<br><span style='color:#e8a030'>Limited to %1 px, the largest side the GPU can render.</span>").arg(m_maxTex);
         else
             text += tr("<br>GPU limit: %1 px per side.").arg(m_maxTex);
+        if (wireLimited)
+            text += tr("<br><span style='color:#e8a030'>Reduced to %1 px: the wireframe at this thickness would be too heavy for this device. Thin allows a larger size.</span>")
+                        .arg(std::max(m_size.width(), m_size.height()));
         if (memLimited)
             text += tr("<br><span style='color:#e8a030'>Reduced to %1 megapixel, the most this device can render safely.</span>")
                         .arg(maxPixels() / 1000000);
