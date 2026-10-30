@@ -35,9 +35,12 @@ layout(location = 6) out float v_borderReach;
 layout(location = 7) out vec3 v_objPos;
 layout(location = 8) out vec3 v_objNormal;
 #ifdef HAS_WIRE_QUAD
-// Distanza in pixel dal centro della linea (con segno) e meta' spessore: il
-// fragment ne ricava la copertura (bordo sfumato).
-layout(location = 9) out vec2 v_wireDist;
+// Posizione del pixel nel riferimento del segmento, in pixel: (distanza di lato
+// dall'asse, distanza lungo l'asse da A, lunghezza del segmento, meta' spessore).
+// Il fragment ne ricava la copertura con la distanza dal SEGMENTO: estremi
+// arrotondati e bordo sfumato, cosi' i segmenti che si incontrano si fondono senza
+// spuntoni.
+layout(location = 9) out vec4 v_wireDist;
 #endif
 
 layout(std140, binding = 0) uniform SceneUBO {
@@ -1114,7 +1117,7 @@ void main() {
     const vec4 otherVertex = (along == 0) ? wireB : wireA;
     normal = vec4(0.0, 0.0, 1.0, 0.0);
     texCoord = vec2(0.0);
-    v_wireDist = vec2(0.0);
+    v_wireDist = vec4(0.0);
 #endif
     v_borderSide = -1.0;
     v_borderReach = 0.0;
@@ -1273,19 +1276,21 @@ void main() {
             return;
         }
         const vec2 view = vec2(ubuf.u_wireViewW, ubuf.u_wireViewH);
-        const vec2 a = pos.xy / pos.w * view * 0.5;
-        const vec2 b = posOther.xy / posOther.w * view * 0.5;
-        vec2 dir = b - a;
+        const vec2 here2 = pos.xy / pos.w * view * 0.5;
+        const vec2 other2 = posOther.xy / posOther.w * view * 0.5;
+        // Riferimento fisso A -> B, uguale per i due estremi del segmento.
+        const vec2 sa = (along == 0) ? here2 : other2;
+        const vec2 sb = (along == 0) ? other2 : here2;
+        vec2 dir = sb - sa;
         const float len = length(dir);
         dir = (len > 0.0001) ? dir / len : vec2(1.0, 0.0);
         const vec2 nrm = vec2(-dir.y, dir.x);
         const float hw = ubuf.u_wireHalfWidth;
         const float e = hw + 1.0;   // un pixel in piu' per il bordo sfumato
-        // L'estremo si sposta di lato e un po' in fuori: i segmenti che si incontrano
-        // in un vertice si sovrappongono invece di lasciare una tacca.
-        const vec2 offsetPx = nrm * side * e - dir * hw;
+        const float endSign = (along == 0) ? -1.0 : 1.0;
+        const vec2 offsetPx = nrm * side * e + dir * endSign * e;
         gl_Position = vec4(pos.xy + offsetPx * 2.0 / view * pos.w, pos.z, pos.w);
-        v_wireDist = vec2(side * e, hw);
+        v_wireDist = vec4(side * e, (along == 0) ? -e : len + e, len, hw);
         return;
     }
 #endif

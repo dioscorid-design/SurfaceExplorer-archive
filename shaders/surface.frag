@@ -14,8 +14,8 @@ layout(location = 6) in float v_borderReach;
 layout(location = 7) in vec3 v_objPos;
 layout(location = 8) in vec3 v_objNormal;
 #ifdef HAS_WIRE_QUAD
-// Distanza in pixel dal centro della linea e meta' spessore (vedi surface.vert).
-layout(location = 9) in vec2 v_wireDist;
+// Posizione del pixel nel riferimento del segmento e meta' spessore (vedi surface.vert).
+layout(location = 9) in vec4 v_wireDist;
 #endif
 
 // --- OUTPUT ---
@@ -225,9 +225,10 @@ void main() {
     // Se siamo in modalità Wireframe (2) o Bordi (5), usa colore piatto senza luci
     if (ubuf.u_renderMode == 2 || ubuf.u_renderMode == 5) {
 #ifdef HAS_WIRE_QUAD
-        // Striscia del wireframe: copertura del pixel dalla distanza dal centro, che
-        // da' il bordo sfumato (antialiasing della linea).
-        const float coverage = clamp(v_wireDist.y - abs(v_wireDist.x) + 0.5, 0.0, 1.0);
+        // Striscia del wireframe: copertura del pixel dalla distanza dal SEGMENTO
+        // (estremi arrotondati, bordo sfumato).
+        const float beyond = max(max(-v_wireDist.y, v_wireDist.y - v_wireDist.z), 0.0);
+        const float coverage = clamp(v_wireDist.w - length(vec2(v_wireDist.x, beyond)) + 0.5, 0.0, 1.0);
         FragColor = vec4(ubuf.color, ubuf.alpha * coverage);
 #else
         FragColor = vec4(ubuf.color, ubuf.alpha);

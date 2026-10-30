@@ -5527,7 +5527,10 @@ void ScenarioTest::runImageCaptureScenarios()
     // sparirebbero. Con lo spessore in proporzione l'immagine ha piu' pixel di linea.
     {
         const int prevMode = gl->globalRenderMode();
+        gl->setGlobalRenderMode(0);
+        check(!gl->hasVisibleWireframe(), QStringLiteral("superficie piena: nessun wireframe visibile (la scelta dello spessore si spegne)"));
         gl->setGlobalRenderMode(2);
+        check(gl->hasVisibleWireframe(), QStringLiteral("superficie in wireframe: wireframe visibile (la scelta dello spessore e' attiva)"));
         auto inkOf = [](const QImage &im) {
             const QRgb bg = im.pixel(1, 1);
             qint64 n = 0;

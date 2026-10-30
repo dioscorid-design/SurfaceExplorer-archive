@@ -1147,6 +1147,17 @@ public:
     bool wireframeQuadsEligible() const;
     // Quanti indici di linea ha il wireframe (0 = nessuno): il costo di un ridisegno.
     qint64 wireframeIndexTotal() const { return m_wireframeIndexCount; }
+    // True se qualcosa si sta disegnando in wireframe (la superficie, o una sua parte):
+    // wireframeIndexTotal conta anche gli indici delle superfici piene.
+    bool hasVisibleWireframe() const {
+        if (m_engineMode != ModeParametric || !engine || m_wireframeIndexCount <= 0) return false;
+        const std::vector<MeshPart> &parts = engine->getMeshParts();
+        if (parts.size() > 1) {
+            for (const MeshPart &p : parts) if (effectivePartRenderMode(p) == 2) return true;
+            return false;
+        }
+        return renderMode == 2;
+    }
     // Il lato massimo di una texture / buffer della GPU (QRhi::TextureSizeMax).
     int maxTextureSize();
     void endHiResCapture();

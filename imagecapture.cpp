@@ -70,7 +70,7 @@ static bool isSingleColor(const QImage &im)
     return true;
 }
 
-QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QString *error)
+QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QString *error, double wireFactor)
 {
     const double viewRatio = double(gl->width()) / double(std::max(1, gl->height()));
     const float verticalScale = verticalScaleFor(ratio, viewRatio);
@@ -86,11 +86,10 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
     // lo spessore al costo (indici x ridisegni, al massimo 30 milioni) e, se l'immagine esce comunque
     // di un solo colore, si riprova con meno.
     auto drawsFor = [](int w) { return std::max(1, 2 * w - 1); };   // la croce di wireframeOffsets
-    // Strisce di triangoli con bordo sfumato: un po' piu' spesse della linea a schermo
-    // (x1.5) per leggersi bene anche a un poster ridotto; con le linee native
-    // ridisegnate si resta alla proporzione esatta.
+    // Spessore proporzionale alla vista, moltiplicato per la scelta nel dialogo
+    // (sottile / normale / spesso).
     const bool quads = gl->wireframeQuadsEligible();
-    int lineWidth = int(std::lround(quads ? scale * 1.5 : scale));
+    int lineWidth = int(std::lround(scale * wireFactor));
     const qint64 wireIndices = gl->wireframeIndexTotal();
     // Con le strisce di triangoli (parametriche) lo spessore e' libero: un solo
     // disegno, qualunque sia. Le linee native ridisegnate (tubi, mesh custom)
@@ -314,6 +313,20 @@ public:
         form->addRow(tr("Long side:"), m_printRow);
         m_printLabel = form->labelForField(m_printRow);
 
+        // --- SPESSORE DEL WIREFRAME (solo se la scena ne ha uno) ---
+        m_wireCombo = new QComboBox;
+        m_wireCombo->addItem(tr("Thin"), 0.5);
+        m_wireCombo->addItem(tr("Normal"), 1.0);
+        m_wireCombo->addItem(tr("Thick"), 2.0);
+        m_wireCombo->setCurrentIndex(qBound(0, st.value("imageWireWidth", 1).toInt(), 2));
+        m_wireCombo->setToolTip(tr("Width of the wireframe lines relative to the view: Normal keeps the proportion of the screen, Thin halves it, Thick doubles it."));
+        form->addRow(tr("Wireframe lines:"), m_wireCombo);
+        // Senza wireframe in scena la scelta non fa niente: si spegne, col perche'.
+        if (!gl->hasVisibleWireframe()) {
+            m_wireCombo->setEnabled(false);
+            m_wireCombo->setToolTip(tr("Only for scenes drawn in wireframe."));
+        }
+
         // --- INFORMAZIONI ---
         m_info = new QLabel;
         m_info->setWordWrap(true);
@@ -359,6 +372,7 @@ public:
     }
 
     double ratio() const { return m_ratio; }
+    double wireFactor() const { return m_wireCombo->currentData().toDouble(); }
     QSize size() const { return m_size; }
 
     void saveSettings() const
@@ -368,6 +382,7 @@ public:
         st.setValue("imageCustomW", m_customW->value());
         st.setValue("imageCustomH", m_customH->value());
         st.setValue("imageSizeMode", m_modeCombo->currentIndex());
+        st.setValue("imageWireWidth", m_wireCombo->currentIndex());
         st.setValue("imageLongSide", m_longSpin->value());
         st.setValue("imagePrintLength", m_printLen->value());
         st.setValue("imagePrintUnit", m_unitCombo->currentIndex());
@@ -452,7 +467,7 @@ private:
     double m_viewRatio = 1.0;
     bool m_phone = false;
     QVector<RatioItem> m_items;
-    QComboBox *m_ratioCombo, *m_modeCombo, *m_presetCombo, *m_unitCombo;
+    QComboBox *m_ratioCombo, *m_modeCombo, *m_presetCombo, *m_unitCombo, *m_wireCombo;
     QSpinBox *m_customW, *m_customH, *m_longSpin, *m_dpiSpin;
     QDoubleSpinBox *m_printLen;
     QWidget *m_customRow, *m_pixelRow, *m_printRow;
@@ -492,6 +507,7 @@ bool ImageCapture::run(GLWidget *gl, QWidget *parent, const QString &defaultDir)
     dlg.saveSettings();
     const QSize size = dlg.size();
     const double ratio = dlg.ratio();
+    const double wireFactor = dlg.wireFactor();
 
     // IL FILE. Prima del rendering: un'immagine grande puo' volerci piu' di qualche
     // secondo, e chiedere il nome dopo la butterebbe via a un Annulla.
@@ -529,7 +545,7 @@ bool ImageCapture::run(GLWidget *gl, QWidget *parent, const QString &defaultDir)
         busy.setMinimumDuration(0);
         busy.show();
         QCoreApplication::processEvents();
-        img = render(gl, size, ratio, &error);
+        img = render(gl, size, ratio, &error, wireFactor);
     }
     if (img.isNull()) {
         QMessageBox::warning(parent, QObject::tr("Capture Image"), error);

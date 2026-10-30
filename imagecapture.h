@@ -47,7 +47,10 @@ public:
     static QRect guideRect(const QSize &view, double ratio);
     // Rende l'immagine di dimensione `size` fuori schermo. Vuota (con `error`) se
     // la GPU non ce la fa.
-    static QImage render(GLWidget *gl, const QSize &size, double ratio, QString *error = nullptr);
+    // `wireFactor`: spessore del wireframe rispetto a quello proporzionale alla vista
+    // (1 = come a schermo, 0.5 sottile, 2 spesso).
+    static QImage render(GLWidget *gl, const QSize &size, double ratio, QString *error = nullptr,
+                         double wireFactor = 1.0);
     // Secondi per megapixel, misurati su un fotogramma di prova: serve a stimare
     // il tempo di un'immagine grande (e ad avvisare se la scena e' pesante).
     static double secondsPerMegapixel(GLWidget *gl);
