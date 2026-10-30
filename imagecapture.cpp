@@ -35,6 +35,8 @@
 // LOGICA PURA
 // ==========================================================
 
+static int s_testBlankFrames = 0;   // vedi setTestBlankFrames
+
 QSize ImageCapture::sizeFor(double ratio, int longSide)
 {
     longSide = std::max(1, longSide);
@@ -60,14 +62,29 @@ QRect ImageCapture::guideRect(const QSize &view, double ratio)
     return QRect((view.width() - w) / 2, (view.height() - h) / 2, w, h);
 }
 
-// Un'immagine di un solo colore: sintomo di un fotogramma fallito sulla GPU.
-static bool isSingleColor(const QImage &im)
+bool ImageCapture::isSingleColor(const QImage &im)
 {
     if (im.isNull()) return false;
     const QRgb first = im.pixel(0, 0);
+    // Pochi punti sparsi bastano quasi sempre, e costano niente.
     for (int k = 1; k <= 64; ++k)
         if (im.pixel(im.width() * k / 65, im.height() * (k * 7 % 64 + 1) / 65) != first) return false;
+    // Poi tutti: un wireframe rado su uno sfondo unito puo' sfuggire ai punti sparsi.
+    const QImage rgb = (im.depth() == 32) ? im : im.convertToFormat(QImage::Format_RGB32);
+    const quint32 value = *reinterpret_cast<const quint32 *>(rgb.constScanLine(0));
+    for (int y = 0; y < rgb.height(); ++y) {
+        const quint32 *line = reinterpret_cast<const quint32 *>(rgb.constScanLine(y));
+        for (int x = 0; x < rgb.width(); ++x)
+            if (line[x] != value) return false;
+    }
     return true;
+}
+
+bool ImageCapture::wireFits(int maxWidth, qint64 budget, qint64 segments, int width)
+{
+    // Senza limiti (desktop), o a un pixel: la linea nativa costa poco a ogni dimensione.
+    if (maxWidth <= 0 || width <= 1) return true;
+    return width <= maxWidth && 2 * segments * width <= budget;   // due passate, profondita' e colore
 }
 
 namespace { bool isPhone(); }
@@ -75,7 +92,7 @@ namespace { bool isPhone(); }
 // Limiti del wireframe a strisce su telefono e tablet: una striscia larga su un wireframe
 // fitto sovrappone milioni di pixel, con blending, in un solo fotogramma, e il sistema
 // ferma la GPU (visto su iPhone a 7984x4491 con "Thick"). Si limitano spessore massimo e
-// costo (segmenti x spessore); al dialogo conviene ridurre la DIMENSIONE dell'immagine
+// costo (ImageCapture::wireFits); al dialogo conviene ridurre la DIMENSIONE dell'immagine
 // piuttosto che sbiadire le linee (a spessore proporzionale, meno pixel = meno spessore).
 // Valori prudenti, non misurati. maxWidth 0 = nessun limite (desktop).
 struct WireLimits { int maxWidth; qint64 budget; };
@@ -109,12 +126,11 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
     const double scale = wireScaleFor(gl, size, ratio);
     // Ogni ridisegno costa tutto il wireframe: su una scena fitta troppi ridisegni
     // in un solo fotogramma fanno fallire la GPU (immagine tutta magenta). Si limita
-    // lo spessore al costo (indici x ridisegni, al massimo 30 milioni) e, se l'immagine esce comunque
-    // di un solo colore, si riprova con meno.
+    // lo spessore al costo (indici x ridisegni, al massimo 30 milioni) e, se l'immagine
+    // esce comunque di un solo colore, si riprova con meno.
     auto drawsFor = [](int w) { return std::max(1, 2 * w - 1); };   // la croce di wireframeOffsets
     // Spessore proporzionale alla vista, moltiplicato per la scelta nel dialogo
     // (sottile / normale / spesso).
-    const bool quads = gl->wireframeQuadsEligible();
     int lineWidth = int(std::lround(scale * wireFactor));
     const qint64 wireIndices = gl->wireframeIndexTotal();
     // Con le strisce di triangoli (parametriche) lo spessore e' libero: un solo
@@ -129,10 +145,10 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
     const WireLimits wl = wireLimitsForDevice();
     if (wl.maxWidth > 0 && wireIndices > 0) {
         lineWidth = std::min(lineWidth, wl.maxWidth);
-        const qint64 segments = wireIndices / 2;
-        while (lineWidth > 1 && segments * lineWidth > wl.budget) --lineWidth;
+        while (!wireFits(wl.maxWidth, wl.budget, wireIndices / 2, lineWidth)) --lineWidth;
     }
     QImage img;
+    bool singleColor = false;
     for (;;) {
         gl->setCaptureVerticalScale(verticalScale);
         gl->setCaptureLineWidth(lineWidth);
@@ -144,8 +160,25 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
         gl->setCaptureVerticalScale(1.0f);
         gl->setCaptureLineWidth(1);
         gl->endHiResCapture();
-        if (lineWidth <= 1 || img.isNull() || !isSingleColor(img)) break;
-        lineWidth = std::max(1, lineWidth - 1);
+        if (s_testBlankFrames > 0) {
+            --s_testBlankFrames;
+            img.fill(Qt::magenta);
+        }
+        singleColor = isSingleColor(img);
+        // Ridurre lo spessore aiuta solo il wireframe; a meta' per volta, ogni prova pesa.
+        if (!singleColor || lineWidth <= 1 || !gl->hasVisibleWireframe()) break;
+        lineWidth /= 2;
+    }
+    // Ancora di un solo colore: un fotogramma fallito, o una scena davvero uniforme (il
+    // solo sfondo). Lo dice un fotogramma piccolo, che la GPU non ha motivo di rifiutare.
+    if (singleColor) {
+        const QSize probe = sizeFor(ratio, 320);
+        gl->setCaptureVerticalScale(verticalScale);
+        gl->beginHiResCapture(probe.width(), probe.height());
+        const QImage small = gl->getFrameForVideo(probe.width(), probe.height(), true);
+        gl->setCaptureVerticalScale(1.0f);
+        gl->endHiResCapture();
+        if (!small.isNull() && !isSingleColor(small)) img = QImage();
     }
     gl->update();
     if (img.isNull() || img.size() != size) {
@@ -157,6 +190,8 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
     if (img.format() != QImage::Format_RGB32) img = img.convertToFormat(QImage::Format_RGB32);
     return img;
 }
+
+void ImageCapture::setTestBlankFrames(int frames) { s_testBlankFrames = frames; }
 
 double ImageCapture::secondsPerMegapixel(GLWidget *gl)
 {
@@ -408,6 +443,8 @@ public:
 
     double ratio() const { return m_ratio; }
     double wireFactor() const { return m_wireCombo->currentData().toDouble(); }
+    // I dpi scelti, se l'immagine e' a misura di stampa (0 = a pixel).
+    int dpi() const { return (!m_phone && m_modeCombo->currentIndex() == 1) ? m_dpiSpin->value() : 0; }
     QSize size() const { return m_size; }
 
     void saveSettings() const
@@ -463,7 +500,7 @@ private:
             const double factor = m_wireCombo->currentData().toDouble();
             auto fits = [&]() {
                 const int w = int(std::lround(wireScaleFor(m_gl, m_size, m_ratio) * factor));
-                return w <= wl.maxWidth && segments * std::max(1, w) <= wl.budget;
+                return ImageCapture::wireFits(wl.maxWidth, wl.budget, segments, w);
             };
             while (!fits() && longSide > 16) {
                 longSide = longSide * 95 / 100;
@@ -562,6 +599,7 @@ bool ImageCapture::run(GLWidget *gl, QWidget *parent, const QString &defaultDir)
     const QSize size = dlg.size();
     const double ratio = dlg.ratio();
     const double wireFactor = dlg.wireFactor();
+    const int dpi = dlg.dpi();
 
     // IL FILE. Prima del rendering: un'immagine grande puo' volerci piu' di qualche
     // secondo, e chiedere il nome dopo la butterebbe via a un Annulla.
@@ -604,6 +642,13 @@ bool ImageCapture::run(GLWidget *gl, QWidget *parent, const QString &defaultDir)
     if (img.isNull()) {
         QMessageBox::warning(parent, QObject::tr("Capture Image"), error);
         return false;
+    }
+
+    // La misura di stampa va nel file: senza, chi lo apre vede la densita' di default.
+    if (dpi > 0) {
+        const int dotsPerMeter = int(std::lround(dpi / 0.0254));
+        img.setDotsPerMeterX(dotsPerMeter);
+        img.setDotsPerMeterY(dotsPerMeter);
     }
 
     // IL SALVATAGGIO, in un altro thread: la codifica PNG di un'immagine da

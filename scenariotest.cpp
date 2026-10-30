@@ -5478,6 +5478,18 @@ void ScenarioTest::runImageCaptureScenarios()
               QStringLiteral("guideRect: stretto -> piena altezza al centro, largo -> piena larghezza al centro"));
     }
     check(gl->maxTextureSize() >= 4096, QStringLiteral("limite di texture della GPU letto (%1)").arg(gl->maxTextureSize()));
+    {
+        QImage flat(640, 480, QImage::Format_RGB32);
+        flat.fill(Qt::magenta);
+        const bool uniform = ImageCapture::isSingleColor(flat);
+        flat.setPixel(3, 5, qRgb(0, 0, 0));   // lontano dai punti sparsi, come un filo di wireframe
+        check(uniform && !ImageCapture::isSingleColor(flat),
+              QStringLiteral("isSingleColor: un pixel diverso, ovunque stia, basta"));
+    }
+    check(ImageCapture::wireFits(0, 0, 1000000000, 64) && ImageCapture::wireFits(6, 6000000, 1000000000, 1)
+              && ImageCapture::wireFits(6, 6000000, 500000, 6) && !ImageCapture::wireFits(6, 6000000, 500000, 7)
+              && !ImageCapture::wireFits(32, 80000000, 30000000, 2),
+          QStringLiteral("wireFits: desktop senza limiti; a un pixel sempre (la dimensione non crolla); oltre spessore o costo no"));
 
     if (!loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) return;
     gl->stopAllTimers();
@@ -5554,10 +5566,40 @@ void ScenarioTest::runImageCaptureScenarios()
             check(a2 > a1 * 1.5, QStringLiteral("wireframe in un'immagine grande: pixel di linea %1 con spessore, %2 senza").arg(a2).arg(a1));
             thick.save(m_outDir + QStringLiteral("/image-capture-wire-thick.png"));
             thin.save(m_outDir + QStringLiteral("/image-capture-wire-thin.png"));
+            // Un fotogramma fallito (tutto di un colore) col wireframe: si riprova con
+            // meno spessore; se falliscono tutti, un errore e non un'immagine "salvata".
+            ImageCapture::setTestBlankFrames(1);
+            const QImage retried = ImageCapture::render(gl, sw, viewRatio, &err);
+            check(!retried.isNull() && !ImageCapture::isSingleColor(retried),
+                  QStringLiteral("wireframe, fotogramma fallito: si riprova e l'immagine esce"));
+            ImageCapture::setTestBlankFrames(100);
+            err.clear();
+            const QImage allFailed = ImageCapture::render(gl, sw, viewRatio, &err);
+            ImageCapture::setTestBlankFrames(0);
+            check(allFailed.isNull() && !err.isEmpty(),
+                  QStringLiteral("wireframe, tutti i fotogrammi falliti: nessuna immagine, errore (%1)").arg(err));
+            check(!gl->m_wireQuadVbo, QStringLiteral("a cattura finita il buffer delle strisce e' liberato"));
         } else {
             check(false, QStringLiteral("wireframe: immagine vuota"));
         }
         gl->setGlobalRenderMode(prevMode);
+    }
+    // Senza wireframe ridurre lo spessore non serve: un tentativo solo. Una scena
+    // davvero uniforme (il solo sfondo) non e' un fallimento.
+    {
+        ImageCapture::setTestBlankFrames(1);
+        err.clear();
+        const QImage failed = ImageCapture::render(gl, s1, viewRatio, &err);
+        ImageCapture::setTestBlankFrames(0);
+        check(failed.isNull() && !err.isEmpty(), QStringLiteral("superficie piena, fotogramma fallito: errore al primo tentativo"));
+        const float prevAlpha = gl->globalAlpha();
+        gl->setAlpha(0.0f);
+        wait(200);
+        const QImage background = ImageCapture::render(gl, s1, viewRatio, &err);
+        gl->setAlpha(prevAlpha);
+        wait(200);
+        check(!background.isNull() && ImageCapture::isSingleColor(background),
+              QStringLiteral("scena di solo sfondo: l'immagine uniforme si salva"));
     }
 
     // Piu' stretta della vista: il campo verticale non cambia, si taglia ai lati.
@@ -5593,6 +5635,86 @@ void ScenarioTest::runImageCaptureScenarios()
                       .arg(dense.isNull() ? 0 : inkOf(dense)));
             gl->setClocksDrivenByRecorder(false);
         }
+    }
+    // WIREFRAME A STRISCE contro linee native: il taglio CUTOUT e le giunzioni.
+    {
+        auto wireShot = [&](int width, const QSize &size) {
+            gl->setCaptureLineWidth(width);
+            gl->beginHiResCapture(size.width(), size.height());
+            const QImage im = gl->getFrameForVideo(size.width(), size.height(), true);
+            gl->setCaptureLineWidth(1);
+            gl->endHiResCapture();
+            return im.convertToFormat(QImage::Format_RGB32);
+        };
+        auto inked = [](const QImage &im, int x, int y) {
+            const QRgb bg = im.pixel(1, 1), p = im.pixel(x, y);
+            return std::abs(qRed(p) - qRed(bg)) + std::abs(qGreen(p) - qGreen(bg)) + std::abs(qBlue(p) - qBlue(bg)) > 30;
+        };
+        const QSize sw = ImageCapture::sizeFor(viewRatio, 3200);
+        // Il taglio dipende da (u,v): le strisce tagliano dove tagliano le linee native, ne'
+        // piu' ne' meno (con (u,v) sbagliati sparivano bande intere). Ogni pixel di una delle
+        // due immagini ha una linea dell'altra a pochi pixel.
+        if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Multi Meshes/Octahedron Bands.json"))) {
+            gl->stopAllTimers();
+            gl->setClocksDrivenByRecorder(true);
+            gl->setGlobalRenderMode(2);
+            wait(500);
+            const QImage native = wireShot(1, sw), strips = wireShot(3, sw);
+            const bool quads = gl->wireframeQuadsActive() && gl->wireframeQuadsEligible();
+            strips.save(m_outDir + QStringLiteral("/image-capture-cutout-strips.png"));
+            auto uncovered = [&](const QImage &a, const QImage &b) {
+                QVector<char> ink(sw.width() * sw.height(), 0);
+                for (int y = 0; y < sw.height(); ++y)
+                    for (int x = 0; x < sw.width(); ++x)
+                        ink[y * sw.width() + x] = inked(b, x, y);
+                QPair<qint64, qint64> n(0, 0);
+                for (int y = 3; y + 3 < sw.height(); ++y)
+                    for (int x = 3; x + 3 < sw.width(); ++x) {
+                        if (!inked(a, x, y)) continue;
+                        ++n.first;
+                        bool near = false;
+                        for (int dy = -3; dy <= 3 && !near; ++dy)
+                            for (int dx = -3; dx <= 3 && !near; ++dx)
+                                near = ink[(y + dy) * sw.width() + x + dx];
+                        if (!near) ++n.second;
+                    }
+                return n;
+            };
+            const QPair<qint64, qint64> extra = uncovered(strips, native), missing = uncovered(native, strips);
+            check(quads && extra.first > 1000 && extra.second < extra.first / 200 && missing.second < missing.first / 200,
+                  QStringLiteral("wireframe con taglio CUTOUT: strisce (%1) e linee native coincidono "
+                                 "(%2 pixel di striscia di troppo, %3 di linea mancanti su %4)")
+                      .arg(quads).arg(extra.second).arg(missing.second).arg(missing.first));
+            gl->setClocksDrivenByRecorder(false);
+        }
+        // Alpha < 1: una linea si miscela una volta sola, anche dove i segmenti si toccano.
+        if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) {
+            gl->stopAllTimers();
+            gl->setClocksDrivenByRecorder(true);
+            gl->setColor(1.0f, 1.0f, 1.0f);
+            gl->setAlpha(0.5f);
+            gl->setGlobalRenderMode(2);
+            wait(500);
+            const QImage im = wireShot(6, sw);
+            im.save(m_outDir + QStringLiteral("/image-capture-wire-alpha.png"));
+            const int bg = qRed(im.pixel(1, 1));
+            const int once = bg + (255 - bg) / 2, twice = bg + (255 - bg) * 3 / 4;
+            const int limit = (once + twice) / 2;
+            qint64 line = 0, denser = 0;
+            for (int y = 0; y < im.height(); ++y)
+                for (int x = 0; x < im.width(); ++x) {
+                    const int r = qRed(im.pixel(x, y));
+                    if (r > bg + 20) ++line;
+                    if (r > limit) ++denser;
+                }
+            check(line > 1000 && denser < line / 20,
+                  QStringLiteral("wireframe con alpha < 1: pixel miscelati due volte %1 su %2 di linea (il 37 per cento senza la passata di profondita')").arg(denser).arg(line));
+            gl->setClocksDrivenByRecorder(false);
+        }
+        if (!loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) return;
+        gl->stopAllTimers();
+        gl->setClocksDrivenByRecorder(true);
+        wait(300);
     }
     // IL FLUSSO INTERO, col dialogo vero: lo si accetta da un timer dopo averne
     // fatto uno screenshot, il file va in un percorso di prova.
@@ -5633,6 +5755,29 @@ void ScenarioTest::runImageCaptureScenarios()
         check(sawDialog && done && QFile::exists(out) && onDisk.isValid() && onDisk.width() > 100,
               QStringLiteral("flusso intero: dialogo, rendering e PNG salvato (dialogo %1, salvato %2, su disco %3x%4)")
                   .arg(sawDialog).arg(done).arg(onDisk.width()).arg(onDisk.height()));
+        // A misura di stampa i dpi vanno nel file: 10 cm a 300 dpi.
+        const QString outPrint = m_outDir + QStringLiteral("/image-capture-print.png");
+        ImageCapture::setTestSavePath(outPrint);
+        ImageCapture::setTestDialogHandler([](QDialog *d) {
+            for (QComboBox *c : d->findChildren<QComboBox *>())
+                if (c->count() == 2 && c->itemText(1) == QStringLiteral("Print size")) c->setCurrentIndex(1);
+            for (QDoubleSpinBox *s : d->findChildren<QDoubleSpinBox *>()) s->setValue(10.0);
+            QCoreApplication::processEvents();
+            d->accept();
+        });
+        const bool donePrint = ImageCapture::run(gl, m_mw, m_outDir);
+        ImageCapture::setTestSavePath(QString());
+        ImageCapture::setTestDialogHandler(nullptr);
+        const QImage printed(outPrint);
+        check(donePrint && std::abs(printed.dotsPerMeterX() - 11811) <= 1 && std::abs(printed.dotsPerMeterY() - 11811) <= 1
+                  && printed.width() == 1181,
+              QStringLiteral("misura di stampa nel PNG: %1 punti al metro (300 dpi), %2 pixel di lato")
+                  .arg(printed.dotsPerMeterX()).arg(printed.width()));
+        {
+            QSettings st;
+            for (const char *k : { "imagePrintLength", "imagePrintUnit", "imageDpi", "imageSizeMode", "imageLongSide", "imageRatioIndex" })
+                st.remove(QString::fromLatin1(k));
+        }
     }
     gl->setClocksDrivenByRecorder(false);
 }

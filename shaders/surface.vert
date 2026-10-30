@@ -1116,7 +1116,10 @@ void main() {
     vertex = (along == 0) ? wireA : wireB;
     const vec4 otherVertex = (along == 0) ? wireB : wireA;
     normal = vec4(0.0, 0.0, 1.0, 0.0);
-    texCoord = vec2(0.0);
+    // (u,v) del vertice sul dominio: il taglio CUTOUT del fragment li rilegge da qui.
+    const vec2 wireSpan = vec2(ubuf.u_max - ubuf.u_min, ubuf.v_max - ubuf.v_min);
+    texCoord = vec2((abs(wireSpan.x) > 1.0e-12) ? (vertex.x - ubuf.u_min) / wireSpan.x : 0.0,
+                    (abs(wireSpan.y) > 1.0e-12) ? (vertex.y - ubuf.v_min) / wireSpan.y : 0.0);
     v_wireDist = vec4(0.0);
 #endif
     v_borderSide = -1.0;

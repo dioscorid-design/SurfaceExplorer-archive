@@ -1137,18 +1137,29 @@ public:
     // Spessore, in pixel dell'immagine, con cui si disegnano le linee dei wireframe
     // durante una cattura (1 = linea nativa della GPU). Le linee della GPU sono
     // sempre larghe un pixel: in un'immagine molto piu' grande della vista
-    // sparirebbero. Si ottiene ridisegnandole con la finestra spostata di qualche
-    // pixel. Si rimette a 1 a cattura finita.
+    // sparirebbero. Si ottiene con strisce di triangoli (prepareWireQuads) o, per tubi
+    // e mesh custom, ridisegnandole con la finestra spostata di qualche pixel. Si
+    // rimette a 1 a cattura finita, e le strisce si liberano.
     void setCaptureLineWidth(int pixels);
     // True se il wireframe si disegna a strisce di triangoli (spessore libero, bordo
     // sfumato); false se ricade sulle linee native ridisegnate (tubi, mesh custom).
-    bool wireframeQuadsActive() const { return m_wireframeIndexCount <= 0 || m_wireQuadPipeline; }
+    bool wireframeQuadsActive() const { return !hasVisibleWireframe() || m_wireQuadPipeline; }
     // Prima della cattura: il wireframe PUO' andare a strisce?
     bool wireframeQuadsEligible() const;
-    // Quanti indici di linea ha il wireframe (0 = nessuno): il costo di un ridisegno.
-    qint64 wireframeIndexTotal() const { return m_wireframeIndexCount; }
-    // True se qualcosa si sta disegnando in wireframe (la superficie, o una sua parte):
-    // wireframeIndexTotal conta anche gli indici delle superfici piene.
+    // Quanti indici di linea ha il wireframe visibile (0 = nessuno): il costo di un
+    // ridisegno, per limitare lo spessore di una cattura. Solo cio' che si disegna: le
+    // superfici piene hanno gli indici ma non le linee.
+    qint64 wireframeIndexTotal() const {
+        if (!hasVisibleWireframe()) return 0;
+        if (m_wireframeRanges.size() <= 1) return m_wireframeIndexCount;
+        const std::vector<MeshPart> &parts = engine->getMeshParts();
+        qint64 n = 0;
+        for (const WireframeRange &r : m_wireframeRanges)
+            if (r.meshIndex < 0 || r.meshIndex >= int(parts.size())
+                || effectivePartRenderMode(parts[r.meshIndex]) == 2) n += r.indexCount;
+        return n;
+    }
+    // True se qualcosa si sta disegnando in wireframe (la superficie, o una sua parte).
     bool hasVisibleWireframe() const {
         if (m_engineMode != ModeParametric || !engine || m_wireframeIndexCount <= 0) return false;
         const std::vector<MeshPart> &parts = engine->getMeshParts();
@@ -1356,6 +1367,7 @@ private:
     // sono pronti.
     QRhiBuffer *m_wireQuadVbo = nullptr;
     QRhiGraphicsPipeline *m_wireQuadPipeline = nullptr;
+    QRhiGraphicsPipeline *m_wireQuadDepthPipeline = nullptr;   // la passata di profondita'
     int m_wireQuadSerial = -1;
     int m_captureSerial = 0;
     void prepareWireQuads(QRhiResourceUpdateBatch *resourceUpdates);

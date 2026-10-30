@@ -229,6 +229,11 @@ void main() {
         // (estremi arrotondati, bordo sfumato).
         const float beyond = max(max(-v_wireDist.y, v_wireDist.y - v_wireDist.z), 0.0);
         const float coverage = clamp(v_wireDist.w - length(vec2(v_wireDist.x, beyond)) + 0.5, 0.0, 1.0);
+#ifdef WIRE_QUAD_DEPTH
+        // Passata di sola profondita' (vedi GLWidget::prepareWireQuads): il corpo della
+        // linea, non il bordo sfumato, che coprirebbe le linee vicine.
+        if (coverage < 0.5) discard;
+#endif
         FragColor = vec4(ubuf.color, ubuf.alpha * coverage);
 #else
         FragColor = vec4(ubuf.color, ubuf.alpha);

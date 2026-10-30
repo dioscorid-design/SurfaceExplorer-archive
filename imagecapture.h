@@ -36,6 +36,9 @@ public:
     // Solo per i test: chiamata con il dialogo appena aperto (prima di ogni altro
     // evento), per fotografarlo e accettarlo senza una persona.
     static void setTestDialogHandler(std::function<void(QDialog *)> handler);
+    // Solo per i test: i prossimi `frames` fotogrammi di render() escono di un solo
+    // colore, come quelli che la GPU non riesce a finire.
+    static void setTestBlankFrames(int frames);
 
     // --- Logica pura, usata dal dialogo e dai test ---
     // Le dimensioni da un rapporto (largo/alto) e dal lato lungo in pixel.
@@ -45,6 +48,11 @@ public:
     static float verticalScaleFor(double ratio, double viewRatio);
     // Il riquadro, nelle coordinate della vista, di cio' che entra nell'immagine.
     static QRect guideRect(const QSize &view, double ratio);
+    // Tutti i pixel di un colore: il sintomo di un fotogramma fallito sulla GPU.
+    static bool isSingleColor(const QImage &im);
+    // Un wireframe di `segments` segmenti largo `width` pixel sta nei limiti del
+    // dispositivo (WireLimits)? L'unica regola, per il dialogo e per render().
+    static bool wireFits(int maxWidth, qint64 budget, qint64 segments, int width);
     // Rende l'immagine di dimensione `size` fuori schermo. Vuota (con `error`) se
     // la GPU non ce la fa.
     // `wireFactor`: spessore del wireframe rispetto a quello proporzionale alla vista
