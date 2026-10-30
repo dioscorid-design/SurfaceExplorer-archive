@@ -70,6 +70,8 @@ static bool isSingleColor(const QImage &im)
     return true;
 }
 
+namespace { bool isPhone(); }
+
 QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QString *error, double wireFactor)
 {
     const double viewRatio = double(gl->width()) / double(std::max(1, gl->height()));
@@ -98,6 +100,19 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
         lineWidth = std::min(lineWidth, 12);
         while (lineWidth > 1 && qint64(drawsFor(lineWidth)) * wireIndices > 30000000) --lineWidth;
     }
+#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+    // Sui telefoni e sui tablet una striscia larga su un wireframe fitto sovrappone
+    // milioni di pixel, con blending, in un solo fotogramma: il sistema ferma la GPU e
+    // l'app resta bloccata (visto su iPhone a 7984x4491 con "Thick"). Tetto allo
+    // spessore e al costo (segmenti x spessore); valori prudenti, non misurati.
+    if (wireIndices > 0) {
+        const bool phone = isPhone();
+        lineWidth = std::min(lineWidth, phone ? 4 : 8);
+        const qint64 segments = wireIndices / 2;
+        const qint64 budget = phone ? 6000000 : 20000000;
+        while (lineWidth > 1 && segments * lineWidth > budget) --lineWidth;
+    }
+#endif
     QImage img;
     for (;;) {
         gl->setCaptureVerticalScale(verticalScale);
