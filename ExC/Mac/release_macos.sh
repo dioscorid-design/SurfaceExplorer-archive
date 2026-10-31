@@ -2,8 +2,8 @@
 #
 # release_macos.sh - Pipeline di release macOS per Surface Explorer.
 #
-#   Firma (Developer ID + Hardened Runtime) -> .dmg (con link ad /Applications)
-#   -> notarizza -> staple -> (opz.) carica su GitHub Releases.
+#   macdeployqt -> firma (Developer ID + Hardened Runtime) -> .dmg (con link ad
+#   /Applications) -> notarizza -> staple -> (opz.) carica su GitHub Releases.
 #
 # Uso:
 #   ./release_macos.sh              firma + .dmg + notarizza (nessun upload)
@@ -25,6 +25,7 @@ BUNDLE_ID="com.dioscorid.surfaceexplorer"
 SIGN_IDENTITY="Developer ID Application: GAETANO MOSCHETTI (BAPKX72394)"
 NOTARY_PROFILE="notarytool-profile"
 REPO="dioscorid-design/SurfaceExplorer"
+MACDEPLOYQT="$HOME/Qt/6.10.1/macos/bin/macdeployqt"
 
 # Lo script vive in ExC/Mac/ : la root del progetto e' due cartelle sopra
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # ExC/Mac
@@ -67,25 +68,41 @@ TAG="v$VERSION"
 ASSET_NAME="SurfaceExplorer-${TAG}-macos.dmg"
 
 if [ ! -d "$APP_PATH" ]; then
-  echo "ERRORE: $APP_PATH non trovato. Compila prima il progetto (macdeployqt incluso)."
+  echo "ERRORE: $APP_PATH non trovato. Compila prima la Release da Qt Creator."
   exit 1
 fi
+[ -x "$MACDEPLOYQT" ] || { echo "ERRORE: macdeployqt non trovato: $MACDEPLOYQT"; exit 1; }
+
+# Si lavora su una copia: macdeployqt e la firma cambiano il bundle, e quello di Qt
+# Creator deve restare com'e' (firmato in place, al primo Info.plist rigenerato senza
+# relink la firma non combaciava piu' e macOS uccideva l'app all'avvio).
+STAGING_DIR="$BUILD_DIR/dmg_staging"
+rm -rf "$STAGING_DIR"
+mkdir -p "$STAGING_DIR"
+STAGED_APP="$STAGING_DIR/$APP_NAME.app"
+cp -R "$APP_PATH" "$STAGED_APP"
+
+echo ">>> 0. macdeployqt: framework e plugin Qt dentro l'app..."
+# Qt Creator non lo fa: la build trova Qt solo con un rpath verso ~/Qt, che esiste
+# solo su questo Mac. Qui tutto funziona, su un altro Mac l'app si ferma all'avvio
+# (Library not loaded: QtWidgets): i DMG dalla v1.2 alla v1.5 sono usciti cosi'.
+"$MACDEPLOYQT" "$STAGED_APP"
+[ -d "$STAGED_APP/Contents/Frameworks/QtCore.framework" ] \
+  || { echo "ERRORE: macdeployqt non ha incorporato i framework Qt."; exit 1; }
+[ -f "$STAGED_APP/Contents/PlugIns/platforms/libqcocoa.dylib" ] \
+  || { echo "ERRORE: manca il plugin cocoa: l'app si fermerebbe all'avvio."; exit 1; }
 
 echo ">>> 1. Firma con Developer ID + Hardened Runtime..."
 codesign --force --deep --options runtime \
   --entitlements "$ENTITLEMENTS" \
   --sign "$SIGN_IDENTITY" \
-  "$APP_PATH"
+  "$STAGED_APP"
 
 echo ">>> 2. Verifica firma..."
-codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+codesign --verify --deep --strict --verbose=2 "$STAGED_APP"
 
 echo ">>> 3. Creazione .dmg (con collegamento alla cartella Applicazioni)..."
 rm -f "$DMG_PATH"
-STAGING_DIR="$BUILD_DIR/dmg_staging"
-rm -rf "$STAGING_DIR"
-mkdir -p "$STAGING_DIR"
-cp -R "$APP_PATH" "$STAGING_DIR/"
 ln -s /Applications "$STAGING_DIR/Applications"
 hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH"
 rm -rf "$STAGING_DIR"

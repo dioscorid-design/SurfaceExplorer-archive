@@ -6,7 +6,7 @@ e integrarla nel desktop. Riassume il processo e gli strumenti per piattaforma:
 | Script | Piattaforma | Cosa fa |
 |--------|-------------|---------|
 | [`Linux/release_linux.sh`](../Linux/release_linux.sh) | Linux | Compila → AppImage → carica su GitHub |
-| [`Mac/release_macos.sh`](../Mac/release_macos.sh) | macOS | Firma → `.dmg` → notarizza (da lanciare **sul Mac**) |
+| [`Mac/release_macos.sh`](../Mac/release_macos.sh) | macOS | `macdeployqt` → firma → `.dmg` → notarizza (da lanciare **sul Mac**) |
 | [`Windows/make_standalone.ps1`](../Windows/make_standalone.ps1) | Windows | Bundle DLL con `windeployqt` → `.zip` (upload manuale) |
 | [`Linux/install-linux.sh`](../Linux/install-linux.sh) | Linux (utente finale) | Integra l'AppImage nel menu applicazioni |
 
@@ -106,11 +106,11 @@ Il token GitHub viene preso da `GH_TOKEN` oppure da `~/.git-credentials`
 
 ## 🍎 Rilascio macOS (sul Mac)
 
-Sul Mac, dopo aver compilato la `.app` in `build/Desktop_Qt_6_10-Release`
-(con `macdeployqt` incluso):
+Sul Mac, dopo aver compilato la Release da Qt Creator
+(`build/Desktop_Qt_6_10-Release`):
 
 ```sh
-# firma + .dmg + notarizza (senza toccare GitHub)
+# macdeployqt + firma + .dmg + notarizza (senza toccare GitHub)
 ./ExC/Mac/release_macos.sh
 
 # come sopra, poi crea/aggiorna la release GitHub e carica il .dmg
@@ -118,7 +118,9 @@ Sul Mac, dopo aver compilato la `.app` in `build/Desktop_Qt_6_10-Release`
 ```
 
 Cosa fa lo script, nell'ordine:
-1. Firma la `.app` con **Developer ID + Hardened Runtime** e verifica la firma.
+0. Copia la `.app` (quella di Qt Creator resta intatta) ed esegue `macdeployqt`:
+   senza, l'app trova Qt solo su questo Mac e sugli altri si ferma all'avvio.
+1. Firma la copia con **Developer ID + Hardened Runtime** e verifica la firma.
 2. Crea il `.dmg` (con un link ad `/Applications`, così l'utente installa col
    drag-and-drop) e lo firma.
 3. Lo invia a **notarizzazione** Apple (`notarytool submit --wait`) e fa lo
