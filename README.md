@@ -17,7 +17,7 @@ Surface Explorer is built on the Qt RHI architecture and adds two major renderin
 * **Audio-Visual Synthesis**: Real-time synchronization between geometric parameters and a mathematical sound synthesizer or external audio tracks (FFmpeg powered), with a native macOS video encoder (no ffmpeg dependency).
 
 ## 💻 System Requirements
-* **OS**: Linux (Fedora/Ubuntu), Windows 10/11, or macOS 12.0+ (Universal).
+* **OS**: Linux (Fedora/Ubuntu), Windows 10/11, or macOS 13 or later (arm64).
 * **Graphics**: GPU with support for **Vulkan 1.0+**, **Metal**, **Direct3D 11+**, or **OpenGL 3.3+**.
 * **Framework**: Built with **Qt 6.10.2** for maximum stability and High-DPI support.
 

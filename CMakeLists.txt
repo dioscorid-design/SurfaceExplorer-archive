@@ -443,6 +443,11 @@ endif()
 # App Store): sotto sandbox non si possono lanciare eseguibili esterni al bundle,
 # e ffmpeg-kit-full-gpl non e' incorporabile (GPL incompatibile con l'App Store).
 if(APPLE AND NOT IOS)
+    # Il minimo di macOS, fisso: senza, il dmg prende la versione del Mac che compila
+    # (solo Xcode eredita 13 da Qt). Stesso valore per dmg e App Store, e per
+    # LSMinimumSystemVersion (Info-macos.plist).
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
+
     target_sources(SurfaceExplorer PRIVATE
         nativevideoencoder.h
         nativevideoencoder_mac.mm

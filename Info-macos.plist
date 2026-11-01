@@ -51,9 +51,9 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.education</string>
 
-	<!-- Deve combaciare con MACOSX_DEPLOYMENT_TARGET del progetto Xcode (13,
-	     ereditato da Qt 6.10). Dichiararne uno PIU' BASSO fa installare l'app su
-	     sistemi dove non parte; verificarlo con:
+	<!-- Deve combaciare con CMAKE_OSX_DEPLOYMENT_TARGET in CMakeLists.txt (13), che
+	     diventa il MACOSX_DEPLOYMENT_TARGET del progetto Xcode. Dichiararne uno PIU'
+	     BASSO fa installare l'app su sistemi dove non parte; verificarlo con:
 	       grep -o "MACOSX_DEPLOYMENT_TARGET = [^;]*" \
 	         build/macos-appstore/SurfaceExplorer.xcodeproj/project.pbxproj | sort -u -->
 	<key>LSMinimumSystemVersion</key>
