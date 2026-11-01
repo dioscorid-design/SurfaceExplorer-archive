@@ -1,6 +1,7 @@
 #include "libraryfileoperations.h"
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "libraryfolders.h"
 
 #include <QTreeWidget>
 #include <QSettings>
@@ -190,6 +191,33 @@ LibraryFileOperations::resolveMoveCollision(const QString &fileName, QString &de
     return choice;
 }
 
+QString LibraryFileOperations::pasteDestination()
+{
+    QTreeWidgetItem *currentItem = m_mainWindow->getCurrentLibraryItem();
+
+    if (currentItem && currentItem->data(0, Qt::UserRole + 10).isValid()) {
+        return currentItem->data(0, Qt::UserRole + 10).toString();
+    }
+    if (currentItem && currentItem->data(0, Qt::UserRole).isValid()) {
+        return QFileInfo(m_mainWindow->m_libraryManager.getSurface(currentItem->data(0, Qt::UserRole).toInt()).filePath).absolutePath();
+    }
+    if (currentItem && currentItem->data(0, Qt::UserRole + 2).isValid()) {
+        return QFileInfo(m_mainWindow->m_libraryManager.getMotion(currentItem->data(0, Qt::UserRole + 2).toInt()).filePath).absolutePath();
+    }
+    // Accanto al suono selezionato (mancava, e si finiva nella radice del ramo).
+    if (currentItem && currentItem->data(0, Qt::UserRole + 3).isValid()) {
+        return QFileInfo(m_mainWindow->m_libraryManager.getSound(currentItem->data(0, Qt::UserRole + 3).toInt()).filePath).absolutePath();
+    }
+
+    // Nessuna voce: la radice del ramo da cui viene il primo file, per
+    // POSIZIONE (LibraryFolders::branchOf). Prima lo si indovinava cercando
+    // "record", "motion", "sound" nel percorso: una Shape con una di quelle
+    // parole nel nome o nelle cartelle finiva in un altro ramo.
+    const LibraryFolders::Branch branch = LibraryFolders::branchOf(m_mainWindow->m_cutFilePaths.first());
+    return LibraryFolders::branchDir(branch == LibraryFolders::Branch::None
+                                     ? LibraryFolders::Branch::Surfaces : branch);
+}
+
 void LibraryFileOperations::performPasteExample(const QString &destDirOverride)
 {
     static bool isPasting = false;
@@ -201,44 +229,9 @@ void LibraryFileOperations::performPasteExample(const QString &destDirOverride)
         return;
     }
 
-    QSettings settings;
-
     // Destinazione esplicita (ramo principale): il menu ci passa gia' la root della
     // categoria, quindi saltiamo del tutto la deduzione da item selezionato/euristica.
-    QString destDir = destDirOverride;
-
-    if (destDir.isEmpty()) {
-        QTreeWidgetItem *currentItem = m_mainWindow->getCurrentLibraryItem();
-
-        if (currentItem && currentItem->data(0, Qt::UserRole + 10).isValid()) {
-            destDir = currentItem->data(0, Qt::UserRole + 10).toString();
-        }
-        else if (currentItem && currentItem->data(0, Qt::UserRole).isValid()) {
-            destDir = QFileInfo(m_mainWindow->m_libraryManager.getSurface(currentItem->data(0, Qt::UserRole).toInt()).filePath).absolutePath();
-        }
-        else if (currentItem && currentItem->data(0, Qt::UserRole + 2).isValid()) {
-            destDir = QFileInfo(m_mainWindow->m_libraryManager.getMotion(currentItem->data(0, Qt::UserRole + 2).toInt()).filePath).absolutePath();
-        }
-    }
-
-    if (destDir.isEmpty()) {
-        QString rootPath = settings.value("libraryRootPath").toString();
-        QString firstFile = m_mainWindow->m_cutFilePaths.first();
-
-        if (firstFile.contains("records", Qt::CaseInsensitive) || firstFile.contains("record", Qt::CaseInsensitive)
-            || firstFile.contains("motions", Qt::CaseInsensitive) || firstFile.contains("motion", Qt::CaseInsensitive)) {
-            // I Record (ex "Motion") stanno in pathRecords -> .../records; il vecchio
-            // ramo cercava solo "motion" e usava pathMotions, cosi' un path .../records
-            // cadeva nell'else (Surfaces) e usava la chiave sbagliata.
-            destDir = settings.value("pathRecords", rootPath + "/records").toString();
-        } else if (firstFile.contains("sounds", Qt::CaseInsensitive) || firstFile.contains("sound", Qt::CaseInsensitive)) {
-            destDir = settings.value("pathSounds", rootPath + "/sounds").toString();
-        } else {
-            // Case MINUSCOLO: la cartella reale e' "/surfaces" (mainwindow ~7430);
-            // "/Surfaces" non esiste su iOS case-sensitive.
-            destDir = settings.value("pathSurfaces", rootPath + "/surfaces").toString();
-        }
-    }
+    const QString destDir = destDirOverride.isEmpty() ? pasteDestination() : destDirOverride;
 
     // Su iOS/Android la sottocartella di destinazione puo' non esistere ancora nel
     // container (prima scrittura): senza questo mkpath sia QFile::rename che

@@ -389,6 +389,15 @@ void MainWindow::captureStartPose()
 {
     if (!ui->glWidget) return;
     m_startFraming     = ui->glWidget->framing();
+    // In modalita' path la vista guarda il bersaglio del path e yaw/pitch
+    // grezzi restano quelli di prima: si fotografa la direzione EFFETTIVA, come
+    // fa il Save dei record (getEffectiveCameraYaw). Un path che ha gia' fatto
+    // il primo passo al momento della foto dava una posa con la posizione del
+    // path e la direzione salvata nel file, e il RESET View guardava altrove.
+    if (ui->glWidget->isPathFollowing()) {
+        m_startFraming.yaw = ui->glWidget->getEffectiveCameraYaw();
+        m_startFraming.pitch = ui->glWidget->getEffectiveCameraPitch();
+    }
     m_startOrientation = ui->glWidget->orientation();
     m_startFov         = m_scene.fov;
 }

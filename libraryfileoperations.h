@@ -24,6 +24,9 @@ public:
     // cui dedurre la destinazione: su mobile getCurrentLibraryItem() e' nullo e le
     // vecchie euristiche sul nome del file sorgente fallivano -> paste inerte.
     void performPasteExample(const QString &destDirOverride = QString());
+    // Dove va un Incolla senza destinazione esplicita (da tastiera): la cartella
+    // della voce selezionata, altrimenti la radice del ramo del primo file.
+    QString pasteDestination();
     void performPasteTexture(const QString &destDirOverride = QString());
     void deleteSelected();
     void undoDelete();

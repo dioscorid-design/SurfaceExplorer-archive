@@ -24,6 +24,9 @@ bool isLibraryRoot(const QDir &dir);
 // records/ resta records. None = fuori da tutti i rami.
 enum class Branch { None, Surfaces, Textures, Sounds, Records };
 Branch branchOf(const QString &path);
+// La cartella di un ramo come la legge la libreria (refreshRepositories): la
+// scelta con Change Folder, altrimenti <radice>/<ramo>. Vuota per None.
+QString branchDir(Branch branch);
 // La cartella vive dentro iCloud Drive o un altro servizio di
 // sincronizzazione (solo macOS; altrove false).
 bool isCloudSynced(const QString &path);

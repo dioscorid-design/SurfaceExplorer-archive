@@ -2342,10 +2342,14 @@ void MainWindow::applyEmptySceneGating()
         if (ui->radioWF)     ui->radioWF->setEnabled(!isRM);
         if (ui->radioShell)  ui->radioShell->setEnabled(true);
         if (ui->radioSolid)  ui->radioSolid->setEnabled(true);
-        // Scelta del marcher: SOLO in Ray Marching (nel ramo parametrico non c'e'
-        // marcher). radioWF qui sopra usa la stessa condizione, al contrario.
-        if (ui->radioMarcherFast)    ui->radioMarcherFast->setEnabled(isRM);
-        if (ui->radioMarcherPrecise) ui->radioMarcherPrecise->setEnabled(isRM);
+        // Scelta del marcher: sempre accesa, come Shell/Solid. Stanno nella
+        // linguetta Ray Marching (panelRenderControls), che nel parametrico non
+        // si vede, e nessun'altra regola li riaccende: con la condizione isRM,
+        // uscendo dalla scena vuota con una Shape parametrica restavano spenti
+        // e il clic sulla linguetta Ray Marching li lasciava cosi', inerti,
+        // fino al preset RM successivo.
+        if (ui->radioMarcherFast)    ui->radioMarcherFast->setEnabled(true);
+        if (ui->radioMarcherPrecise) ui->radioMarcherPrecise->setEnabled(true);
         // NB: il gate di Ray Steps col marcher Precise NON va qui. Questo ramo
         // gira una volta sola, all'uscita dalla scena vuota (m_emptySceneGated
         // viene azzerato sopra): con una superficie gia' carica non passa mai.

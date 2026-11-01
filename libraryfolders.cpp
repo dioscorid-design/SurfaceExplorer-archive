@@ -102,6 +102,25 @@ QString LibraryFolders::root() {
 #endif
 }
 
+namespace {
+struct BranchEntry { LibraryFolders::Branch branch; const char *key; const char *name; };
+const BranchEntry kBranches[] = {
+    { LibraryFolders::Branch::Surfaces, "pathSurfaces", "surfaces" },
+    { LibraryFolders::Branch::Textures, "pathTextures", "textures" },
+    { LibraryFolders::Branch::Sounds,   "pathSounds",   "sounds"   },
+    { LibraryFolders::Branch::Records,  "pathRecords",  "records"  },
+};
+}
+
+QString LibraryFolders::branchDir(Branch branch)
+{
+    for (const BranchEntry &e : kBranches)
+        if (e.branch == branch)
+            return QSettings().value(QLatin1String(e.key),
+                                     root() + QLatin1Char('/') + QLatin1String(e.name)).toString();
+    return QString();
+}
+
 // IL RAMO DI UN PERCORSO. I salvataggi lo cercavano come SOTTOSTRINGA
 // ("/surfaces/" nel percorso, maiuscole comprese): una cartella "Surfaces"
 // dentro records/ faceva rifiutare il Save Record ("must be saved exclusively
@@ -115,17 +134,10 @@ LibraryFolders::Branch LibraryFolders::branchOf(const QString &path)
 {
     const QString p = QDir::cleanPath(QFileInfo(path).absoluteFilePath());
     const QString rootDir = root();
-    struct Entry { Branch branch; const char *key; const char *name; };
-    static const Entry entries[] = {
-        { Branch::Surfaces, "pathSurfaces", "surfaces" },
-        { Branch::Textures, "pathTextures", "textures" },
-        { Branch::Sounds,   "pathSounds",   "sounds"   },
-        { Branch::Records,  "pathRecords",  "records"  },
-    };
     QSettings settings;
     Branch best = Branch::None;
     qsizetype bestLen = -1;
-    for (const Entry &e : entries) {
+    for (const BranchEntry &e : kBranches) {
         QStringList dirs;
         if (!rootDir.isEmpty()) dirs << rootDir + QLatin1Char('/') + QLatin1String(e.name);
         const QString chosen = settings.value(QLatin1String(e.key)).toString();

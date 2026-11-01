@@ -912,23 +912,13 @@ void MainWindow::resetEngineToImplicit(bool loadDefaultSurface)
         ui->glWidget->setCameraPitch(0.0f);
         ui->glWidget->setCameraRoll(0.0f);
 
-        // FIX 3: Compilazione e invio della sfera alla GPU
-        //
-        // Scena vuota: in Ray Marching non esiste una mesh da azzerare (il
-        // gate m_indexCount non governa questo ramo), quindi l'unico modo di
-        // non far vedere NIENTE e' dare al marcher un campo che non venga mai
-        // intersecato. Non si puo' passare "": createImplicitFragmentShader
-        // ha un fallback (~4077) che sostituisce la stringa vuota proprio con
-        // la sfera, e otterremmo l'opposto della scena vuota. Una costante
-        // positiva e' sempre > epsilon a ogni passo -> nessun hit, sfondo
-        // pulito, e lo shader compila (se non compilasse, il ripristino di
-        // emergenza in validateAndApplyImplicitShader rimetterebbe a schermo
-        // l'equazione PRECEDENTE).
-        const QString implicitEqF = loadDefaultSurface
-                                  ? QStringLiteral("(x^2 + y^2 + z^2) - (1.0)")
-                                  : QLatin1String(kEmptyImplicitField);
-        ui->glWidget->setImplicitEquation(implicitEqF);
-        ui->glWidget->validateAndApplyImplicitShader(implicitEqF, "", "");
+        // FIX 3: Compilazione e invio della sfera alla GPU (la scena vuota di
+        // NEW la fa applyEmptySurfaceToEngine, piu' sotto).
+        if (loadDefaultSurface) {
+            const QString implicitEqF = QStringLiteral("(x^2 + y^2 + z^2) - (1.0)");
+            ui->glWidget->setImplicitEquation(implicitEqF);
+            ui->glWidget->validateAndApplyImplicitShader(implicitEqF, "", "");
+        }
 
         // Shell/Solid tornano al default di avvio (Shell, vedi il setup a
         // ~1926). Senza questo il reset alla sfera di default ereditava lo
@@ -954,25 +944,52 @@ void MainWindow::resetEngineToImplicit(bool loadDefaultSurface)
         if (loadDefaultSurface && crossSectionActive) {
             loadCrossSectionDefaultSurface();
         }
-        // SCENA VUOTA dal Cross Section: il campo vuoto va applicato al SUO
-        // ramo. setImplicitEquation() qui sopra riporta il marcher al ramo
-        // 3D (lo fa apposta, vedi la sua nota), e le due righe sopra
-        // agiscono entrambe sul solo ramo 3D. Senza questo blocco il New
-        // lasciava m_eqCrossSectionF INTATTO, con dentro l'equazione
-        // precedente: a schermo la scena era vuota (coerente: il ramo vivo
-        // era il 3D col campo vuoto), ma lo STATO era incoerente -- sotto-tab
-        // Cross Section attivo e marcher sull'altro ramo.
-        // Si autocorreggeva al primo Invio, che passa useCrossSection=true:
-        // il guasto viveva nella finestra fra il New e quel commit, dove
-        // chiunque LEGGA il ramo attivo (p.es. isSceneEmpty) trovava il 3D
-        // mentre l'utente era nel Cross Section.
-        else if (!loadDefaultSurface && crossSectionActive) {
-            ui->glWidget->validateAndApplyImplicitShader(
-                        QLatin1String(kEmptyImplicitField), "", "",
-                        /*useCrossSection=*/true);
-            ui->glWidget->rebuildShader();
+        // SCENA VUOTA (NEW): il campo vuoto, sul ramo del sotto-tab.
+        else if (!loadDefaultSurface) {
+            applyEmptySurfaceToEngine();
         }
     }
+}
+
+void MainWindow::applyEmptySurfaceToEngine()
+{
+    if (implicitMode()) {
+        // Ray marching: non esiste una mesh da azzerare (il gate m_indexCount
+        // non governa questo ramo), quindi l'unico modo di non far vedere
+        // NIENTE e' dare al marcher un campo che non venga mai intersecato.
+        // Non si puo' passare "": createImplicitFragmentShader ha un fallback
+        // (~4077) che sostituisce la stringa vuota proprio con la sfera. Una
+        // costante positiva (kEmptyImplicitField) e' sempre > epsilon a ogni
+        // passo -> nessun hit, sfondo pulito, e lo shader compila (se non
+        // compilasse, il ripristino di emergenza in
+        // validateAndApplyImplicitShader rimetterebbe a schermo l'equazione
+        // PRECEDENTE). Dal Cross Section va applicato
+        // anche al SUO ramo: setImplicitEquation() riporta il marcher al ramo
+        // 3D (lo fa apposta, vedi la sua nota) e la prima validazione agisce
+        // sul solo 3D. Senza, il New lasciava m_eqCrossSectionF INTATTO, con
+        // dentro l'equazione precedente: a schermo la scena era vuota (il ramo
+        // vivo era il 3D col campo vuoto), ma lo STATO era incoerente --
+        // sotto-tab Cross Section attivo e marcher sull'altro ramo, e chiunque
+        // LEGGA il ramo attivo (p.es. isSceneEmpty) trovava il 3D.
+        const QString empty = QLatin1String(kEmptyImplicitField);
+        ui->glWidget->setImplicitEquation(empty);
+        ui->glWidget->validateAndApplyImplicitShader(empty, "", "");
+        if (crossSectionTab())
+            ui->glWidget->validateAndApplyImplicitShader(empty, "", "", /*useCrossSection=*/true);
+        ui->glWidget->rebuildShader();
+        return;
+    }
+    // Parametrico. Non basta passare equazioni vuote a setParametricEquations:
+    // createVertexShaderSource le traduce in "0.0" (~4440), quindi lo shader
+    // compila benissimo e la griglia viene generata lo stesso -- tutti i
+    // vertici collassati nell'origine, cioe' un blob al centro invece del
+    // nulla. La mesh si svuota alla sorgente: clear() lascia vertici e indici
+    // vuoti e il ramo "mesh vuota" di render() azzera m_indexCount.
+    // Anche le equazioni del MOTORE, non solo i campi: restando quelle della
+    // superficie precedente, il primo updateSurfaceData() di chiunque (o un
+    // semplice cambio di risoluzione) la farebbe RIAPPARIRE dal nulla.
+    ui->glWidget->setParametricEquations("", "", "", "");
+    ui->glWidget->clearSceneGeometry();
 }
 
 void MainWindow::resetEngineToParametric(bool loadDefaultSurface)
@@ -1031,19 +1048,8 @@ void MainWindow::resetEngineToParametric(bool loadDefaultSurface)
         ui->glWidget->setParametricEquations(m_scene.eq.x, m_scene.eq.y,
                                              m_scene.eq.z, m_scene.eq.p);
     } else {
-        // SCENA VUOTA. Non basta passare equazioni vuote a
-        // setParametricEquations: createVertexShaderSource le traduce in
-        // "0.0" (~4440), quindi lo shader compila benissimo e la griglia
-        // viene generata lo stesso -- tutti i vertici collassati
-        // nell'origine, cioe' un blob al centro invece del nulla.
-        // La mesh si svuota alla sorgente: clear() lascia vertici e indici
-        // vuoti e il ramo "mesh vuota" di render() azzera m_indexCount.
-        // Anche le equazioni del MOTORE, non solo i campi: restando quelle
-        // della superficie precedente, il primo updateSurfaceData() di
-        // chiunque (o un semplice cambio di risoluzione) la farebbe
-        // RIAPPARIRE dal nulla.
-        ui->glWidget->setParametricEquations("", "", "", "");
-        ui->glWidget->clearSceneGeometry();
+        // SCENA VUOTA (NEW).
+        applyEmptySurfaceToEngine();
     }
 
     // 5. CONFIGURAZIONE ENGINE PARAMETRICO
@@ -2554,6 +2560,17 @@ void MainWindow::startRecordCameraMotion(const LibraryItem &data)
     updateProjectionButtonText();
 }
 
+bool MainWindow::recordHasNoSurface(const LibraryItem &data)
+{
+    if (data.isScript || !data.scriptCode.trimmed().isEmpty()) return false;
+    if (data.isImplicitMode) {
+        const QString eq = (data.usesCrossSection ? data.crossSectionEq : data.implicitEq).trimmed();
+        return eq.isEmpty() || eq == QLatin1String(kEmptyImplicitField);
+    }
+    if (data.isTube) return (data.tubeX + data.tubeY + data.tubeZ + data.tubeP).trimmed().isEmpty();
+    return (data.x + data.y + data.z + data.w).trimmed().isEmpty();
+}
+
 bool MainWindow::runRecordGeometry(const LibraryItem &data)
 {
     const bool isImplicit = data.isImplicitMode;
@@ -2583,6 +2600,20 @@ bool MainWindow::runRecordGeometry(const LibraryItem &data)
     static const QRegularExpression metricReturnRe(R"(\breturn\s+mat3\s*\()");
     const bool isMetricScript =
             isScript && data.scriptCode.contains(metricReturnRe);
+
+    // NESSUNA SUPERFICIE (record salvato da una scena vuota, col solo sfondo o
+    // il solo suono): la scena vuota di NEW, senza Run. Il Run validava
+    // equazioni vuote e mostrava "You must use exactly 2 or 3 valid spatial
+    // variables" -- e il load poi proseguiva lo stesso.
+    if (!isScript && recordHasNoSurface(data)) {
+        applyEmptySurfaceToEngine();
+        applyAnimationState(false);
+        // I controlli della superficie spenti come dopo NEW (applyEmptySceneGating,
+        // in coda a updateRenderState): quello del load e' gia' passato, con
+        // la superficie di prima ancora nel motore.
+        updateRenderState();
+        return false;
+    }
 
     if (!isScript) {
         // onStartClicked RILEGGE lineTexture e ricommitta lo shader implicito:
@@ -2913,8 +2944,11 @@ void MainWindow::applyMotionExample(LibraryItem data)
 
     updateScriptButtonText();
 
-    // isScript: da runRecordGeometry.
-    QTimer::singleShot(20, this, [this, isScript]() {
+    // isScript: da runRecordGeometry. Senza superficie la griglia non si
+    // rigenera: checkAndTriggerMeshUpdate la ricostruirebbe dalle equazioni
+    // vuote (un blob nell'origine, vedi applyEmptySurfaceToEngine).
+    const bool noSurface = !isScript && recordHasNoSurface(data);
+    QTimer::singleShot(20, this, [this, isScript, noSurface]() {
         if (ui->glWidget) {
             updateULimits();
             updateVLimits();
@@ -2922,7 +2956,7 @@ void MainWindow::applyMotionExample(LibraryItem data)
             ui->glWidget->setResolution(m_scene.steps);
             ui->glWidget->setRaySteps(m_scene.steps);
 
-            if (!isScript) {
+            if (!isScript && !noSurface) {
                 checkAndTriggerMeshUpdate();
             } else {
                 ui->glWidget->update(); // Facciamo solo un refresh visivo
