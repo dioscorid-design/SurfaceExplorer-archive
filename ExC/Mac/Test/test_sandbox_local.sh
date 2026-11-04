@@ -38,15 +38,15 @@
 #      deve essere ancora piena e l'export deve funzionare ancora
 #   Il passo 3 e' esattamente il caso che falliva su TestFlight.
 #
-# Richiede: macOS, Xcode command line tools, Qt 6.10.1 macOS.
+# Richiede: macOS, Xcode command line tools, Qt 6.12.0 macOS.
 
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/build/macos-sandbox-test"
 ENTITLEMENTS="$PROJECT_DIR/ExC/Mac/macos_appstore.entitlements"
-QT_CMAKE="$HOME/Qt/6.10.1/macos/bin/qt-cmake"
-MACDEPLOYQT="$HOME/Qt/6.10.1/macos/bin/macdeployqt"
+QT_CMAKE="$HOME/Qt/6.12.0/macos/bin/qt-cmake"
+MACDEPLOYQT="$HOME/Qt/6.12.0/macos/bin/macdeployqt"
 BUNDLE_ID="com.dioscorid.surfaceexplorer"
 # ATTENZIONE: il container NON si chiama sempre come il bundle id. macOS puo'
 # assegnargli un nome UUID (e' il caso di questa app), e il suo metadata non e'
@@ -184,7 +184,7 @@ if ! otool -l "$APP/Contents/MacOS/SurfaceExplorer" 2>/dev/null \
   # macdeployqt aggiunge l'rpath giusto ma NON sempre rimuove quello vecchio:
   # se ~/Qt resta in lista viene provato per primo e la library validation
   # uccide comunque il processo. Va tolto esplicitamente.
-  install_name_tool -delete_rpath "$HOME/Qt/6.10.1/macos/lib" \
+  install_name_tool -delete_rpath "$HOME/Qt/6.12.0/macos/lib" \
                     "$APP/Contents/MacOS/SurfaceExplorer" 2>/dev/null || true
 
   otool -l "$APP/Contents/MacOS/SurfaceExplorer" 2>/dev/null \

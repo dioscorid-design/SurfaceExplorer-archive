@@ -51,13 +51,13 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.education</string>
 
-	<!-- Deve combaciare con CMAKE_OSX_DEPLOYMENT_TARGET in CMakeLists.txt (13), che
+	<!-- Deve combaciare con CMAKE_OSX_DEPLOYMENT_TARGET in CMakeLists.txt (14.4), che
 	     diventa il MACOSX_DEPLOYMENT_TARGET del progetto Xcode. Dichiararne uno PIU'
 	     BASSO fa installare l'app su sistemi dove non parte; verificarlo con:
 	       grep -o "MACOSX_DEPLOYMENT_TARGET = [^;]*" \
 	         build/macos-appstore/SurfaceExplorer.xcodeproj/project.pbxproj | sort -u -->
 	<key>LSMinimumSystemVersion</key>
-	<string>13.0</string>
+	<string>14.4</string>
 
 	<key>NSHighResolutionCapable</key>
 	<true/>

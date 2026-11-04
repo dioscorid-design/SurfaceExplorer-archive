@@ -223,7 +223,9 @@ if (IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.dioscorid.surfaceexplorer")
     # 2. Architettura e Versione
     set(CMAKE_OSX_ARCHITECTURES "arm64")
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "17.0")
+    # iOS 18: il minimo dei framework di Qt 6.12 (minos 18.0). Piu' basso, l'App
+    # Store installerebbe l'app su sistemi dove non parte.
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "18.0")
     # 3. Proprietà dell'App
     set_target_properties(SurfaceExplorer PROPERTIES
         MACOSX_BUNDLE TRUE
@@ -444,9 +446,11 @@ endif()
 # e ffmpeg-kit-full-gpl non e' incorporabile (GPL incompatibile con l'App Store).
 if(APPLE AND NOT IOS)
     # Il minimo di macOS, fisso: senza, il dmg prende la versione del Mac che compila
-    # (solo Xcode eredita 13 da Qt). Stesso valore per dmg e App Store, e per
-    # LSMinimumSystemVersion (Info-macos.plist).
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
+    # (solo Xcode eredita il minimo da Qt). 14.4 e' il minimo dei framework di
+    # Qt 6.12 (minos 14.4): piu' basso, l'app si installerebbe su sistemi dove non
+    # parte. Stesso valore per dmg e App Store, e per LSMinimumSystemVersion
+    # (Info-macos.plist).
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "14.4")
 
     target_sources(SurfaceExplorer PRIVATE
         nativevideoencoder.h

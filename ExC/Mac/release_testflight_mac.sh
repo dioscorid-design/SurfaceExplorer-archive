@@ -46,7 +46,7 @@
 #   ./ExC/Mac/release_testflight_mac.sh --no-archive    solo bump + clean + rigenera Xcode, poi apre il progetto
 #   ./ExC/Mac/release_testflight_mac.sh --help
 #
-# Richiede: macOS, Xcode + command line tools, qt-cmake macOS (Qt 6.10.1).
+# Richiede: macOS, Xcode + command line tools, qt-cmake macOS (Qt 6.12.0).
 
 set -euo pipefail
 
@@ -63,10 +63,10 @@ PLIST_IOS="$PROJECT_DIR/Info.plist"
 BUILD_DIR="$PROJECT_DIR/build/macos-appstore"
 XCODEPROJ="$BUILD_DIR/SurfaceExplorer.xcodeproj"
 SCHEME="SurfaceExplorer"
-QT_CMAKE="$HOME/Qt/6.10.1/macos/bin/qt-cmake"
+QT_CMAKE="$HOME/Qt/6.12.0/macos/bin/qt-cmake"
 # Su macOS Qt e' DINAMICO: framework e plugin vanno incorporati nel bundle a
 # mano, dopo l'archive. Xcode non lo fa (non sa nulla di Qt).
-MACDEPLOYQT="$HOME/Qt/6.10.1/macos/bin/macdeployqt"
+MACDEPLOYQT="$HOME/Qt/6.12.0/macos/bin/macdeployqt"
 GIT_BRANCH="v1"
 ARCHIVE_DIR="$HOME/Library/Developer/Xcode/Archives"
 
@@ -282,7 +282,7 @@ ok "Archivio creato: $ARCHIVE_PATH"
 # ---------------------------------------------------------------------------
 # Xcode non sa nulla di Qt: archivia il binario cosi' com'e', con
 # Contents/Frameworks e Contents/PlugIns VUOTE e un rpath che punta a
-# ~/Qt/6.10.1/macos/lib. Sulla macchina di sviluppo i framework si trovano lo
+# ~/Qt/6.12.0/macos/lib. Sulla macchina di sviluppo i framework si trovano lo
 # stesso e sembra tutto a posto, ma i PLUGIN no: manca il plugin di piattaforma
 # "cocoa", QGuiApplicationPrivate::createPlatformIntegration() fallisce e Qt
 # chiama qFatal -> l'app ABORTISCE all'avvio (SIGABRT). Su un altro Mac non

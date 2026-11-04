@@ -20,7 +20,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 SRC="${1:-$PROJECT_DIR}"
 BLD="${2:-$PROJECT_DIR/build/Tests}"
 CMAKE="${CMAKE:-$HOME/Qt/Tools/CMake/CMake.app/Contents/bin/cmake}"
-QT_PREFIX="${QT_PREFIX:-$HOME/Qt/6.10.1/macos}"
+QT_PREFIX="${QT_PREFIX:-$HOME/Qt/6.12.0/macos}"
 NINJA="${NINJA:-$HOME/Qt/Tools/Ninja/ninja}"
 
 if [ ! -f "$BLD/build.ninja" ]; then

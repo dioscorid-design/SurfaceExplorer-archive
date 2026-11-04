@@ -26,7 +26,7 @@
 #   ./ExC/Mac/release_testflight.sh --no-archive    solo bump + clean + rigenera Xcode, poi apre il progetto
 #   ./ExC/Mac/release_testflight.sh --help
 #
-# Richiede: macOS, Xcode + command line tools, qt-cmake iOS (Qt 6.10.1).
+# Richiede: macOS, Xcode + command line tools, qt-cmake iOS (Qt 6.12.0).
 
 set -euo pipefail
 
@@ -39,7 +39,7 @@ PLIST="$PROJECT_DIR/Info.plist"
 BUILD_DIR="$PROJECT_DIR/build/ios-appstore"
 XCODEPROJ="$BUILD_DIR/SurfaceExplorer.xcodeproj"
 SCHEME="SurfaceExplorer"
-QT_CMAKE="$HOME/Qt/6.10.1/ios/bin/qt-cmake"
+QT_CMAKE="$HOME/Qt/6.12.0/ios_device/bin/qt-cmake"
 GIT_BRANCH="v1"
 # Cartella dove xcodebuild deposita l'archivio (poi visibile anche nell'Organizer).
 ARCHIVE_DIR="$HOME/Library/Developer/Xcode/Archives"

@@ -25,7 +25,7 @@ BUNDLE_ID="com.dioscorid.surfaceexplorer"
 SIGN_IDENTITY="Developer ID Application: GAETANO MOSCHETTI (BAPKX72394)"
 NOTARY_PROFILE="notarytool-profile"
 REPO="dioscorid-design/SurfaceExplorer"
-MACDEPLOYQT="$HOME/Qt/6.10.1/macos/bin/macdeployqt"
+MACDEPLOYQT="$HOME/Qt/6.12.0/macos/bin/macdeployqt"
 
 # Lo script vive in ExC/Mac/ : la root del progetto e' due cartelle sopra
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # ExC/Mac

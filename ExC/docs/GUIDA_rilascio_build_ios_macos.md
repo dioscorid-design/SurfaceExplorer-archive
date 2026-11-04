@@ -19,8 +19,8 @@ sostanziale è solo lo script da lanciare e la destinazione dell'archive.
 | Repo sorgente | `/Users/dioscorid/Projects/C/SurfaceExplorer` |
 | Progetto Xcode **iOS** (generato) | `build/ios-appstore/SurfaceExplorer.xcodeproj` |
 | Progetto Xcode **macOS** (generato) | `build/macos-appstore/SurfaceExplorer.xcodeproj` |
-| qt-cmake **iOS** | `/Users/dioscorid/Qt/6.10.1/ios/bin/qt-cmake` |
-| qt-cmake **macOS** | `/Users/dioscorid/Qt/6.10.1/macos/bin/qt-cmake` |
+| qt-cmake **iOS** | `/Users/dioscorid/Qt/6.12.0/ios_device/bin/qt-cmake` |
+| qt-cmake **macOS** | `/Users/dioscorid/Qt/6.12.0/macos/bin/qt-cmake` |
 | Bundle ID (lo stesso per iOS e macOS) | `com.dioscorid.surfaceexplorer` |
 | Team | GAETANO MOSCHETTI (AJ655XKJR8) |
 | Apple ID developer | adenio@libero.it |
@@ -176,12 +176,12 @@ find ~/Library/Developer/Xcode/DerivedData -maxdepth 1 -name 'SurfaceExplorer-*'
 
 # --- iOS ---
 rm -rf build/ios-appstore
-/Users/dioscorid/Qt/6.10.1/ios/bin/qt-cmake -S . -B build/ios-appstore -G Xcode
+/Users/dioscorid/Qt/6.12.0/ios_device/bin/qt-cmake -S . -B build/ios-appstore -G Xcode
 
 # --- macOS ---
 rm -rf build/macos-appstore
 export PATH="$HOME/Qt/Tools/CMake/CMake.app/Contents/bin:$PATH"   # vedi nota sotto
-/Users/dioscorid/Qt/6.10.1/macos/bin/qt-cmake -S . -B build/macos-appstore -G Xcode
+/Users/dioscorid/Qt/6.12.0/macos/bin/qt-cmake -S . -B build/macos-appstore -G Xcode
 ```
 
 > ⚠️ **`qt-cmake` ha bisogno di `cmake` nel PATH.** È un wrapper che fa `exec cmake`, e su
@@ -316,7 +316,7 @@ QMessageLogger::fatal  <-  QGuiApplicationPrivate::createPlatformIntegration  <-
 ```
 Causa: **il bundle non contiene Qt.** Xcode archivia il binario così com'è, con
 `Contents/Frameworks` e `Contents/PlugIns` vuote e l'rpath che punta a
-`~/Qt/6.10.1/macos/lib`. Sulla macchina di sviluppo i *framework* si trovano lo stesso e
+`~/Qt/6.12.0/macos/lib`. Sulla macchina di sviluppo i *framework* si trovano lo stesso e
 sembra tutto a posto, ma i *plugin* no: senza il plugin di piattaforma **cocoa** Qt chiama
 `qFatal` e abortisce. Su un altro Mac non parte affatto.
 
@@ -460,7 +460,7 @@ find ~/Library/Developer/Xcode/DerivedData -maxdepth 1 -name 'SurfaceExplorer-*'
 
 # --- iOS ---
 rm -rf build/ios-appstore
-/Users/dioscorid/Qt/6.10.1/ios/bin/qt-cmake -S . -B build/ios-appstore -G Xcode
+/Users/dioscorid/Qt/6.12.0/ios_device/bin/qt-cmake -S . -B build/ios-appstore -G Xcode
 open build/ios-appstore/SurfaceExplorer.xcodeproj
 # -> in Xcode: destinazione "Any iOS Device (arm64)", Product > Archive,
 #    poi Distribute App > App Store Connect > Upload
@@ -468,7 +468,7 @@ open build/ios-appstore/SurfaceExplorer.xcodeproj
 # --- macOS ---
 rm -rf build/macos-appstore
 export PATH="$HOME/Qt/Tools/CMake/CMake.app/Contents/bin:$PATH"   # qt-cmake esegue `cmake`
-/Users/dioscorid/Qt/6.10.1/macos/bin/qt-cmake -S . -B build/macos-appstore -G Xcode
+/Users/dioscorid/Qt/6.12.0/macos/bin/qt-cmake -S . -B build/macos-appstore -G Xcode
 open build/macos-appstore/SurfaceExplorer.xcodeproj
 # -> in Xcode: destinazione "My Mac", Product > Archive,
 #    poi Distribute App > App Store Connect > Upload

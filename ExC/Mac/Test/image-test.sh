@@ -44,7 +44,7 @@ PRESETS="${PRESETS:-$(cd "$PROJECT_DIR/.." && pwd)/presets}"
 REPORTS="$PROJECT_DIR/build/test-reports"
 CMAKE="${CMAKE:-$HOME/Qt/Tools/CMake/CMake.app/Contents/bin/cmake}"
 # Qt e ninja: gli stessi di build-tests.sh.
-QT_PREFIX="${QT_PREFIX:-$HOME/Qt/6.10.1/macos}"
+QT_PREFIX="${QT_PREFIX:-$HOME/Qt/6.12.0/macos}"
 NINJA="${NINJA:-$HOME/Qt/Tools/Ninja/ninja}"
 
 err() { printf 'ERRORE: %s\n' "$*" >&2; exit 1; }
