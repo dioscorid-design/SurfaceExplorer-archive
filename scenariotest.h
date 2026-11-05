@@ -173,6 +173,12 @@ private:
     // Run riavviano comunque la texture della superficie.
     // Da sola: --scenario-only texture-target.
     void runTextureTargetScenarios();
+    // UNA TEXTURE PER BERSAGLIO, ANCHE NELL'AVVISO: con la texture della
+    // superficie modificata, una scelta in Library sullo sfondo non chiede di
+    // salvare (la superficie resta com'e') e la superficie resta da salvare;
+    // lo stesso al contrario, tra fasce diverse e col Save Texture di una sola.
+    // Da sola: --scenario-only texture-owner.
+    void runTextureOwnerScenarios();
     // IMMAGINI SULLE SINGOLE MESH (multi-mesh, ambito Mesh): un'immagine scelta
     // in Library con una fascia selezionata va su QUELLA fascia, ferma, e la
     // superficie non cambia; fasce diverse tengono immagini diverse; uno script
@@ -279,6 +285,13 @@ private:
     // sole maiuscole permesse, cartella con record in scena e appunti di Copia
     // che la seguono. Da sola: --scenario-only library-rename.
     void runLibraryRenameScenarios();
+    // Library: una cartella e un file con lo stesso nome visualizzato nella
+    // stessa cartella (la texture "Shadertoy Style.json" e la cartella
+    // "Shadertoy Style"). La cartella resta una voce sua, col proprio
+    // contenuto, e il file resta un file: prima, se il disco restituiva il file
+    // per primo, la cartella si fondeva nella sua voce e il menu era quello del
+    // file (niente Paste Here). Da sola: --scenario-only library-clash.
+    void runLibraryNameClashScenarios();
     // Master su TUTTI i record della libreria: dopo il load ogni modulo
     // accendibile e' acceso e il tasto dice STOP (il suono escluso: il test lo
     // spegne). Lunga (~5 minuti): solo con --scenario-only master-records.

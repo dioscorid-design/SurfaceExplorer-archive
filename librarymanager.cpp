@@ -538,12 +538,28 @@ void LibraryManager::loadFromDirectory(const QString &dirPath, QTreeWidget *tree
     tree->sortItems(0, Qt::AscendingOrder);
 }
 
+// Voce di un FILE (superficie, texture, record, suono): ha l'indice nella sua
+// lista in uno dei ruoli UserRole+0..3. Le cartelle non ne hanno nessuno.
+static bool isFileEntry(const QTreeWidgetItem *item)
+{
+    for (int role = 0; role <= 3; ++role)
+        if (item->data(0, Qt::UserRole + role).isValid()) return true;
+    return false;
+}
+
 QTreeWidgetItem* LibraryManager::getOrCreateSubCategory(QTreeWidget* tree, QTreeWidgetItem* parent, const QString& name)
 {
     int childCount = (parent) ? parent->childCount() : tree->topLevelItemCount();
     for (int i = 0; i < childCount; ++i) {
         QTreeWidgetItem* item = (parent) ? parent->child(i) : tree->topLevelItem(i);
-        if (item->text(0) == name) return item;
+        // Solo CARTELLE. Un file con lo stesso nome visualizzato (la texture
+        // "Shadertoy Style.json" accanto alla cartella "Shadertoy Style") non e'
+        // la cartella: preso per tale, riceveva il percorso della cartella e ne
+        // adottava i file, ma il menu lo trattava da texture (controlla prima
+        // il ruolo del file): niente Paste Here, Rename Folder... Dipendeva
+        // dall'ordine in cui il disco restituisce le voci (file prima della
+        // cartella).
+        if (item->text(0) == name && !isFileEntry(item)) return item;
     }
 
     QTreeWidgetItem* newItem = new QTreeWidgetItem();

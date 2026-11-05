@@ -119,6 +119,11 @@ MainWindow::FingerprintPart MainWindow::fingerprintPart(const QString &key)
                    ? PartCore : PartTexture;
     if (key.startsWith(QLatin1String("meshParts[")))
         return key.section(QLatin1Char('/'), 1).startsWith(QLatin1String("tex")) ? PartTexture : PartCore;
+    // Del bordo e' del modulo texture la sola texture (la salva Save Texture
+    // col bersaglio Border, la sostituisce una scelta in Library); spessore,
+    // colore e modo sono della scena.
+    if (key.startsWith(QLatin1String("border/texture/")))
+        return PartTexture;
     // Tubo: la curva e' testo della superficie (conta quando il Run la porta a
     // schermo, come le equazioni); lo spessore agisce subito, come le costanti.
     if (key.startsWith(QLatin1String("tube/")))
@@ -183,7 +188,7 @@ void MainWindow::markSceneClean()
     m_pickedTexture  = m_cleanTexture;
     m_pickedSound    = m_cleanSound;
     m_viewTouched = false;
-    m_textureViewTouched = false;
+    m_textureViewTouched.clear();
 }
 
 // Save Surface: la scena e' su disco come superficie. I moduli texture e suono
@@ -199,17 +204,57 @@ void MainWindow::markSurfaceSaved()
     m_viewTouched = false;
 }
 
-void MainWindow::markTexturePicked()
+QString MainWindow::textureOwnerOfKey(const QString &key)
 {
-    m_cleanTexture  = fingerprintSlice(sceneFingerprint(), PartTexture);
-    m_pickedTexture = m_cleanTexture;
-    m_textureViewTouched = false;
+    return key.section(QLatin1Char('/'), 0, 0);
+}
+
+QString MainWindow::targetTextureOwner() const
+{
+    switch (targetTextureSlot()) {
+    case SlotBackgroundTexture: return QStringLiteral("background");
+    case SlotBorderTexture:     return QStringLiteral("border");
+    case SlotMeshTexture:
+        return QStringLiteral("meshParts[%1]").arg(ui->glWidget ? ui->glWidget->activeMeshPart() : 0);
+    default:                    return QStringLiteral("texture");
+    }
+}
+
+void MainWindow::markTexturePicked(const SceneFingerprint &before, const QString &owner)
+{
+    const SceneFingerprint now = fingerprintSlice(sceneFingerprint(), PartTexture);
+    QSet<QString> keys;
+    for (auto it = now.constBegin(); it != now.constEnd(); ++it) keys.insert(it.key());
+    for (auto it = before.constBegin(); it != before.constEnd(); ++it)
+        if (fingerprintPart(it.key()) == PartTexture) keys.insert(it.key());
+    for (auto it = m_cleanTexture.constBegin(); it != m_cleanTexture.constEnd(); ++it) keys.insert(it.key());
+    for (auto it = m_pickedTexture.constBegin(); it != m_pickedTexture.constEnd(); ++it) keys.insert(it.key());
+    for (const QString &k : std::as_const(keys)) {
+        // Le altre texture: solo cio' che il caricamento stesso ha cambiato.
+        // Il lavoro fatto prima su di loro resta da salvare.
+        if (textureOwnerOfKey(k) != owner && before.value(k) == now.value(k)) continue;
+        if (now.contains(k)) {
+            m_cleanTexture.insert(k, now.value(k));
+            m_pickedTexture.insert(k, now.value(k));
+        } else {
+            m_cleanTexture.remove(k);
+            m_pickedTexture.remove(k);
+        }
+    }
+    m_textureViewTouched.remove(owner);
 }
 
 void MainWindow::markTextureSaved()
 {
-    m_cleanTexture = fingerprintSlice(sceneFingerprint(), PartTexture);
-    m_textureViewTouched = false;
+    // Save Texture scrive la sola texture del bersaglio: le altre, se
+    // modificate, restano da salvare.
+    const QString owner = targetTextureOwner();
+    const SceneFingerprint now = fingerprintSlice(sceneFingerprint(), PartTexture);
+    for (auto it = m_cleanTexture.begin(); it != m_cleanTexture.end(); )
+        it = (textureOwnerOfKey(it.key()) == owner) ? m_cleanTexture.erase(it) : it + 1;
+    for (auto it = now.constBegin(); it != now.constEnd(); ++it)
+        if (textureOwnerOfKey(it.key()) == owner) m_cleanTexture.insert(it.key(), it.value());
+    m_textureViewTouched.remove(owner);
 }
 
 void MainWindow::markSoundPicked()
@@ -293,7 +338,10 @@ QStringList MainWindow::unsavedKeys() const
         }
     }
     if (m_viewTouched) out << QStringLiteral("scena:(vista mossa)");
-    if (m_textureViewTouched) out << QStringLiteral("texture:(inquadratura 2D mossa)");
+    QStringList framed(m_textureViewTouched.constBegin(), m_textureViewTouched.constEnd());
+    framed.sort();
+    for (const QString &owner : std::as_const(framed))
+        out << QStringLiteral("texture:%1/(inquadratura 2D mossa)").arg(owner);
     return out;
 }
 
@@ -313,11 +361,14 @@ bool MainWindow::hasUnsavedWork() const
     return false;
 }
 
-bool MainWindow::textureModuleDirty() const
+bool MainWindow::textureModuleDirty(const QString &owner) const
 {
+    const QLatin1String tag("texture:");
     const QStringList keys = unsavedKeys();
-    for (const QString &k : keys)
-        if (k.startsWith(QLatin1String("texture:"))) return true;
+    for (const QString &k : keys) {
+        if (!k.startsWith(tag)) continue;
+        if (owner.isEmpty() || textureOwnerOfKey(k.mid(tag.size())) == owner) return true;
+    }
     return false;
 }
 
@@ -385,7 +436,7 @@ void MainWindow::wireViewControlsTracking()
         connect(ui->glWidget, &GLWidget::userMovedView, this, [this]() {
             if (ui->glWidget && ui->glWidget->isFlatView()) {
                 if (!m_uiReady) return;
-                m_textureViewTouched = true;
+                m_textureViewTouched.insert(targetTextureOwner());
                 return;
             }
             noteViewControlUsed();
@@ -433,7 +484,10 @@ MainWindow::RunOutcomeGuard::~RunOutcomeGuard()
 //                  con UN popup solo, e il salvataggio parte dalla radice --
 //                  scegliere "records" tiene insieme superficie, texture,
 //                  suono, camera e rotazioni in un file solo.
-//   ScopeTexture - si perde la sola texture (se ne sta caricando un'altra).
+//   ScopeTexture - si perde la sola texture del BERSAGLIO (se ne sta
+//                  caricando un'altra, o la si spegne): superficie, sfondo,
+//                  bordo o fascia. Le altre texture restano dove sono, e del
+//                  loro lavoro non si chiede.
 //   ScopeSound   - si perde il solo suono.
 //                  Per questi due si guarda SOLO il flag del modulo e il
 //                  dialogo punta diritto al suo ramo: il tipo e' gia' deciso.
@@ -463,12 +517,20 @@ bool MainWindow::confirmDiscardUnsaved(DiscardScope scope)
     // --- Moduli singoli: si guarda un flag solo e si salva nel suo ramo ---
     if (scope == ScopeTexture || scope == ScopeSound) {
         const bool isTex = (scope == ScopeTexture);
-        if (isTex ? !textureModuleDirty() : !soundModuleDirty()) return true;
+        const QString owner = isTex ? targetTextureOwner() : QString();
+        if (isTex ? !textureModuleDirty(owner) : !soundModuleDirty()) return true;
 
+        // Quale texture: con piu' texture modificate, "la texture corrente"
+        // non diceva quale si stava per perdere.
+        const QString texName =
+              owner == QLatin1String("background") ? QStringLiteral("The background texture")
+            : owner == QLatin1String("border")     ? QStringLiteral("The border texture")
+            : owner == QLatin1String("texture")    ? QStringLiteral("The surface texture")
+                                                   : QStringLiteral("The texture of the selected mesh");
         QMessageBox box(this);
         box.setIcon(QMessageBox::Warning);
         box.setWindowTitle(isTex ? "Unsaved texture" : "Unsaved sound");
-        box.setText(isTex ? "The current texture has unsaved changes."
+        box.setText(isTex ? texName + " has unsaved changes."
                           : "The current sound has unsaved changes.");
         box.setInformativeText("They will be discarded. Do you want to save it first?");
         QPushButton *saveBtn    = box.addButton("Save",       QMessageBox::AcceptRole);

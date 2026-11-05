@@ -1215,22 +1215,43 @@ private:
     SceneFingerprint m_pickedTexture;
     SceneFingerprint m_pickedSound;
     bool m_viewTouched = false;         // posa mossa dall'utente (mouse, touch, tasti di camera)
-    bool m_textureViewTouched = false;  // inquadratura 2D della texture mossa nella vista piatta
+    // Le texture la cui inquadratura 2D e' stata mossa nella vista piatta (per
+    // nome, vedi textureOwnerOfKey).
+    QSet<QString> m_textureViewTouched;
     bool m_lastSaveSucceeded = false;   // esito dell'ultimo salvataggio (lo legge confirmDiscardUnsaved)
+
+    // LE TEXTURE DEL MODULO. Il modulo texture e' fatto di texture
+    // indipendenti -- della superficie, dello sfondo, del bordo, di ogni
+    // fascia -- e una scelta in Library, un Save Texture o il checkbox che la
+    // spegne agiscono sulla SOLA texture del bersaglio. L'avviso deve
+    // difendere quella e nessun'altra: guardando il modulo intero, caricare
+    // uno sfondo chiedeva di salvare la texture della superficie modificata,
+    // che restava dov'era. E dopo il caricamento l'intero modulo risultava
+    // pulito: la texture della superficie, ancora modificata, non era piu'
+    // difesa da nessuno.
+    // Il nome di una texture e' il primo tratto delle sue chiavi
+    // nell'impronta: "texture" (superficie), "background", "border",
+    // "meshParts[i]".
+    static QString textureOwnerOfKey(const QString &key);
+    QString targetTextureOwner() const;   // la texture del bersaglio corrente
 
     // I momenti PULITI. Scena: tutto e' su disco o appena caricato. Surface:
     // Save Surface (i moduli texture/suono restano com'erano). Texture/suono
     // "picked": presi dalla Library; "saved": scritti nel loro file.
     void markSceneClean();
     void markSurfaceSaved();
-    void markTexturePicked();
-    void markTextureSaved();
+    // La texture `owner` e' quella appena presa dalla Library: diventa pulita,
+    // e con lei cio' che il caricamento ha cambiato rispetto a `before`. Le
+    // altre texture restano com'erano, modificate comprese.
+    void markTexturePicked(const SceneFingerprint &before, const QString &owner);
+    void markTextureSaved();   // la texture del bersaglio e' su disco
     void markSoundPicked();
     void markSoundSaved();
     // Il testo della superficie e' andato a schermo (Run riuscito, limite
     // confermato): da qui conta per l'avviso. `prefixes` vuoto = tutte le chiavi.
     void noteSurfaceApplied(const QStringList &prefixes = QStringList());
-    bool textureModuleDirty() const;
+    // `owner` vuoto = una texture qualunque del modulo.
+    bool textureModuleDirty(const QString &owner = QString()) const;
     bool soundModuleDirty() const;
     // Le chiavi che rendono sporchi scena e moduli ("scena:colors/alpha"...):
     // per i test e per la diagnosi.
@@ -1245,6 +1266,17 @@ private:
         SceneFingerprint before;
         explicit AbsorbChangesGuard(MainWindow *mw) : w(mw), before(mw->sceneFingerprint()) {}
         ~AbsorbChangesGuard() { w->absorbChangesSince(before); }
+    };
+    // Scelta in Library, qualunque uscita abbia: all'uscita la texture del
+    // bersaglio e' quella della Library (markTexturePicked). Bersaglio e
+    // impronta si leggono all'INGRESSO, prima che il caricamento li cambi.
+    struct TexturePickedGuard {
+        MainWindow *w;
+        SceneFingerprint before;
+        QString owner;
+        explicit TexturePickedGuard(MainWindow *mw)
+            : w(mw), before(mw->sceneFingerprint()), owner(mw->targetTextureOwner()) {}
+        ~TexturePickedGuard() { w->markTexturePicked(before, owner); }
     };
     // Momento pulito all'uscita da un load o da un reset, qualunque uscita sia.
     // E' anche l'apertura della scena: la sua posa e' quella a cui torna il RESET.

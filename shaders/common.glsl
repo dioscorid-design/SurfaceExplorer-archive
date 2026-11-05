@@ -8,6 +8,23 @@ const float TAU = 6.28318530718;
 const float tau = 6.28318530718;
 const float e   = 2.71828182846;
 
+// --- DERIVATE IN PIXEL DELLO SCHERMO ---
+// dFdx/dFdy/fwidth misurano in pixel del color buffer. Nelle catture a
+// risoluzione fissa (immagine, video FBO) il buffer e' piu' grande della vista,
+// e cio' che una texture misura in pixel -- le linee "larghe un pixel" della
+// texture Wireframe, i bordi sfumati di un pixel -- restava di UN pixel
+// dell'immagine: rispetto allo schermo piu' sottile, e l'immagine, vista alla
+// stessa misura, molto piu' scura. Qui le derivate tornano in pixel dello
+// SCHERMO: ubuf.u_mathParams2.w e' quanti pixel dell'immagine vale un pixel
+// della vista, meno 1 (0 a schermo; vedi GLWidget::render). Nel corpo il nome e'
+// quello della funzione vera: una macro non si espande dentro se stessa.
+// Il codice dell'app non usa derivate: le macro valgono per le texture.
+// Nel vertex non servono (le derivate esistono solo nel fragment) ma non
+// disturbano: una macro mai usata non produce codice.
+#define dFdx(x)   (dFdx(x) * (1.0 + ubuf.u_mathParams2.w))
+#define dFdy(x)   (dFdy(x) * (1.0 + ubuf.u_mathParams2.w))
+#define fwidth(x) (fwidth(x) * (1.0 + ubuf.u_mathParams2.w))
+
 // --- SAFE POW ---
 // pow() sicura per basi negative. In GLSL pow(x, y) è UNDEFINED per x < 0: su
 // desktop/Metal spesso restituisce il valore corretto per esponenti interi, ma su

@@ -194,11 +194,13 @@ bool MainWindow::confirmLibraryClick(QTreeWidget *src, QTreeWidgetItem *item)
     const bool isLeaf = (item && item->childCount() == 0);
 
     if (src == ui->treeTextures && isLeaf) {
-        // Si sta perdendo la sola TEXTURE, non la scena: si guarda il flag
-        // di quel modulo e il salvataggio punta al ramo textures/. Chiedere
-        // qui della scena intera (cosa che una texture pure cambia) faceva
-        // uscire un popup a ogni modifica, anche quando la texture non era
-        // stata toccata.
+        // Si sta perdendo la sola TEXTURE DEL BERSAGLIO, non la scena: si
+        // guarda il flag di quella texture e il salvataggio punta al ramo
+        // textures/. Chiedere qui della scena intera (cosa che una texture
+        // pure cambia) faceva uscire un popup a ogni modifica, anche quando la
+        // texture non era stata toccata; chiedere dell'intero modulo faceva
+        // salvare la texture della superficie caricando uno sfondo, e
+        // viceversa (vedi textureOwnerOfKey).
         // ...tranne quando la texture non puo' andare sul bersaglio: verra'
         // rifiutata con un avviso (refuseIncompatibleTexture) e nulla cambia,
         // quindi non c'e' niente da difendere.
@@ -371,10 +373,7 @@ void MainWindow::restartActiveLibraryTexture(const LibraryItem &data)
     bool isBg = editingBackground();
     // Il riclic rimette colori e inquadratura del preset: e' di nuovo la
     // texture della Library, come dopo una scelta (markTexturePicked).
-    struct TexturePickedGuard {
-        MainWindow *w;
-        ~TexturePickedGuard() { w->markTexturePicked(); }
-    } texturePickedGuard{this};
+    TexturePickedGuard texturePickedGuard(this);
 
     // RIAVVIO DALL'INIZIO. Ricliccare il preset gia' attivo lo fa
     // ripartire da capo: e' la regola della Library, che superfici,

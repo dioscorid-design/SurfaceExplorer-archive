@@ -855,14 +855,13 @@ void MainWindow::handleTextureSelection(int index)
     m_currentTexturePresetPath = data.filePath;
 
     // A schermo ci sara' una texture di libreria, non lavoro dell'utente: per
-    // il MODULO texture non c'e' piu' niente da proteggere (la conferma per la
-    // texture PRECEDENTE l'ha gia' chiesta il chiamante, onExampleItemClicked).
+    // la texture del BERSAGLIO non c'e' piu' niente da proteggere (la conferma
+    // per quella PRECEDENTE l'ha gia' chiesta il chiamante,
+    // onExampleItemClicked). Le altre texture del modulo restano come sono,
+    // modificate comprese.
     // La SCENA invece e' cambiata rispetto al suo file: il record la salva, e
     // l'avviso di scena la difende. All'uscita, quando la texture e' applicata.
-    struct TexturePickedGuard {
-        MainWindow *w;
-        ~TexturePickedGuard() { w->markTexturePicked(); }
-    } texturePickedGuard{this};
+    TexturePickedGuard texturePickedGuard(this);
 
     static int lastTextureIndex = -1;
     static bool lastWasBg = false;

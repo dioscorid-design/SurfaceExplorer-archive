@@ -1814,6 +1814,11 @@ void ScenarioTest::run()
         finish();
         return;
     }
+    if (m_only == QLatin1String("texture-owner")) {
+        runTextureOwnerScenarios();
+        finish();
+        return;
+    }
     if (m_only == QLatin1String("mesh-image")) {
         runMeshImageScenarios();
         finish();
@@ -1841,6 +1846,11 @@ void ScenarioTest::run()
     }
     if (m_only == QLatin1String("library-rename")) {
         runLibraryRenameScenarios();
+        finish();
+        return;
+    }
+    if (m_only == QLatin1String("library-clash")) {
+        runLibraryNameClashScenarios();
         finish();
         return;
     }
@@ -2016,7 +2026,7 @@ void ScenarioTest::run()
     if (loadRecord(QString::fromLatin1(kParametricRecord))) {
         checkTexColors(QStringLiteral("record caricato"));
         const QColor m1(QStringLiteral("#1c3664")), m2(QStringLiteral("#e28d57"));
-        if (selectTexture(QStringLiteral("textures/Procedurals/Mandelbrot.json")))
+        if (selectTexture(QStringLiteral("textures/Procedurals/Fractals/Mandelbrot.json")))
             checkTexColors(QStringLiteral("Mandelbrot dalla Library"), m1, m2);
         const QColor n2(10, 200, 30);
         setTexColorBySliders(true, n2);
@@ -2052,14 +2062,14 @@ void ScenarioTest::run()
         if (!ui->radioMeshAll->isChecked()) click(ui->radioMeshAll);
         checkTexColors(QStringLiteral("ambito All"));
         const QColor m1(QStringLiteral("#1c3664")), m2(QStringLiteral("#e28d57"));
-        if (selectTexture(QStringLiteral("textures/Procedurals/Mandelbrot.json")))
+        if (selectTexture(QStringLiteral("textures/Procedurals/Fractals/Mandelbrot.json")))
             checkTexColors(QStringLiteral("All: Mandelbrot dalla Library"), m1, m2);
         if (!ui->radioMeshOne->isChecked()) click(ui->radioMeshOne);
         ui->spinMeshSel->setValue(1);  wait(300);
         const QColor d1(QStringLiteral("#33cc33")), d2(Qt::black);
         checkTexColors(QStringLiteral("fascia 1 (colori propri)"), m1, m2, d1, d2);
         const QColor b1(QStringLiteral("#f2e4d8")), b2(QStringLiteral("#8a4a32"));
-        if (selectTexture(QStringLiteral("textures/Procedurals/Porous Bone.json")))
+        if (selectTexture(QStringLiteral("textures/Procedurals/Materials/Porous Bone.json")))
             checkTexColors(QStringLiteral("fascia 1: Porous Bone dalla Library"), m1, m2, b1, b2);
         const QColor o1(250, 120, 0);
         setTexColorBySliders(false, o1);
@@ -2306,7 +2316,7 @@ void ScenarioTest::run()
     // CODICE DELLA TEXTURE, parametrico: lo script del dock Script. Il Save
     // scrive l'intenzione (l'editor, anche non eseguito) qualunque modulo il
     // dock stia mostrando.
-    const QString kMandelbrot = QStringLiteral("textures/Procedurals/Mandelbrot.json");
+    const QString kMandelbrot = QStringLiteral("textures/Procedurals/Fractals/Mandelbrot.json");
     m_lines.append(QString());
     m_lines.append(QStringLiteral("== Codice texture: parametrico (%1) ==")
                        .arg(QString::fromLatin1(kParametricRecord)));
@@ -2431,7 +2441,7 @@ void ScenarioTest::run()
             presetTextureCode(QString::fromLatin1(kMultiMeshRecord), LibraryType::Motion, true);
         if (!ui->radioMeshOne->isChecked()) click(ui->radioMeshOne);
         ui->spinMeshSel->setValue(1);  wait(300);
-        if (selectTexture(QStringLiteral("textures/Procedurals/Porous Bone.json")))
+        if (selectTexture(QStringLiteral("textures/Procedurals/Materials/Porous Bone.json")))
             checkTextureCode(QStringLiteral("multi-mesh, fascia 1: Porous Bone dalla Library"), globalCode);
         setScriptMode(MainWindow::ScriptModeTexture);
         checkTextureCode(QStringLiteral("dock Script sulla texture della fascia"), globalCode);
@@ -3689,7 +3699,7 @@ void ScenarioTest::run()
         const QString atLoad = overlay();
         selectTexture(QStringLiteral("textures/Procedurals/Linear Gradient.json"));  wait(300);
         const QString plain = overlay();
-        selectTexture(QStringLiteral("textures/Procedurals/Mandelbrot.json"));  wait(300);
+        selectTexture(QStringLiteral("textures/Procedurals/Fractals/Mandelbrot.json"));  wait(300);
         const QString hinted = overlay();
         auto flat = [](QString s) { return s.replace(QLatin1Char('\n'), QLatin1String(" / ")); };
         check(atLoad.contains(QLatin1String("frequencies")) && plain.isEmpty()
@@ -3739,12 +3749,14 @@ void ScenarioTest::run()
 
     runScriptDockScenarios();
     runTextureTargetScenarios();
+    runTextureOwnerScenarios();
     runMeshImageScenarios();
     runMeshClockScenarios();
     runRecordTextureScenarios();
     runLibraryFolderScenarios();
     runLibraryPasteScenarios();
     runLibraryRenameScenarios();
+    runLibraryNameClashScenarios();
     runResetSceneScenarios();
     runResetButtonScenarios();
     runBorderScenarios();
@@ -4640,7 +4652,7 @@ void ScenarioTest::runBorderScenarios()
         // ("Border slider", al plurale con piu' costanti), alla scelta in
         // Library e nel record riaperto.
         click(ui->radioBorder);
-        selectTexture(QStringLiteral("textures/Procedurals/Mandelbrot.json"));
+        selectTexture(QStringLiteral("textures/Procedurals/Fractals/Mandelbrot.json"));
         const QString hPick = m_mw->composedHintText();
         m_record = QStringLiteral("border-hint");
         const LibraryItem recHint = captureSave();
@@ -5553,7 +5565,12 @@ void ScenarioTest::runImageCaptureScenarios()
                 }
             return n;
         };
-        const QSize sw = ImageCapture::sizeFor(viewRatio, 3200);
+        // Almeno 2.5 volte la vista: lo spessore e' la scala ARROTONDATA, e con
+        // una finestra grande (2.x, o la sezione lanciata da sola) 3200 pixel
+        // valevano 1.3 volte la vista -> spessore 1, niente strisce, e le tre
+        // verifiche qui sotto fallivano per la finestra, non per il codice.
+        const int viewLong = int(std::lround(std::max(gl->width(), gl->height()) * gl->devicePixelRatioF()));
+        const QSize sw = ImageCapture::sizeFor(viewRatio, std::max(3200, int(2.5 * viewLong)));
         const QImage thick = ImageCapture::render(gl, sw, viewRatio, &err);
         gl->setCaptureLineWidth(1);
         gl->beginHiResCapture(sw.width(), sw.height());
@@ -5779,6 +5796,41 @@ void ScenarioTest::runImageCaptureScenarios()
                 st.remove(QString::fromLatin1(k));
         }
     }
+
+    // DERIVATE IN PIXEL DELLO SCHERMO. La texture Wireframe (Ray Marching) tiene
+    // le linee larghe un pixel con fwidth: in un'immagine piu' grande della vista
+    // restavano di un pixel dell'immagine, e riportata alla misura dello schermo
+    // l'immagine usciva molto piu' scura del display (Gyroid del record DMI).
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Immagine piu' grande della vista: cio' che la texture misura in pixel resta in proporzione =="));
+    if (loadRecord(QStringLiteral("records/DMI/Gyroid.json"))) {
+        gl->stopAllTimers();
+        wait(500);
+        auto luma = [](const QImage &im) {
+            double sum = 0.0;
+            for (int y = 0; y < im.height(); ++y)
+                for (int x = 0; x < im.width(); ++x) {
+                    const QRgb p = im.pixel(x, y);
+                    sum += 0.299 * qRed(p) + 0.587 * qGreen(p) + 0.114 * qBlue(p);
+                }
+            return sum / std::max(1.0, double(im.width()) * im.height());
+        };
+        const QImage live = gl->grabFramebuffer().convertToFormat(QImage::Format_RGB32);
+        const double vr = double(gl->width()) / double(std::max(1, gl->height()));
+        const QSize big = ImageCapture::sizeFor(vr, 2 * std::max(live.width(), live.height()));
+        QString e;
+        const QImage hi = ImageCapture::render(gl, big, vr, &e);
+        if (!live.isNull() && !hi.isNull()) {
+            const QImage down = hi.scaled(live.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+            const double a = luma(live), b = luma(down);
+            check(b > 0.85 * a && b < 1.15 * a,
+                  QStringLiteral("immagine %1x%2 (vista %3x%4), riportata alla misura della vista: luminosita' media %5 contro %6 a schermo")
+                      .arg(big.width()).arg(big.height()).arg(live.width()).arg(live.height())
+                      .arg(b, 0, 'f', 1).arg(a, 0, 'f', 1));
+        } else {
+            check(false, QStringLiteral("immagine piu' grande della vista: rendering fallito %1").arg(e));
+        }
+    }
     gl->setClocksDrivenByRecorder(false);
 }
 
@@ -5919,7 +5971,7 @@ void ScenarioTest::runShapeBackgroundScenarios()
     wait(300);
     check(!QFile::exists(defaultBg) && m_lastPopup.contains(QLatin1String("no background texture")),
           QStringLiteral("sfondo di default -> Save Texture rifiutato (%1)").arg(m_lastPopup));
-    if (selectTexture(QStringLiteral("textures/Procedurals/Mandelbrot.json"))) {
+    if (selectTexture(QStringLiteral("textures/Procedurals/Fractals/Mandelbrot.json"))) {
         const QColor c1(QStringLiteral("#aa3311")), c2(QStringLiteral("#113355"));
         m_mw->m_scene.bgTexColor1 = c1;
         m_mw->m_scene.bgTexColor2 = c2;
@@ -5986,7 +6038,7 @@ void ScenarioTest::runShapeBackgroundScenarios()
         auto background = [&]() {
             click(ui->radioBackground);
             if (!ui->chkBoxTexture->isChecked()) click(ui->chkBoxTexture);
-            selectTexture(QStringLiteral("textures/Procedurals/Mandelbrot.json"));
+            selectTexture(QStringLiteral("textures/Procedurals/Fractals/Mandelbrot.json"));
             wait(300);
             click(ui->radioSurface);
         };
@@ -6564,6 +6616,93 @@ void ScenarioTest::runLibraryRenameScenarios()
               .arg(m_mw->m_currentRecordPath, m_mw->m_cutFilePaths.join(QStringLiteral(", "))));
     m_mw->m_currentRecordPath = keepRecord;
     m_mw->m_cutFilePaths = keepCut;
+}
+
+void ScenarioTest::runLibraryNameClashScenarios()
+{
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Library: cartella e file con lo stesso nome =="));
+
+    // 1. Senza disco, quindi senza dipendere dall'ordine: nell'albero c'e' gia'
+    //    la voce di una texture col nome della cartella che si cerca.
+    {
+        LibraryManager lm;
+        QTreeWidget tree;
+        auto *fileItem = new QTreeWidgetItem();
+        fileItem->setText(0, QStringLiteral("Shadertoy Style"));
+        fileItem->setData(0, Qt::UserRole + 1, 0);
+        tree.addTopLevelItem(fileItem);
+        QTreeWidgetItem *folder = lm.getOrCreateSubCategory(&tree, nullptr, QStringLiteral("Shadertoy Style"));
+        check(folder && folder != fileItem && tree.topLevelItemCount() == 2,
+              QStringLiteral("texture gia' nell'albero col nome della cartella -> la cartella e' una voce nuova"));
+        check(lm.getOrCreateSubCategory(&tree, nullptr, QStringLiteral("Shadertoy Style")) == folder,
+              QStringLiteral("la ricerca successiva ritrova la cartella, non la texture"));
+    }
+
+    // 2. Dal disco, con loadFromDirectory come all'avvio. L'ordine in cui il
+    //    disco restituisce file e cartella non si sceglie: con piu' coppie
+    //    qualcuna capita col file PRIMA della cartella, il caso che si rompeva.
+    QTemporaryDir tmp;
+    if (!tmp.isValid()) {
+        check(false, QStringLiteral("cartella temporanea non creata"));
+        return;
+    }
+    const QString root = tmp.path() + QStringLiteral("/textures");
+    const int pairs = 12;
+    auto writeTexture = [](const QString &path, const QString &name) {
+        QFile f(path);
+        if (f.open(QIODevice::WriteOnly))
+            f.write(QStringLiteral("{\"type\": \"custom_texture\", \"name\": \"%1\", \"code\": \"return vec3(1.0);\"}")
+                        .arg(name).toUtf8());
+    };
+    for (int i = 0; i < pairs; ++i) {
+        const QString name = QStringLiteral("Clash %1").arg(i);
+        QDir().mkpath(root + QLatin1Char('/') + name);
+        writeTexture(root + QLatin1Char('/') + name + QStringLiteral(".json"), name);
+        writeTexture(root + QLatin1Char('/') + name + QStringLiteral("/Inner %1.json").arg(i),
+                     QStringLiteral("Inner %1").arg(i));
+    }
+    int fileFirst = 0;
+    {
+        QStringList order;
+        QDirIterator it(root, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+        while (it.hasNext()) order << QFileInfo(it.next()).fileName();
+        for (int i = 0; i < pairs; ++i) {
+            const QString name = QStringLiteral("Clash %1").arg(i);
+            if (order.indexOf(name + QStringLiteral(".json")) < order.indexOf(name)) ++fileFirst;
+        }
+    }
+
+    LibraryManager lm;
+    QTreeWidget tree;
+    lm.loadFromDirectory(root, &tree, LibraryType::Texture);
+    int good = 0;
+    QStringList bad;
+    for (int i = 0; i < pairs; ++i) {
+        const QString name = QStringLiteral("Clash %1").arg(i);
+        QTreeWidgetItem *file = nullptr;
+        QTreeWidgetItem *folder = nullptr;
+        for (int k = 0; k < tree.topLevelItemCount(); ++k) {
+            QTreeWidgetItem *it = tree.topLevelItem(k);
+            if (it->text(0) != name) continue;
+            if (it->data(0, Qt::UserRole + 1).isValid()) file = it;
+            else folder = it;
+        }
+        const bool fileOk = file && !file->data(0, Qt::UserRole + 10).isValid() && file->childCount() == 0;
+        const bool folderOk = folder
+            && QDir::cleanPath(folder->data(0, Qt::UserRole + 10).toString())
+                   == QDir::cleanPath(root + QLatin1Char('/') + name)
+            && folder->childCount() == 1
+            && folder->child(0)->text(0) == QStringLiteral("Inner %1").arg(i)
+            && folder->child(0)->data(0, Qt::UserRole + 1).isValid();
+        if (fileOk && folderOk) ++good;
+        else bad << QStringLiteral("%1 (%2%3)").arg(name, fileOk ? QString() : QStringLiteral("file fuso o mancante "),
+                                                     folderOk ? QString() : QStringLiteral("cartella senza voce propria"));
+    }
+    check(good == pairs,
+          QStringLiteral("cartelle e texture omonime dal disco: %1 su %2 a posto (%3 lette col file prima della cartella)%4")
+              .arg(good).arg(pairs).arg(fileFirst)
+              .arg(bad.isEmpty() ? QString() : QStringLiteral(": ") + bad.join(QStringLiteral(", "))));
 }
 
 void ScenarioTest::runLibraryPasteScenarios()
@@ -7166,6 +7305,126 @@ void ScenarioTest::runTextureTargetScenarios()
         if (selectTexture(QStringLiteral("textures/Procedurals/Plasma.json")))
             check(m_popupsClosed == closed + 1 && m_mw->implicitMode() && m_mw->m_scene.rm.texture == rmTex,
                   QStringLiteral("texture parametrica su Ray Marching -> un avviso, scena e texture invariate"));
+    }
+}
+
+void ScenarioTest::runTextureOwnerScenarios()
+{
+    Ui::MainWindow *ui = m_mw->ui;
+    auto click = [this](QAbstractButton *b) { b->click(); wait(200); };
+    const QString mark = QStringLiteral("seOwnerTest");
+    // Lo script della texture del bersaglio scritto a mano, come nell'editor.
+    auto touchScript = [this, ui, mark]() {
+        setScriptMode(MainWindow::ScriptModeTexture);
+        ui->txtScriptEditor->setPlainText(ui->txtScriptEditor->toPlainText()
+                                          + QStringLiteral("\nfloat %1 = 1.0;").arg(mark));
+        wait(300);
+    };
+    // Le texture da salvare, per nome ("background", "texture", "meshParts[2]").
+    auto dirtyOwners = [this]() {
+        QStringList l;
+        const QLatin1String tag("texture:");
+        for (const QString &k : m_mw->unsavedKeys()) {
+            if (!k.startsWith(tag)) continue;
+            const QString o = MainWindow::textureOwnerOfKey(k.mid(tag.size()));
+            if (!l.contains(o)) l << o;
+        }
+        l.sort();
+        return l.isEmpty() ? QStringLiteral("nessuna") : l.join(QStringLiteral(", "));
+    };
+    // Una scelta in Library: quante domande "vuoi salvare?" ha fatto.
+    auto pick = [this](const QString &rel) {
+        const int before = m_discardPrompts;
+        selectTexture(rel);
+        return m_discardPrompts - before;
+    };
+
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Superficie e sfondo: l'avviso difende la sola texture che si sostituisce =="));
+    if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) {
+        if (!ui->radioSurface->isChecked()) click(ui->radioSurface);
+        selectTexture(QStringLiteral("textures/Procedurals/Plasma.json"));
+        touchScript();
+        QString d = dirtyOwners();
+        check(d == QLatin1String("texture"),
+              QStringLiteral("texture della superficie modificata -> da salvare: %1").arg(d));
+
+        click(ui->radioBackground);
+        int q = pick(QStringLiteral("textures/Procedurals/Soft Clouds.json"));
+        check(q == 0, QStringLiteral("sfondo dalla Library, superficie modificata -> nessuna domanda (domande: %1)").arg(q));
+        d = dirtyOwners();
+        check(d == QLatin1String("texture") && m_mw->surfaceTextureScript().contains(mark),
+              QStringLiteral("...e la texture della superficie resta modificata e da salvare (da salvare: %1)").arg(d));
+
+        touchScript();
+        d = dirtyOwners();
+        check(d == QLatin1String("background, texture"),
+              QStringLiteral("sfondo modificato anche lui -> da salvare: %1").arg(d));
+
+        click(ui->radioSurface);
+        q = pick(QStringLiteral("textures/Procedurals/Marble.json"));
+        check(q == 1, QStringLiteral("superficie dalla Library, superficie e sfondo modificati -> una domanda (domande: %1)").arg(q));
+        d = dirtyOwners();
+        check(d == QLatin1String("background") && m_mw->backgroundTextureScript().contains(mark),
+              QStringLiteral("...e lo sfondo resta modificato e da salvare (da salvare: %1)").arg(d));
+
+        // Save Texture scrive la sola texture del bersaglio.
+        touchScript();
+        click(ui->radioBackground);
+        m_mw->markTextureSaved();
+        d = dirtyOwners();
+        check(d == QLatin1String("texture"),
+              QStringLiteral("Save Texture dello sfondo -> resta da salvare la superficie (da salvare: %1)").arg(d));
+
+        q = pick(QStringLiteral("textures/Procedurals/Plasma.json"));
+        d = dirtyOwners();
+        check(q == 0 && d == QLatin1String("texture"),
+              QStringLiteral("sfondo salvato e poi sostituito dalla Library -> nessuna domanda (%1), da salvare: %2").arg(q).arg(d));
+        click(ui->radioSurface);
+        q = pick(QStringLiteral("textures/Procedurals/Wood.json"));
+        d = dirtyOwners();
+        check(q == 1 && d == QLatin1String("nessuna"),
+              QStringLiteral("superficie sostituita -> una domanda (%1), poi da salvare: %2").arg(q).arg(d));
+        setScriptMode(MainWindow::ScriptModeSurface);
+    }
+
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Fasce diverse: ognuna ha il suo avviso (%1) ==").arg(QString::fromLatin1(kMultiMeshRecord)));
+    if (loadRecord(QString::fromLatin1(kMultiMeshRecord))) {
+        if (!ui->radioSurface->isChecked()) click(ui->radioSurface);
+        if (!ui->radioMeshOne->isChecked()) click(ui->radioMeshOne);
+        ui->spinMeshSel->setValue(3);  wait(300);
+        touchScript();
+        // La texture della fascia e' animata: il tasto dice Stop, e il primo
+        // clic la ferma soltanto. Il Run vero e' il secondo.
+        if (ui->btnRunCurrentScript->text().startsWith(QLatin1String("Stop"))) {
+            m_mw->onRunCurrentScript();  wait(300);
+        }
+        m_mw->onRunCurrentScript();  wait(800);
+        QString d = dirtyOwners();
+        check(d == QLatin1String("meshParts[2]"),
+              QStringLiteral("texture della fascia 3 modificata -> da salvare: %1").arg(d));
+
+        ui->spinMeshSel->setValue(2);  wait(300);
+        int q = pick(QStringLiteral("textures/Procedurals/Marble.json"));
+        d = dirtyOwners();
+        check(q == 0 && d == QLatin1String("meshParts[2]"),
+              QStringLiteral("fascia 2 dalla Library, fascia 3 modificata -> nessuna domanda (%1), da salvare: %2").arg(q).arg(d));
+
+        click(ui->radioBackground);
+        q = pick(QStringLiteral("textures/Procedurals/Soft Clouds.json"));
+        d = dirtyOwners();
+        check(q == 0 && d == QLatin1String("meshParts[2]"),
+              QStringLiteral("sfondo dalla Library, fascia 3 modificata -> nessuna domanda (%1), da salvare: %2").arg(q).arg(d));
+        click(ui->radioSurface);
+
+        ui->spinMeshSel->setValue(3);  wait(300);
+        q = pick(QStringLiteral("textures/Procedurals/Wood.json"));
+        d = dirtyOwners();
+        check(q == 1 && d == QLatin1String("nessuna"),
+              QStringLiteral("fascia 3 dalla Library -> una domanda (%1), poi da salvare: %2").arg(q).arg(d));
+        click(ui->radioMeshAll);
+        setScriptMode(MainWindow::ScriptModeSurface);
     }
 }
 
