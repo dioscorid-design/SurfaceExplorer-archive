@@ -106,8 +106,9 @@ Il token GitHub viene preso da `GH_TOKEN` oppure da `~/.git-credentials`
 
 ## 🍎 Rilascio macOS (sul Mac)
 
-Sul Mac, dopo aver compilato la Release da Qt Creator
-(`build/Desktop_Qt_6_10-Release`):
+Sul Mac, dopo aver compilato la Release da Qt Creator col kit Qt 6.12 for macOS
+(`build/Qt_6_12_0_for_macOS_Release`: lo script ricava il nome dalla versione di
+Qt scritta in testa, `QT_VERSION`; per un'altra cartella `BUILD_DIR=<cartella>`):
 
 ```sh
 # macdeployqt + firma + .dmg + notarizza (senza toccare GitHub)

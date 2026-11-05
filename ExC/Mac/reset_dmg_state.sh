@@ -40,15 +40,15 @@
 # A QUALE APP SI APPLICA: a TUTTE quelle del canale DMG.
 # Non azzera "un'applicazione" ma un CANALE: le preferenze cancellate qui sono
 # condivise da qualunque bundle con id "...surfaceexplorer.dmg", ovunque si
-# trovi -- /Applications, build/Desktop_Qt_6_10-Release,
-# build/Desktop_Qt_6_10-Debug. Tutti leggono lo stesso libraryRootPath, quindi
+# trovi -- /Applications, build/Qt_6_12_0_for_macOS_Release,
+# build/Qt_6_12_0_for_macOS_Debug. Tutti leggono lo stesso libraryRootPath, quindi
 # NON serve installare il DMG per provare una modifica: basta lanciare il
 # binario appena compilato con --app.
 #
 # USO
 #   ./ExC/Mac/reset_dmg_state.sh                     azzera e basta
 #   ./ExC/Mac/reset_dmg_state.sh --run               azzera e lancia /Applications
-#   ./ExC/Mac/reset_dmg_state.sh --run --app build/Desktop_Qt_6_10-Release/SurfaceExplorer.app
+#   ./ExC/Mac/reset_dmg_state.sh --run --app build/Qt_6_12_0_for_macOS_Release/SurfaceExplorer.app
 #                                                    azzera e lancia quel bundle
 # -----------------------------------------------------------------------------
 set -euo pipefail
@@ -81,7 +81,7 @@ done
 #
 # Si cercano TUTTI i binari del canale, non solo quello in /Applications:
 # queste preferenze sono condivise da qualunque bundle con id "...dmg" --
-# /Applications, build/Desktop_Qt_6_10-Release, build/Desktop_Qt_6_10-Debug --
+# /Applications, build/Qt_6_12_0_for_macOS_Release, build/Qt_6_12_0_for_macOS_Debug --
 # quindi il reset si applica a tutti e tre e uno qualsiasi di essi, se in
 # esecuzione, puo' annullarlo. Guardare solo /Applications lasciava passare
 # proprio il caso di chi prova il binario appena compilato.

@@ -25,12 +25,19 @@ BUNDLE_ID="com.dioscorid.surfaceexplorer"
 SIGN_IDENTITY="Developer ID Application: GAETANO MOSCHETTI (BAPKX72394)"
 NOTARY_PROFILE="notarytool-profile"
 REPO="dioscorid-design/SurfaceExplorer"
-MACDEPLOYQT="$HOME/Qt/6.12.0/macos/bin/macdeployqt"
+# Versione di Qt per macOS: l'UNICA riga da cambiare a un aggiornamento di Qt.
+# Ne derivano macdeployqt e la cartella della Release di Qt Creator (BUILD_DIR).
+QT_VERSION="6.12.0"
+MACDEPLOYQT="$HOME/Qt/$QT_VERSION/macos/bin/macdeployqt"
 
 # Lo script vive in ExC/Mac/ : la root del progetto e' due cartelle sopra
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # ExC/Mac
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"               # root del progetto
-BUILD_DIR="$PROJECT_DIR/build/Desktop_Qt_6_10-Release"
+# La cartella che Qt Creator da' alla Release del kit "Qt <versione> for macOS"
+# (6.12.0 -> build/Qt_6_12_0_for_macOS_Release). Era scritta a mano col nome
+# dell'era Qt 6.10 (build/Desktop_Qt_6_10-Release) e, passati a 6.12, lo script
+# non trovava piu' l'app. Un'altra cartella: BUILD_DIR=<cartella> ./release_macos.sh
+BUILD_DIR="${BUILD_DIR:-$PROJECT_DIR/build/Qt_${QT_VERSION//./_}_for_macOS_Release}"
 APP_PATH="$BUILD_DIR/$APP_NAME.app"
 DMG_NAME="$APP_NAME.dmg"
 DMG_PATH="$SCRIPT_DIR/$DMG_NAME"                             # .dmg prodotto accanto allo script, in ExC/Mac
@@ -68,7 +75,13 @@ TAG="v$VERSION"
 ASSET_NAME="SurfaceExplorer-${TAG}-macos.dmg"
 
 if [ ! -d "$APP_PATH" ]; then
-  echo "ERRORE: $APP_PATH non trovato. Compila prima la Release da Qt Creator."
+  echo "ERRORE: $APP_PATH non trovato. Compila prima la Release da Qt Creator (kit Qt $QT_VERSION for macOS)."
+  # Le app che ci sono, per capire subito se e' solo il nome della cartella.
+  OTHERS="$(ls -d "$PROJECT_DIR"/build/*/"$APP_NAME.app" 2>/dev/null || true)"
+  if [ -n "$OTHERS" ]; then
+    echo "App trovate in altre cartelle di build (per usarne una: BUILD_DIR=<cartella> $0):"
+    echo "$OTHERS"
+  fi
   exit 1
 fi
 [ -x "$MACDEPLOYQT" ] || { echo "ERRORE: macdeployqt non trovato: $MACDEPLOYQT"; exit 1; }
