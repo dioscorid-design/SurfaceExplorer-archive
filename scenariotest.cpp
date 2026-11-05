@@ -7306,6 +7306,35 @@ void ScenarioTest::runTextureTargetScenarios()
             check(m_popupsClosed == closed + 1 && m_mw->implicitMode() && m_mw->m_scene.rm.texture == rmTex,
                   QStringLiteral("texture parametrica su Ray Marching -> un avviso, scena e texture invariate"));
     }
+
+    // TEXTURE STATICHE CHE NOMINANO IL TEMPO SOLO NEI COMMENTI ("STATIC (no t)",
+    // "write ... iTime * 0.08"): dalla Library l'orologio resta spento, come dicono
+    // i tasti Run/Stop. Prima il caricamento cercava t/iTime nel testo grezzo e
+    // l'orologio partiva a vuoto.
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Tempo solo nei commenti: la texture e' statica anche per il suo orologio =="));
+    auto clockAfterPick = [this, ui, gl](const char *surface, bool record, const char *texture) -> int {
+        const bool loaded = record ? loadRecord(QString::fromLatin1(surface))
+                                   : loadSurface(QString::fromLatin1(surface));
+        if (!loaded || !selectTexture(QString::fromLatin1(texture))) return -1;
+        wait(400);
+        setScriptMode(MainWindow::ScriptModeTexture);
+        const bool runShowsStop = ui->btnRunCurrentScript->text().startsWith(QLatin1String("Stop"));
+        setScriptMode(MainWindow::ScriptModeSurface);
+        return (gl->isSurfaceTextureAnimating() ? 1 : 0) + (runShowsStop ? 2 : 0);
+    };
+    const char *torus = "surfaces/Parametric/Surfaces/Equations/R3/Torus.json";
+    int st = clockAfterPick(torus, false, "textures/Procedurals/Fractals/XOR Relief.json");
+    check(st == 0, QStringLiteral("XOR Relief (iTime solo in un commento) -> orologio %1, tasto %2")
+                       .arg(st < 0 ? QStringLiteral("?") : onOff(st & 1)).arg((st & 2) ? QStringLiteral("Stop") : QStringLiteral("Run")));
+    st = clockAfterPick(torus, false, "textures/Procedurals/Fractals/XOR Lattice.json");
+    check(st == 3, QStringLiteral("XOR Lattice (animata) -> orologio %1, tasto %2")
+                       .arg(st < 0 ? QStringLiteral("?") : onOff(st & 1)).arg((st & 2) ? QStringLiteral("Stop") : QStringLiteral("Run")));
+    // Su una superficie senza costanti: Wireframe usa lo slider F, e su un record
+    // che lo usa gia' la domanda sulla costante contesa annullerebbe la scelta.
+    st = clockAfterPick("surfaces/Implicit/3D/Gyroid.json", false, "textures/Ray Marching/Wireframe.json");
+    check(st == 0, QStringLiteral("Wireframe Ray Marching (\"STATIC (no t)\") -> orologio %1, tasto %2")
+                       .arg(st < 0 ? QStringLiteral("?") : onOff(st & 1)).arg((st & 2) ? QStringLiteral("Stop") : QStringLiteral("Run")));
 }
 
 void ScenarioTest::runTextureOwnerScenarios()

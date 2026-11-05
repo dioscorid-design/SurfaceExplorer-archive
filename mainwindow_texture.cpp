@@ -1596,7 +1596,10 @@ void MainWindow::restartLibraryTextureClocks()
     // ANIMAZIONE: selezionare una texture di SUPERFICIE avvia solo il proprio
     // orologio. NON tocca né la geometria (SDF) né lo sfondo né la camera.
     // ==========================================
-    const QRegularExpression& timeRegex = kReTimeVar;
+    // Tempo nel codice: hasTimeVariable, come i tasti Run/Stop. Cercare
+    // t/iTime nel testo grezzo contava anche i COMMENTI ("STATIC (no t)",
+    // "don't"): una texture statica accendeva il suo orologio a vuoto e
+    // il master diceva STOP mentre i tasti della texture dicevano Run.
     bool isRM = (implicitMode());
     // STATO DELLA TEXTURE DI SUPERFICIE, non del checkbox: in Background quel
     // widget e' il display dello SFONDO, e leggerlo qui faceva spegnere il clock
@@ -1621,10 +1624,10 @@ void MainWindow::restartLibraryTextureClocks()
     bool dispAnim     = false;   // 't' nel displacement     -> orologio TEXTURE
     if (isSurfTexActive) {
         if (isRM) {
-            texColorAnim = m_scene.rm.texture.contains(timeRegex);
-            dispAnim     = m_scene.rm.displacement.contains(timeRegex);
+            texColorAnim = hasTimeVariable(m_scene.rm.texture);
+            dispAnim     = hasTimeVariable(m_scene.rm.displacement);
         } else {
-            texColorAnim = allSurfaceTextureCode().contains(timeRegex);
+            texColorAnim = hasTimeVariable(allSurfaceTextureCode());
         }
     }
     bool texAnim = texColorAnim || dispAnim;
@@ -1778,9 +1781,9 @@ void MainWindow::onRunRaymarchTextureClicked()
 {
     if (!ui->glWidget) return;
 
-    const QRegularExpression& timeRegex = kReTimeVar;
-    bool texColorHasTime = m_scene.rm.texture.contains(timeRegex);
-    bool dispHasTime     = m_scene.rm.displacement.contains(timeRegex);
+    // Commenti esclusi, come ovunque (hasTimeVariable).
+    bool texColorHasTime = hasTimeVariable(m_scene.rm.texture);
+    bool dispHasTime     = hasTimeVariable(m_scene.rm.displacement);
 
     // Il MODULO TEXTURE possiede UN solo orologio: colore e displacement leggono
     // entrambi dummyZero.x nello shader. Quindi Run/Stop texture agisce SOLO su

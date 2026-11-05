@@ -1134,7 +1134,7 @@ void MainWindow::onApplyTextureScriptClicked()
         }
     }
 
-    const QRegularExpression& timeRegex = kReTimeVar;
+    // Tempo nel codice: hasTimeVariable (commenti esclusi), come i tasti.
 
     // RUN texture: agisce SOLO sul clock della texture interessata (Problema 3).
     // La superficie e l'altro canale texture NON vengono toccati.
@@ -1147,7 +1147,7 @@ void MainWindow::onApplyTextureScriptClicked()
         // RUN sulla texture di SFONDO: solo il clock background.
         // Run esplicito del canale: riarma un eventuale stop manuale.
         m_userStoppedBgClock = false;
-        bool bgNeedsAnim = m_scene.bgTextureCode.contains(timeRegex);
+        bool bgNeedsAnim = hasTimeVariable(m_scene.bgTextureCode);
         if (ui->glWidget) ui->glWidget->setBackgroundTextureAnimating(bgNeedsAnim);
     } else {
         // RUN sulla texture di SUPERFICIE: solo il clock texture superficie.
@@ -1155,10 +1155,11 @@ void MainWindow::onApplyTextureScriptClicked()
         m_userStoppedTexClock = false;
         bool surfTexNeedsAnim = false;
         if (surfaceTextureShown()) {
-            QString surfTexToCheck = (implicitMode())
-                    ? (m_scene.rm.texture + m_scene.rm.displacement)
-                    : allSurfaceTextureCode();
-            if (surfTexToCheck.contains(timeRegex)) surfTexNeedsAnim = true;
+            // Colore e displacement separati: concatenati, un commento in coda
+            // al primo si mangerebbe la prima riga del secondo.
+            surfTexNeedsAnim = implicitMode()
+                    ? (hasTimeVariable(m_scene.rm.texture) || hasTimeVariable(m_scene.rm.displacement))
+                    : hasTimeVariable(allSurfaceTextureCode());
         }
         if (ui->glWidget) ui->glWidget->setSurfaceTextureAnimating(surfTexNeedsAnim);
 

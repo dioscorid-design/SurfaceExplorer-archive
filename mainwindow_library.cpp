@@ -484,8 +484,8 @@ void MainWindow::restartActiveLibraryTexture(const LibraryItem &data)
         // (~7548) per decidere l'orologio al caricamento.
         const bool isRMTex = (implicitMode());
         const bool texIsAnimated = isRMTex
-            ? (m_scene.rm.texture.contains(kReTimeVar)
-               || m_scene.rm.displacement.contains(kReTimeVar))
+            ? (hasTimeVariable(m_scene.rm.texture)
+               || hasTimeVariable(m_scene.rm.displacement))
             : (hasTimeVariable(allSurfaceTextureCode()) || anyMeshTextureCodeAnimated());
 
         // NON azzeriamo m_masterStopped (come il ramo background sopra):
