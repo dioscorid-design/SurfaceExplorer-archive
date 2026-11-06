@@ -8313,6 +8313,51 @@ void ScenarioTest::runMeshCountScenarios()
               QStringLiteral("toro (una mesh) con texture -> sulle coordinate u/v, non globale"));
     }
 
+    // WIREFRAME SEMPRE OPACO. In wireframe la trasparenza e' spenta, ma l'alpha
+    // abbassato prima in modalita' solida passava alle linee (segnalato: alpha 0
+    // in solido, poi Wireframe -> il wireframe non appare). Il caso era quello
+    // per-mesh: l'azzeramento di updateRenderState scatta solo col wireframe
+    // GLOBALE. Il fotogramma del wireframe dopo alpha 0 deve essere quello del
+    // wireframe con la superficie opaca.
+    {
+        struct WireCase { const char *rel; bool perMesh; };
+        for (const WireCase &wc : { WireCase{ "surfaces/Parametric/Surfaces/Equations/R3/Torus.json", false },
+                                    WireCase{ "surfaces/Parametric/Surfaces/Multi Meshes/Calabi-Yau.json", false },
+                                    WireCase{ "surfaces/Parametric/Surfaces/Multi Meshes/Calabi-Yau.json", true },
+                                    WireCase{ "surfaces/Parametric/Solid Curves/Multi Curves/Trefoil Trio.json", true } }) {
+            if (!loadSurface(QString::fromLatin1(wc.rel))) continue;
+            if (m_mw->editingBackground()) click(ui->radioSurface);
+            if (parts() > 1) click(wc.perMesh ? ui->radioMeshOne : ui->radioMeshAll);
+            const QString label = QStringLiteral("%1 (%2)").arg(QFileInfo(QString::fromLatin1(wc.rel)).baseName(),
+                parts() <= 1 ? QStringLiteral("una mesh") : wc.perMesh ? QStringLiteral("Mesh") : QStringLiteral("All"));
+            // Riferimento dopo lo STESSO giro solido -> wireframe: sui tubi il
+            // ritorno al solido ricostruisce le sezioni e i contorni si spostano
+            // di un soffio (falci lungo i bordi, nulla a che fare con l'alpha).
+            click(ui->radioWF);  wait(500);
+            const QImage firstWire = gl->grabFramebuffer();
+            click(ui->radioBasic);  wait(300);
+            click(ui->radioWF);  wait(500);
+            const QImage opaqueWire = gl->grabFramebuffer();
+            click(ui->radioBasic);  wait(300);
+            ui->alphaSlider->setValue(0);  wait(300);
+            click(ui->radioWF);  wait(500);
+            const QImage afterAlpha0 = gl->grabFramebuffer();
+            const double pct = changedPct(opaqueWire, afterAlpha0);
+            qInfo().noquote() << QStringLiteral("[scenariotest] info     %1: due giri senza alpha, %2% pixel diversi")
+                                     .arg(label).arg(changedPct(firstWire, opaqueWire), 0, 'f', 2);
+            QDir().mkpath(m_outDir + QStringLiteral("/meshes"));
+            const QString shot = m_outDir + QStringLiteral("/meshes/wire-alpha-") + label.simplified().replace(QLatin1Char(' '), QLatin1Char('-'));
+            opaqueWire.save(shot + QStringLiteral("-opaque.png"));
+            afterAlpha0.save(shot + QStringLiteral("-alpha0.png"));
+            // Il fotogramma e' deterministico (0.00% nei casi giusti): soglia
+            // stretta, o una sola mesh piccola sparita (Calabi-Yau: 0.12%)
+            // passerebbe inosservata.
+            check(pct < 0.02, QStringLiteral("%1: alpha 0 in solido, poi Wireframe -> wireframe come da opaco (%2% pixel diversi)")
+                                 .arg(label).arg(pct, 0, 'f', 2));
+            ui->alphaSlider->setValue(100);  wait(200);
+        }
+    }
+
     // RAY MARCHING: niente copie.
     ui->tabModeSelector->setCurrentIndex(1);  wait(1500);
     check(!ui->lineMeshCount->isEnabled(), QStringLiteral("Ray Marching -> campo Meshes spento"));
