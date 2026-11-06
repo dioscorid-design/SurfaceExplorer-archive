@@ -7470,6 +7470,39 @@ void ScenarioTest::runTextureOwnerScenarios()
         click(ui->radioMeshAll);
         setScriptMode(MainWindow::ScriptModeSurface);
     }
+
+    // MULTI-MESH: texture su UNA mesh, Wireframe e ritorno a solido. Come sulla
+    // superficie singola la texture deve ricomparire, e la scelta seguente in
+    // Library non deve chiedere di salvare: nulla e' stato toccato (segnalato:
+    // la texture non tornava e la Library apriva l'avviso di salvataggio).
+    for (const char *rel : { "surfaces/Parametric/Surfaces/Multi Meshes/Calabi-Yau.json",
+                             "surfaces/Parametric/Solid Curves/Multi Curves/Trefoil Trio.json" }) {
+        const QString name = QFileInfo(QString::fromLatin1(rel)).baseName();
+        m_lines.append(QString());
+        m_lines.append(QStringLiteral("== Multi-mesh: texture di una mesh, Wireframe e ritorno a solido (%1) ==").arg(name));
+        if (!loadSurface(QString::fromLatin1(rel))) continue;
+        GLWidget *gl = ui->glWidget;
+        if (!ui->radioSurface->isChecked()) click(ui->radioSurface);
+        if (!ui->radioMeshOne->isChecked()) click(ui->radioMeshOne);
+        if (!ui->radioBasic->isChecked()) click(ui->radioBasic);
+        auto partTextured = [gl]() {
+            const int k = gl->activeMeshPart();
+            const auto &parts = gl->getEngine()->getMeshParts();
+            return k >= 0 && k < (int)parts.size() && parts[k].effectiveTextureEnabledMulti();
+        };
+        pick(QStringLiteral("textures/Procedurals/Plasma.json"));
+        const bool before = partTextured() && ui->chkBoxTexture->isChecked();
+        click(ui->radioWF);  wait(300);
+        click(ui->radioBasic);  wait(300);
+        const bool after = partTextured() && ui->chkBoxTexture->isChecked();
+        const QString d = dirtyOwners();
+        check(before && after && d == QLatin1String("nessuna"),
+              QStringLiteral("%1: texture sulla mesh, Wireframe, di nuovo solido -> la texture torna (prima %2, dopo %3), da salvare: %4")
+                  .arg(name, onOff(before), onOff(after), d));
+        const int q = pick(QStringLiteral("textures/Procedurals/Marble.json"));
+        check(q == 0, QStringLiteral("%1: poi un'altra texture dalla Library -> nessuna domanda (domande: %2)").arg(name).arg(q));
+        click(ui->radioMeshAll);
+    }
 }
 
 void ScenarioTest::runScriptDockScenarios()

@@ -1733,7 +1733,10 @@ MainWindow::MasterActivity MainWindow::masterActivity() const
         auto hasTime = [this](const QString &c) { return hasTimeVariable(c); };
         bool allRunning = true;
         for (const MeshPart &mp : gl->getEngine()->getMeshParts()) {
-            if (!meshTextureAnimated(mp, hasTime)) continue;
+            // "Che si vede": una fascia in wireframe tiene la texture accesa
+            // ma sospesa (GLWidget::partTextureShown), come la superficie
+            // intera in wireframe, e non conta come animazione in corso.
+            if (!meshTextureAnimated(mp, hasTime) || !gl->partTextureShown(mp)) continue;
             a.texAvailable = true;
             if (mp.texAnimating) a.texAnyRunning = true;
             else allRunning = false;

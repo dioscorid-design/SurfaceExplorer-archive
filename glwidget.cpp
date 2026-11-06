@@ -5033,8 +5033,8 @@ bool GLWidget::isActiveMeshTextureAnimating() const {
 bool GLWidget::anyMeshTextureAnimating() const {
     if (!engine) return false;
     for (const MeshPart &mp : engine->getMeshParts()) {
-        if (mp.texAnimating && mp.hasCustomTexture && mp.textureEnabled
-            && !mp.textureCode.isEmpty())
+        // partTextureShown: una texture sospesa dal wireframe non e' in moto.
+        if (mp.texAnimating && partTextureShown(mp))
             return true;
     }
     return false;

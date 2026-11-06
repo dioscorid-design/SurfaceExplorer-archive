@@ -506,6 +506,16 @@ public:
     // C'e' almeno una parte con texture propria, accesa e in movimento?
     // Il master button la considera attivita' da fermare/riavviare.
     bool anyMeshTextureAnimating() const;
+    // La parte DISEGNA la sua texture? Propria, accesa, con un codice, e la
+    // parte non e' in wireframe (li' il fragment esce prima, a colore piatto).
+    // In wireframe la texture e' SOSPESA, come quella della superficie intera:
+    // resta accesa e salvata, torna uscendo dal wireframe, e intanto non conta
+    // come animazione in corso per il master.
+    bool partTextureShown(const MeshPart &mp) const {
+        const int mode = effectivePartRenderMode(mp);
+        return mp.hasCustomTexture && mp.textureEnabled && !mp.textureCode.isEmpty()
+               && mode != 2 && mode != 5;
+    }
     QString activeMeshTextureCode() const;
     // Come sopra, ma vuoto se la texture della parte e' SPENTA (lo script resta
     // conservato). E' cio' che l'editor deve mostrare: vedi la nota nel .cpp.

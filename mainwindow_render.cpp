@@ -3285,21 +3285,20 @@ void MainWindow::onUserRenderModeChosen()
         // propaga piu' il wireframe a tutte le parti.
         ui->glWidget->setActiveMeshRenderMode(mode);
 
-        // WIREFRAME => TEXTURE SPENTA SU QUESTA MESH. In wireframe la texture
-        // non si disegna (il fragment esce prima con colore piatto), quindi
-        // lasciarla "accesa" descriveva uno stato che a schermo non esisteva:
-        // togliendo il wireframe ricompariva da sola, e per giunta col checkbox
-        // deselezionato -- display e realta' che dicevano il contrario.
-        // Si SPEGNE conservando lo script (setActiveMeshTextureEnabled):
-        // riaccendendo il checkbox si ritrova la propria texture invece di
-        // doverla ricaricare. Non si riaccende da se' uscendo dal wireframe:
-        // e' l'utente a decidere quando rimetterla.
-        if (mode == 2) ui->glWidget->setActiveMeshTextureEnabled(false);
+        // WIREFRAME => TEXTURE SOSPESA, NON SPENTA. In wireframe la texture
+        // della mesh non si disegna (il fragment esce prima, a colore piatto),
+        // ma resta accesa: uscendo dal wireframe ricompare, come quella della
+        // superficie intera. Qui prima la si SPEGNEVA (setActiveMeshTexture-
+        // Enabled(false)), e non tornava piu' da sola (segnalato dall'utente:
+        // "contrariamente alla superficie singola"); per giunta lo spegnimento
+        // cambiava la texture salvata della mesh, e la Library chiedeva di
+        // salvare una texture mai toccata. Il display la mostra spenta finche'
+        // la mesh e' in wireframe (surfaceTextureShown), e il master non la
+        // conta come animazione in corso (GLWidget::partTextureShown).
 
-        // DISPLAY RIALLINEATO A OGNI CAMBIO DI MODALITA', non solo entrando in
-        // wireframe: uscendone (mode 0/1) la texture resta spenta, e senza
-        // questo giro l'editor continuava a mostrare lo script di prima mentre
-        // la mesh tornava in tinta unita.
+        // DISPLAY RIALLINEATO A OGNI CAMBIO DI MODALITA': entrando in wireframe
+        // il checkbox si spegne, uscendone torna a mostrare la texture della
+        // mesh.
         // syncAppearanceControlsToActiveMesh e' il punto unico del display
         // per-mesh: svuota/riempie l'editor, allinea checkbox, picker e tasti.
         syncAppearanceControlsToActiveMesh();
