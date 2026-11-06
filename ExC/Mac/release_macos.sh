@@ -143,10 +143,13 @@ fi
 echo ""
 echo ">>> 7. Upload su GitHub Releases ($REPO, tag $TAG)..."
 # Token GitHub: GH_TOKEN esplicito -> gh CLI (keyring) -> ~/.git-credentials (store)
+#   -> credential helper di git (su macOS: osxkeychain, dove git salva il token dopo
+#   un push). GIT_TERMINAL_PROMPT=0: se il token non c'e', fallisce senza chiedere nulla.
 TOKEN="${GH_TOKEN:-}"
 [ -n "$TOKEN" ] || TOKEN="$(gh auth token 2>/dev/null || true)"
 [ -n "$TOKEN" ] || TOKEN="$(grep 'github.com' "$HOME/.git-credentials" 2>/dev/null | sed -E 's#https://([^:]+):([^@]+)@.*#\2#' | head -1)"
-[ -n "$TOKEN" ] || { echo "ERRORE: nessun token GitHub (imposta GH_TOKEN, oppure 'gh auth login', oppure configura git credential.helper store)."; exit 1; }
+[ -n "$TOKEN" ] || TOKEN="$(printf 'protocol=https\nhost=github.com\n\n' | GIT_TERMINAL_PROMPT=0 git credential fill 2>/dev/null | sed -n 's/^password=//p' | head -1)"
+[ -n "$TOKEN" ] || { echo "ERRORE: nessun token GitHub (imposta GH_TOKEN, oppure 'gh auth login', oppure fai un push a GitHub per salvarlo nel portachiavi)."; exit 1; }
 API="https://api.github.com/repos/$REPO"
 gh_api() { curl -s -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" "$@"; }
 
@@ -186,10 +189,18 @@ if [ -n "$PRERELEASE_TAG" ]; then
 fi
 
 # 7a. assicura il tag vX.Y su origin (lo crea su HEAD se manca; NON sposta uno esistente)
-if ! git -C "$PROJECT_DIR" ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+# Nomi COMPLETI (refs/tags/...): spesso esiste anche un RAMO con lo stesso nome
+# (es. il ramo v1.5 e il tag v1.5) e "git push origin v1.5" e' ambiguo. Se la lettura
+# del remoto fallisce (rete, DNS) ci si ferma: "non l'ho potuto leggere" NON vuol dire
+# "il tag manca".
+REMOTE_TAG="$(git -C "$PROJECT_DIR" ls-remote --tags origin "refs/tags/$TAG")" \
+  || { echo "ERRORE: non riesco a leggere i tag dal remoto (rete o DNS?). Non creo e non pusho nulla: riprova."; exit 1; }
+if [ -z "$REMOTE_TAG" ]; then
   echo ">>> Tag $TAG assente sul remoto: lo creo su HEAD ($(git -C "$PROJECT_DIR" rev-parse --short HEAD)) e lo pusho"
-  git -C "$PROJECT_DIR" tag -a "$TAG" -m "Release $TAG" 2>/dev/null || git -C "$PROJECT_DIR" tag "$TAG"
-  git -C "$PROJECT_DIR" push origin "$TAG"
+  git -C "$PROJECT_DIR" rev-parse -q --verify "refs/tags/$TAG" >/dev/null \
+    || git -C "$PROJECT_DIR" tag -a "$TAG" -m "Release $TAG" 2>/dev/null \
+    || git -C "$PROJECT_DIR" tag "$TAG"
+  git -C "$PROJECT_DIR" push origin "refs/tags/$TAG"
 else
   echo ">>> Tag $TAG gia' presente sul remoto (lo uso cosi' com'e')"
 fi
