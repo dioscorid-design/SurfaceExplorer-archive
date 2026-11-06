@@ -20,6 +20,7 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <QFileInfo>
+#include <QImageReader>
 #include <QCoreApplication>
 #include <QPainter>
 #include <QLinearGradient>
@@ -1714,7 +1715,8 @@ void GLWidget::syncPartImages(QRhiResourceUpdateBatch *resourceUpdates)
     for (const QString &path : used) {
         if (m_partImages.contains(path)) continue;
         PartImage entry;
-        QImage img(path);
+        QString reason;
+        QImage img = readTextureImage(path, &reason);
         if (img.isNull()) {
             // Immagine non caricabile: la fascia ricade su quella della
             // SUPERFICIE (o sulla scacchiera, se non c'e' nemmeno quella), come
@@ -1723,15 +1725,16 @@ void GLWidget::syncPartImages(QRhiResourceUpdateBatch *resourceUpdates)
             // Il file MANCA (record aperto su un altro dispositivo): in
             // silenzio. Il file c'e' ma non e' un'immagine: si avvisa, come
             // loadTextureFromFile.
-            qWarning() << "GLWidget: immagine della fascia non caricabile:" << path;
+            qWarning() << "GLWidget: immagine della fascia non caricabile:" << path << reason;
             entry.failed = true;
             m_partImages.insert(path, entry);
-            if (QFileInfo::exists(path)) emit textureImageLoadFailed(path);
+            if (QFileInfo::exists(path)) emit textureImageLoadFailed(path, reason);
             continue;
         }
         // Stesso formato e stesso verso dell'immagine di superficie
         // (loadTextureFromImage).
         img = img.convertToFormat(QImage::Format_RGBA8888).flipped(Qt::Orientations(Qt::Vertical));
+        fitToGpuTextureLimit(rhi(), img);
         entry.tex = rhi()->newTexture(QRhiTexture::RGBA8, img.size(), 1);
         entry.tex->create();
         QRhiTextureSubresourceUploadDescription subresDesc(img.constBits(), img.sizeInBytes());
@@ -2551,6 +2554,7 @@ void GLWidget::render(QRhiCommandBuffer *cb)
             m_surfaceTexture->destroy();
             delete m_surfaceTexture;
         }
+        fitToGpuTextureLimit(rhi(), m_pendingSurfaceImage);
         m_surfaceTexture = rhi()->newTexture(QRhiTexture::RGBA8, m_pendingSurfaceImage.size(), 1);
         m_surfaceTexture->create();
 
@@ -2584,6 +2588,7 @@ void GLWidget::render(QRhiCommandBuffer *cb)
             delete m_backgroundTexture;
         }
 
+        fitToGpuTextureLimit(rhi(), m_pendingBackgroundImage);
         m_backgroundTexture = rhi()->newTexture(QRhiTexture::RGBA8, m_pendingBackgroundImage.size(), 1);
         m_backgroundTexture->create();
 
@@ -5500,8 +5505,80 @@ void GLWidget::setRecordingActive(bool on)
 // TEXTURES, SCRIPTS & BACKGROUND
 // ==========================================================
 
+// Qt 6 rifiuta di decodificare un'immagine che occuperebbe piu' della sua
+// soglia di memoria (QImageReader::allocationLimit, 256 MB di default):
+// QImage(path) tornava vuota e l'avviso parlava di file corrotto. Caso reale:
+// una panoramica 14576x7100, 26 MB su disco ma 394 MB decodificata, non si
+// apriva. Qui l'immagine si legge gia' RIDOTTA quando un lato supera
+// kTextureImageMaxSide: il JPEG decodifica direttamente a scala ridotta, gli
+// altri formati decodificano intera e poi riducono, e per loro la soglia si
+// alza per la sola durata della lettura. Sotto il lato massimo nulla cambia:
+// QImageReader(path).read() e' cio' che fa QImage(path), stesso formato e
+// nessuna rotazione EXIF.
+QImage GLWidget::readTextureImage(const QString &path, QString *reason)
+{
+    QImageReader reader(path);
+    const QSize full = reader.size();
+    const int oldLimit = QImageReader::allocationLimit();
+    int limit = oldLimit;
+    if (full.isValid()) {
+        QSize decoded = full;
+        if (std::max(full.width(), full.height()) > kTextureImageMaxSide) {
+            const QSize target = full.scaled(kTextureImageMaxSide, kTextureImageMaxSide,
+                                             Qt::KeepAspectRatio);
+            reader.setScaledSize(target);
+            // Il JPEG decodifica gia' ridotto di 1/2, 1/4 o 1/8 (il piu' forte
+            // che resta sopra la misura chiesta) e poi rifinisce: la memoria e'
+            // quella della decodifica ridotta, e cosi' si aprono anche le
+            // panoramiche "original" da 20000-40000 pixel. Gli altri formati
+            // decodificano l'immagine intera.
+            const QByteArray format = reader.format();
+            if (format == "jpeg" || format == "jpg") {
+                int denom = 1;
+                while (denom < 8 && full.width() / (denom * 2) >= target.width()
+                       && full.height() / (denom * 2) >= target.height())
+                    denom *= 2;
+                decoded = QSize((full.width() + denom - 1) / denom, (full.height() + denom - 1) / denom);
+            }
+        }
+        const qint64 mb = qint64(decoded.width()) * decoded.height() * 4 / (1024 * 1024) + 1;
+        if (mb > kTextureImageMaxDecodeMB) {
+            if (reason)
+                *reason = QStringLiteral("The image is too large: %1 x %2 pixels would need %3 MB of "
+                                         "memory to decode (the limit is %4 MB). Reduce it to at most "
+                                         "%5 pixels per side.")
+                              .arg(full.width()).arg(full.height()).arg(mb)
+                              .arg(kTextureImageMaxDecodeMB).arg(kTextureImageMaxSide);
+            return {};
+        }
+        if (oldLimit > 0 && mb > oldLimit) limit = int(mb);
+    }
+    if (limit != oldLimit) QImageReader::setAllocationLimit(limit);
+    QImage img = reader.read();
+    if (limit != oldLimit) QImageReader::setAllocationLimit(oldLimit);
+    if (img.isNull() && reason)
+        *reason = QStringLiteral("The file exists but is not a readable image: it may be corrupted, "
+                                 "or in a format that is not supported (%1).").arg(reader.errorString());
+    return img;
+}
+
+// Il lato massimo di una texture dipende dalla GPU: 16384 sui Mac, meno su
+// alcuni dispositivi mobili. readTextureImage non lo conosce (puo' girare
+// prima che il QRhi esista), quindi si controlla qui, all'upload.
+void GLWidget::fitToGpuTextureLimit(QRhi *rhi, QImage &img)
+{
+    const int maxSide = rhi ? rhi->resourceLimit(QRhi::TextureSizeMax) : 0;
+    if (maxSide <= 0 || (img.width() <= maxSide && img.height() <= maxSide)) return;
+    // La riduzione morbida puo' cambiare formato (premoltiplicato): si torna
+    // a quello di partenza, che e' quello che l'upload si aspetta.
+    const QImage::Format format = img.format();
+    img = img.scaled(maxSide, maxSide, Qt::KeepAspectRatio, Qt::SmoothTransformation)
+              .convertToFormat(format);
+}
+
 void GLWidget::loadTextureFromFile(const QString &f) {
-    QImage img(f);
+    QString reason;
+    QImage img = readTextureImage(f, &reason);
     if (!img.isNull()) {
         loadTextureFromImage(img);
         // Immagine VERA dell'utente (da file). Distinta dalla scacchiera che
@@ -5514,10 +5591,10 @@ void GLWidget::loadTextureFromFile(const QString &f) {
         // la texture PRECEDENTE, che l'utente leggeva come "il preset ha la
         // texture di default". Il percorso e' gia' stato validato da chi
         // chiama (isReadableFile + Smart Path Resolver), quindi arrivare qui
-        // significa che il file si apre ma non contiene un'immagine valida:
-        // formato non supportato, o file corrotto.
-        qWarning() << "GLWidget: immagine non decodificabile:" << f;
-        emit textureImageLoadFailed(f);
+        // significa che il file si apre ma non se ne ricavano pixel: formato
+        // non supportato, file corrotto o immagine troppo grande (reason).
+        qWarning() << "GLWidget: immagine non decodificabile:" << f << reason;
+        emit textureImageLoadFailed(f, reason);
     }
 }
 
@@ -5627,16 +5704,18 @@ void GLWidget::setBackgroundImage(const QString &path) {
     QImage img;
 
     // 1. Tenta il percorso letterale esatto fornito (es. "background.png")
-    img.load(path);
+    // readTextureImage e non img.load(): un'immagine molto grande si legge
+    // ridotta invece di essere rifiutata dal limite di memoria di Qt.
+    img = readTextureImage(path);
 
     // 2. Tenta la risorsa interna Qt (utile se in futuro lo metti nel .qrc)
     if (img.isNull() && !path.startsWith(":/")) {
-        img.load(":/" + path);
+        img = readTextureImage(":/" + path);
     }
 
     // 3. Tenta la cartella in cui si trova l'eseguibile (.exe o AppBundle)
     if (img.isNull()) {
-        img.load(QCoreApplication::applicationDirPath() + "/" + path);
+        img = readTextureImage(QCoreApplication::applicationDirPath() + "/" + path);
     }
 
     // 4. SALVAVITA: Se l'immagine è persa, generiamo un gradiente visibile!

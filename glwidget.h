@@ -1171,6 +1171,20 @@ public:
     }
     // Il lato massimo di una texture / buffer della GPU (QRhi::TextureSizeMax).
     int maxTextureSize();
+    // Lato massimo di un'immagine dell'utente caricata come texture: oltre, la
+    // si legge gia' ridotta (vedi readTextureImage). 8192x8192 RGBA = 256 MB.
+    static constexpr int kTextureImageMaxSide = 8192;
+    // Memoria massima per DECODIFICARE un'immagine (circa 16384x16384 per i
+    // formati che decodificano interi; il JPEG decodifica gia' ridotto): oltre,
+    // readTextureImage rinuncia e lo dice, invece di rischiare la memoria.
+    static constexpr qint64 kTextureImageMaxDecodeMB = 1024;
+    // Legge un'immagine dell'utente per farne una texture, ridotta se un lato
+    // supera kTextureImageMaxSide. Vuota se non si legge; in *reason il motivo,
+    // in inglese, pronto per l'avviso.
+    static QImage readTextureImage(const QString &path, QString *reason = nullptr);
+    // Riduce img al lato massimo che QUESTA GPU accetta (QRhi::TextureSizeMax).
+    // Si chiama all'upload, dove il QRhi esiste di sicuro.
+    static void fitToGpuTextureLimit(QRhi *rhi, QImage &img);
     void endHiResCapture();
     QString getShaderError() const { return m_lastCompilationError; }
     bool validateAndApplyParametricShader(const QString &customLogic);
@@ -1198,11 +1212,13 @@ signals:
     void shaderCompilationFailed(const QString &error);
     // Un'immagine di texture non si e' potuta CARICARE: il file esiste ed e'
     // leggibile (chi chiama lo verifica prima), ma Qt non ne ricava pixel —
-    // formato non supportato o file corrotto. Senza questo segnale
-    // loadTextureFromFile usciva in SILENZIO, lasciando a schermo la texture
-    // precedente: all'utente sembrava che il preset avesse una texture
-    // "sbagliata" o "di default", senza alcun indizio del perche'.
-    void textureImageLoadFailed(const QString &path);
+    // formato non supportato, file corrotto o immagine troppo grande. Senza
+    // questo segnale loadTextureFromFile usciva in SILENZIO, lasciando a
+    // schermo la texture precedente: all'utente sembrava che il preset avesse
+    // una texture "sbagliata" o "di default", senza alcun indizio del perche'.
+    // reason e' il motivo, in inglese (readTextureImage): prima l'avviso diceva
+    // sempre "corrotto", anche per un'immagine solo troppo grande.
+    void textureImageLoadFailed(const QString &path, const QString &reason);
     // Emesso dopo ogni rigenerazione della griglia, quando le parti di mesh
     // possono essere cambiate (nuovo script, nuove sezioni //MESH_BEGIN).
     // MainWindow lo usa per riallineare il selettore di mesh del dock renderer e
