@@ -1914,6 +1914,11 @@ void ScenarioTest::run()
         finish();
         return;
     }
+    if (m_only == QLatin1String("roll")) {
+        runRollScenarios();
+        finish();
+        return;
+    }
     if (m_only == QLatin1String("shape-background")) {
         runShapeBackgroundScenarios();
         finish();
@@ -5704,7 +5709,13 @@ void ScenarioTest::runImageCaptureScenarios()
                       .arg(quads).arg(extra.second).arg(missing.second).arg(missing.first));
             gl->setClocksDrivenByRecorder(false);
         }
-        // Alpha < 1: una linea si miscela una volta sola, anche dove i segmenti si toccano.
+        // Alpha < 1 in WIREFRAME: le linee escono OPACHE. Il wireframe non ha
+        // trasparenza (GLWidget forza alpha 1 sui blocchi disegnati in
+        // wireframe, vedi "WIREFRAME OPACO"; prima un alpha dato in solido
+        // rendeva le linee sbiadite o invisibili). Qui si verificava che una
+        // linea SEMITRASPARENTE si miscelasse una volta sola dove i segmenti si
+        // toccano: con le linee opache la domanda non si pone piu', e il test
+        // controlla invece che alpha 0.5 non le sbiadisca.
         if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) {
             gl->stopAllTimers();
             gl->setClocksDrivenByRecorder(true);
@@ -5715,17 +5726,17 @@ void ScenarioTest::runImageCaptureScenarios()
             const QImage im = wireShot(6, sw);
             im.save(m_outDir + QStringLiteral("/image-capture-wire-alpha.png"));
             const int bg = qRed(im.pixel(1, 1));
-            const int once = bg + (255 - bg) / 2, twice = bg + (255 - bg) * 3 / 4;
-            const int limit = (once + twice) / 2;
-            qint64 line = 0, denser = 0;
+            const int full = bg + (255 - bg) * 9 / 10;
+            qint64 line = 0, opaque = 0;
             for (int y = 0; y < im.height(); ++y)
                 for (int x = 0; x < im.width(); ++x) {
                     const int r = qRed(im.pixel(x, y));
                     if (r > bg + 20) ++line;
-                    if (r > limit) ++denser;
+                    if (r >= full) ++opaque;
                 }
-            check(line > 1000 && denser < line / 20,
-                  QStringLiteral("wireframe con alpha < 1: pixel miscelati due volte %1 su %2 di linea (il 37 per cento senza la passata di profondita')").arg(denser).arg(line));
+            check(line > 1000 && opaque > line * 6 / 10,
+                  QStringLiteral("wireframe con alpha 0.5: linee opache, %1 pixel pieni su %2 di linea (%3%)")
+                      .arg(opaque).arg(line).arg(100.0 * double(opaque) / double(std::max<qint64>(1, line)), 0, 'f', 1));
             gl->setClocksDrivenByRecorder(false);
         }
         if (!loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) return;
@@ -5881,6 +5892,86 @@ void ScenarioTest::runVideoFrameScenarios()
               QStringLiteral("dimensione nativa: immagine intera (%1x%2)").arg(img.width()).arg(img.height()));
     }
     gl->setClocksDrivenByRecorder(false);
+}
+
+// ROLL LEFT / RIGHT A SCENA FERMA. Sulla Shape la camera rolla; sui record
+// (Rotations, Paths) col moto fermato i due tasti non facevano nulla
+// (segnalato dall'utente su Calabi-Yau e Brieskorn-Pham). Si tiene premuto
+// Roll Left come l'utente e si guarda se il fotogramma cambia.
+void ScenarioTest::runRollScenarios()
+{
+    Ui::MainWindow *ui = m_mw->ui;
+    GLWidget *gl = ui->glWidget;
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Roll Left a scena ferma: Shape e record =="));
+    auto changedPct = [](const QImage &a0, const QImage &b0) {
+        const QImage a = a0.convertToFormat(QImage::Format_RGB32), b = b0.convertToFormat(QImage::Format_RGB32);
+        if (a.size() != b.size() || a.isNull()) return 100.0;
+        qint64 diff = 0;
+        for (int y = 0; y < a.height(); ++y) {
+            const QRgb *pa = reinterpret_cast<const QRgb *>(a.constScanLine(y));
+            const QRgb *pb = reinterpret_cast<const QRgb *>(b.constScanLine(y));
+            for (int x = 0; x < a.width(); ++x)
+                if (qAbs(qGray(pa[x]) - qGray(pb[x])) > 6) ++diff;
+        }
+        return 100.0 * double(diff) / double(a.width() * a.height());
+    };
+    int rollSign = 0;   // verso della prima Shape: i record devono girare uguale
+    // NON c'e' il record Rotations "Calabi Yau": salva Speed = 1, e il passo dei
+    // tasti del dock 3D View (Roll compreso) segue Speed, quindi li' il rollio e'
+    // dieci volte piu' lento e sotto la soglia di questo test. E' voluto: Speed
+    // regola insieme path e tasti (deciso con l'utente il 2026-11-07).
+    struct RollCase { const char *rel; bool record; };
+    for (const RollCase &rc : { RollCase{ "surfaces/Parametric/Surfaces/Multi Meshes/Brieskorn-Pham.json", false },
+                                RollCase{ "records/Rotations/Parametric/Surfaces/Multi Meshes/Brieskorn-Pham (3,5).json", true },
+                                RollCase{ "surfaces/Parametric/Surfaces/Multi Meshes/Calabi-Yau.json", false },
+                                RollCase{ "records/Paths/Parametric/Surfaces/Multi Meshes/Calabi-Yau Orbit.json", true } }) {
+        const QString rel = QString::fromLatin1(rc.rel);
+        if (!(rc.record ? loadRecord(rel) : loadSurface(rel))) continue;
+        wait(800);
+        // Moto fermato come dall'utente: STOP del master se qualcosa gira.
+        auto moving = [this, gl] {
+            return gl->isAnimating() || m_mw->pathRunning(CameraPaths::Path3D) || m_mw->pathRunning(CameraPaths::Path4D);
+        };
+        if (moving()) { m_mw->performMasterStop();  wait(600); }
+        const QImage before = gl->grabFramebuffer();
+        const float rollBefore = gl->framing().roll;
+        const bool enabled = ui->btnRollLeft->isEnabled();
+        emit ui->btnRollLeft->pressed();
+        wait(700);
+        emit ui->btnRollLeft->released();
+        wait(300);
+        const QImage after = gl->grabFramebuffer();
+        const double pct = changedPct(before, after);
+        // Verso della rotazione: orientamento dell'asse principale della
+        // figura (momenti del secondo ordine dei pixel diversi dallo sfondo).
+        auto axisDeg = [](const QImage &img0) {
+            const QImage img = img0.convertToFormat(QImage::Format_RGB32);
+            const QRgb bg = img.pixel(0, 0);
+            double n = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+            for (int y = 0; y < img.height(); y += 2) {
+                const QRgb *row = reinterpret_cast<const QRgb *>(img.constScanLine(y));
+                for (int x = 0; x < img.width(); x += 2) {
+                    if (qAbs(qGray(row[x]) - qGray(bg)) <= 10) continue;
+                    n += 1; sx += x; sy += y; sxx += double(x) * x; syy += double(y) * y; sxy += double(x) * y;
+                }
+            }
+            if (n < 10) return 0.0;
+            const double mx = sx / n, my = sy / n;
+            const double cxx = sxx / n - mx * mx, cyy = syy / n - my * my, cxy = sxy / n - mx * my;
+            return qRadiansToDegrees(0.5 * std::atan2(2.0 * cxy, cxx - cyy));
+        };
+        double turn = axisDeg(after) - axisDeg(before);
+        while (turn > 90.0) turn -= 180.0;
+        while (turn < -90.0) turn += 180.0;
+        if (rollSign == 0 && qAbs(turn) > 0.3) rollSign = turn > 0 ? 1 : -1;
+        const bool sameWay = rollSign == 0 || qAbs(turn) <= 0.3 || (turn > 0) == (rollSign > 0);
+        check(enabled && pct > 1.0 && sameWay,
+              QStringLiteral("%1 (%2), moto fermo: Roll Left -> la vista ruota, nel verso della Shape (%3% pixel cambiati, asse %9 gradi, tasto %4, roll %5 -> %6, path %7, animazione %8)")
+                  .arg(QFileInfo(rel).baseName(), rc.record ? QStringLiteral("record") : QStringLiteral("Shape"))
+                  .arg(pct, 0, 'f', 1).arg(onOff(enabled)).arg(rollBefore, 0, 'f', 1).arg(gl->framing().roll, 0, 'f', 1)
+                  .arg(onOff(gl->m_isPathFollowing), onOff(moving())).arg(turn, 0, 'f', 2));
+    }
 }
 
 void ScenarioTest::runShapeBackgroundScenarios()

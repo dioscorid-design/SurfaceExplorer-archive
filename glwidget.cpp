@@ -6476,8 +6476,23 @@ void GLWidget::virtualMove(MoveDir dir, float speed3D, float speed4D)
     case MoveRight:   m_cameraPos += right * speed; break;
     case MoveUp:      m_cameraPos.setY(m_cameraPos.y() + speed); break;
     case MoveDown:    m_cameraPos.setY(m_cameraPos.y() - speed); break;
-    case RollLeft:    m_cameraRoll += rollSpeed; break;
-    case RollRight:   m_cameraRoll -= rollSpeed; break;
+    case RollLeft:
+    case RollRight: {
+        // A PATH FERMO la camera resta in modalita' path (m_isPathFollowing: la
+        // vista dal punto e nella direzione del path), e li' il rollio libero
+        // m_cameraRoll non entra nella vista: sui record con un path, fermato
+        // il moto, i due tasti non facevano nulla (segnalato dall'utente). Si
+        // ruota allora il rollio del path, che il path riscrive al prossimo
+        // tick quando riparte, scivolando da qui (beginPathHandoff).
+        // Segno OPPOSTO: m_cameraRoll ruota il vettore "alto" della camera
+        // (l'immagine gira nel verso contrario), m_pathRoll ruota direttamente
+        // l'immagine. Cosi' Roll Left gira la vista nello stesso verso nei due
+        // casi (verificato dal test degli scenari, sezione roll).
+        const float d = (dir == RollLeft) ? rollSpeed : -rollSpeed;
+        if (m_isPathFollowing) m_pathRoll -= d;
+        else                   m_cameraRoll += d;
+        break;
+    }
 
     case ObsMoveXPos:
         m_cameraPos4D.setX(m_cameraPos4D.x() + obsSpeed);

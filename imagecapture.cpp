@@ -387,7 +387,10 @@ public:
         m_wireCombo->addItem(tr("Thin"), 0.5);
         m_wireCombo->addItem(tr("Normal"), 1.0);
         m_wireCombo->addItem(tr("Thick"), 2.0);
-        m_wireCombo->setCurrentIndex(qBound(0, st.value("imageWireWidth", 1).toInt(), 2));
+        // Ogni apertura riparte da Normal: Thin e Thick valgono per l'immagine
+        // per cui si sono scelti, e ritrovarli la volta dopo produceva linee
+        // sottili o spesse senza accorgersene (chiesto dall'utente).
+        m_wireCombo->setCurrentIndex(1);
         m_wireCombo->setToolTip(tr("Width of the wireframe lines relative to the view: Normal keeps the proportion of the screen, Thin halves it, Thick doubles it."));
         form->addRow(tr("Wireframe lines:"), m_wireCombo);
         // Senza wireframe in scena la scelta non fa niente: si spegne, col perche'.
@@ -454,7 +457,7 @@ public:
         st.setValue("imageCustomW", m_customW->value());
         st.setValue("imageCustomH", m_customH->value());
         st.setValue("imageSizeMode", m_modeCombo->currentIndex());
-        st.setValue("imageWireWidth", m_wireCombo->currentIndex());
+        st.remove("imageWireWidth");   // non si ricorda piu': si riparte da Normal
         st.setValue("imageLongSide", m_longSpin->value());
         st.setValue("imagePrintLength", m_printLen->value());
         st.setValue("imagePrintUnit", m_unitCombo->currentIndex());

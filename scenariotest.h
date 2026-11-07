@@ -239,6 +239,7 @@ private:
     // default, torna riaprendo la Shape, e una Shape senza riporta il grigio.
     // Da sola: --scenario-only shape-background.
     void runShapeBackgroundScenarios();
+    void runRollScenarios();
     // Il fotogramma del video con Screen Upscale e una risoluzione fissa
     // (getFrameForVideo, senza FBO): dimensione del video, vista INTERA con fasce
     // nere (non stirata, non a meta' misura su Retina). Da sola: --scenario-only
