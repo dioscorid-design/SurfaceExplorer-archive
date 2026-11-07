@@ -2109,7 +2109,7 @@ void ScenarioTest::run()
     // ---------------------------------------------------------------------
     // DISPLACEMENT (rilievi), Ray Marching: il campo e il motore insieme.
     const QString kDispRecord = QStringLiteral("records/Animations/Implicit/3D/Blistered Gyroid.json");
-    const QString kLimestone  = QStringLiteral("textures/Ray Marching/Limestone.json");
+    const QString kLimestone  = QStringLiteral("textures/Ray Marching/Materials/Limestone.json");
     const QString kFbm        = QStringLiteral("textures/Ray Marching/Fractal Noise FBm.json");
     const QString kFractal    = QStringLiteral("textures/Ray Marching/Fractal Noise.json");
     m_lines.append(QString());
@@ -3768,6 +3768,7 @@ void ScenarioTest::run()
     runMeshCountScenarios();
     runStepsScenarios();
     runShapeBackgroundScenarios();
+    runRollScenarios();
     runVideoFrameScenarios();
     runImageCaptureScenarios();
     runAnimatedLoadScenarios();
