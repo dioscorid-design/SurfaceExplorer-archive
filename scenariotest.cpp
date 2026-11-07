@@ -474,6 +474,53 @@ void ScenarioTest::runTubeScenarios()
         }
     }
 
+    // LA COSTANTE E NEI CAMPI VALUTATI DA EXPRTK (Meshes, limiti; 2026-11-07).
+    // ExprTk non distingue maiuscole: la 'e' di Nepero, registrata prima,
+    // oscurava la E dello slider, che valeva 2.71828 a qualunque valore
+    // (parseUIConstant, substituteConstantE). La 'e' minuscola resta Nepero e
+    // la notazione scientifica (2E1) non va toccata.
+    {
+        bool okE = false, okLower = false, okSci = false;
+        const float vE = m_mw->parseUIConstant(QStringLiteral("3*round(D) + 6*sgn(round(E))"), 1, 1, 1, 6, 0, 1, 0, &okE);
+        const float vLower = m_mw->parseUIConstant(QStringLiteral("e"), 1, 1, 1, 1, 5, 1, 0, &okLower);
+        const float vSci = m_mw->parseUIConstant(QStringLiteral("2E1 + E"), 1, 1, 1, 1, 5, 1, 0, &okSci);
+        check(okE && vE == 18.0f && okLower && qAbs(vLower - 2.7182818f) < 1e-5f && okSci && vSci == 25.0f,
+              QStringLiteral("costanti nei campi: 3*round(D) + 6*sgn(round(E)) con D = 6, E = 0 -> %1 (18); "
+                             "e -> %2 (Nepero); 2E1 + E con E = 5 -> %3 (25)")
+                  .arg(vE).arg(vLower, 0, 'f', 5).arg(vSci));
+        // UNA COSTANTE CITATA SOLO DAL CAMPO MESHES e' in uso (il campo e' fra
+        // le fonti delle costanti, tubeConstantSource): Spherical Spirals ha
+        // Meshes = A ("Slider A: how many spirals") e A in nessuna equazione.
+        const QString kSpirals = QStringLiteral("surfaces/Parametric/Solid Curves/Multi Curves/Spherical Spirals.json");
+        if (loadSurface(kSpirals)) {
+            const bool openOn = ui->aSlider->isEnabled();
+            const int openParts = gl->meshPartCount();
+            setConstantBySlider(QStringLiteral("A"), 4.0);
+            wait(600);
+            check(openOn && openParts == 6 && ui->aSlider->isEnabled() && gl->meshPartCount() == 4,
+                  QStringLiteral("Spherical Spirals (Meshes = A): aperto con %1 spirali, slider A %2; "
+                                 "A = 4 dallo slider -> %3 spirali, slider A %4")
+                      .arg(openParts).arg(onOff(openOn)).arg(gl->meshPartCount()).arg(onOff(ui->aSlider->isEnabled())));
+        }
+        // Meshes = E: prima il campo, che rende E "in uso" (lo script del
+        // record non la cita), poi il valore di E.
+        const QString kWaveE = QStringLiteral("records/Animations/Parametric/Solid Curves/Multi Curves/Lissajous Layers Wave.json");
+        if (loadRecord(kWaveE)) {
+            typeInField(ui->lineMeshCount, QStringLiteral("E"));
+            pressEnter(ui->lineMeshCount);
+            wait(800);
+            setConstantByField(QStringLiteral("E"), QStringLiteral("5"));
+            wait(400);
+            check(gl->meshPartCount() == 5 && ui->eSlider->isEnabled(),
+                  QStringLiteral("Meshes = E, poi E = 5 -> %1 strati (5), slider E %2")
+                      .arg(gl->meshPartCount()).arg(onOff(ui->eSlider->isEnabled())));
+            m_mw->performMasterStop();
+            m_discardOnPrompt = true;
+            loadRecord(kWaveE);   // di nuovo il record com'e' nel file
+            m_discardOnPrompt = false;
+        }
+    }
+
     // MASTER coi tubi da SCRIPT animati da t: la geometria e' un modulo (prima
     // non lo era: con la geometria ferma il master restava su STOP).
     if (loadRecord(QStringLiteral("records/Animations/Parametric/Solid Curves/Multi Curves/Lissajous Layers Wave.json"))) {

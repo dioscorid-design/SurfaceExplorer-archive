@@ -2316,6 +2316,19 @@ float MainWindow::parseLimitField(const QString &text, bool *ok)
     return parseUIConstant(text, k.a, k.b, k.c, k.d, k.e, k.f, k.s, ok);
 }
 
+// LA COSTANTE E NEI PARSER EXPRTK CON LA 'e' DI NEPERO. ExprTk NON distingue
+// maiuscole e minuscole: registrata la 'e' (2.71828), add_constant("E", ...)
+// fallisce in silenzio e la E dello slider valeva 2.71828. Nel campo Meshes
+// "3*round(D) + 6*round(E)" dava 18 mesh in piu' a qualunque E (stessa famiglia
+// del bug di meshVisibleCount, mainwindow_render.cpp). La E maiuscola si
+// sostituisce col suo valore PRIMA del parser; la 'e' minuscola resta Nepero.
+// Parola intera e maiuscola esatta: "1E5" (notazione scientifica) non cambia.
+static QString substituteConstantE(QString expr, double E)
+{
+    static const QRegularExpression reE(QStringLiteral("\\bE\\b"));
+    return expr.replace(reE, QStringLiteral("(%1)").arg(E, 0, 'g', 17));
+}
+
 float MainWindow::parseUIConstant(const QString &exprStr, float A, float B, float C, float D, float E, float F, float S, bool* ok)
 {
     QString cleanExpr = exprStr.trimmed();
@@ -2323,6 +2336,8 @@ float MainWindow::parseUIConstant(const QString &exprStr, float A, float B, floa
 
     // 1. Uniformiamo la punteggiatura
     cleanExpr.replace(",", ".");
+    // La E dello slider come numero: vedi substituteConstantE.
+    cleanExpr = substituteConstantE(cleanExpr, E);
 
     // 2. PASSAGGIO A DOUBLE: ExprTk è nativo e infallibile in double
     typedef exprtk::symbol_table<double> symbol_table_t;
@@ -2346,7 +2361,7 @@ float MainWindow::parseUIConstant(const QString &exprStr, float A, float B, floa
     symbol_table.add_constant("B", (double)B);
     symbol_table.add_constant("C", (double)C);
     symbol_table.add_constant("D", (double)D);
-    symbol_table.add_constant("E", (double)E);
+    // E: gia' sostituita col suo valore (substituteConstantE).
     symbol_table.add_constant("F", (double)F);
     symbol_table.add_constant("S", (double)S); symbol_table.add_constant("s", (double)S);
 
@@ -3161,7 +3176,8 @@ bool MainWindow::geodesicFieldsAreFinite(const QStringList& exprs,
     st.add_constant("TAU", 6.28318530717958647692);
     st.add_constant("A", (double)A); st.add_constant("B", (double)B);
     st.add_constant("C", (double)C); st.add_constant("D", (double)D);
-    st.add_constant("E", (double)E); st.add_constant("F", (double)F);
+    // E: sostituita col suo valore in ogni espressione (substituteConstantE).
+    st.add_constant("F", (double)F);
     st.add_constant("S", (double)S); st.add_constant("s", (double)S);
     st.add_variable("u", u); st.add_variable("v", v); st.add_variable("w", w);
     st.add_variable("t", t);
@@ -3181,6 +3197,7 @@ bool MainWindow::geodesicFieldsAreFinite(const QStringList& exprs,
         QString clean = raw.trimmed();
         if (clean.isEmpty()) continue;
         clean.replace(",", ".");
+        clean = substituteConstantE(clean, E);
 
         expression_t expr;
         expr.register_symbol_table(st);
