@@ -2,6 +2,7 @@
 // repository, copia/incolla, salvataggi, risorse di fabbrica.
 // Parte della classe MainWindow divisa per argomento (mainwindow_p.h).
 #include "mainwindow_p.h"
+#include "librarytreewidget.h"
 
 // Library: alberi, menu contestuali, osservatore del file system. Parte del costruttore, nell'ordine in cui la chiama.
 void MainWindow::setupLibraryDock()
@@ -521,9 +522,33 @@ void MainWindow::restartActiveLibraryTexture(const LibraryItem &data)
     updateMasterButtonState();
 }
 
+// CMD/CTRL+CLIC (o SHIFT+CLIC) SU UNA VOCE: e' la selezione multipla (Copy,
+// Cut, Delete, trascinamento), non un load. Basta una di tre prove (con la
+// sola prima il preset si caricava ancora col Cmd premuto, 2026-11-08):
+//  - i modificatori del clic, alla pressione o al rilascio (LibraryTreeWidget);
+//  - quelli della tastiera adesso;
+//  - la selezione dopo il clic: un preset si carica solo se e' selezionato ed
+//    e' il solo selezionato del suo albero. Cmd+clic e Shift+clic ne lasciano
+//    piu' d'uno, o tolgono proprio quello cliccato. Non vale per le cartelle,
+//    che il clic semplice non seleziona (LibraryTreeWidget), ne' per la
+//    selezione singola di mobile.
+static bool multiSelectionClick(QObject *sender, QTreeWidgetItem *item)
+{
+    if (QGuiApplication::keyboardModifiers() & (Qt::ControlModifier | Qt::ShiftModifier | Qt::MetaModifier))
+        return true;
+    if (const auto *tree = qobject_cast<const LibraryTreeWidget *>(sender); tree && tree->multiSelectionClick())
+        return true;
+    QTreeWidget *tree = item ? item->treeWidget() : nullptr;
+    if (!tree || tree->selectionMode() == QAbstractItemView::SingleSelection
+        || item->childCount() > 0 || item->data(0, Qt::UserRole + 10).isValid())
+        return false;
+    return !item->isSelected() || tree->selectedItems().size() > 1;
+}
+
 void MainWindow::onExampleItemClicked(QTreeWidgetItem *item, int column)
 {
     Q_UNUSED(column);
+    if (multiSelectionClick(sender(), item)) return;
 
     // Azzeramento incrociato ASIMMETRICO. Prima un click su QUALSIASI albero
     // azzerava tutti gli altri: cosi' caricare una texture dopo una superficie
@@ -1149,6 +1174,7 @@ void MainWindow::onSaveMotionClicked() {
 void MainWindow::onSoundItemClicked(QTreeWidgetItem *item, int column)
 {
     Q_UNUSED(column);
+    if (multiSelectionClick(sender(), item)) return;   // selezione multipla, non un suono da caricare
 
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     if (item->childCount() > 0) {

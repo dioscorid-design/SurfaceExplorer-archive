@@ -7063,11 +7063,80 @@ void ScenarioTest::runLibraryFolderScenarios()
         QCoreApplication::sendEvent(tree->viewport(), &press);
         QCoreApplication::sendEvent(tree->viewport(), &release);
         wait(300);
-        check(folder->isSelected() && leaf->isSelected(),
-              QStringLiteral("Cmd+clic sulla cartella -> selezione multipla, preset e cartella"));
+        check(folder->isSelected() && !leaf->isSelected() && tree->currentItem() == leaf,
+              QStringLiteral("Cmd+clic sulla cartella -> selezionata la cartella; il preset a schermo esce dalla "
+                             "selezione e resta corrente (grigio)"));
         tree->selectionModel()->clearSelection();
         tree->setCurrentItem(leaf);
         wait(200);
+    }
+    // Cmd/Ctrl+clic e Shift+clic su un ALTRO PRESET: selezione multipla, non
+    // un load (prima il preset si caricava subito); il clic semplice lo carica.
+    {
+        QTreeWidgetItem *second = nullptr;
+        for (int i = 0; i < folder->childCount() && !second; ++i)
+            if (folder->child(i) != leaf && folder->child(i)->childCount() == 0) second = folder->child(i);
+        if (second) {
+            auto click = [&](Qt::KeyboardModifiers mods, Qt::KeyboardModifiers releaseMods) {
+                const QPoint pos = tree->visualItemRect(second).center();
+                const QPoint global = tree->viewport()->mapToGlobal(pos);
+                QMouseEvent press(QEvent::MouseButtonPress, pos, global, Qt::LeftButton, Qt::LeftButton, mods);
+                QMouseEvent release(QEvent::MouseButtonRelease, pos, global, Qt::LeftButton, Qt::NoButton, releaseMods);
+                m_discardOnPrompt = true;
+                QCoreApplication::sendEvent(tree->viewport(), &press);
+                QCoreApplication::sendEvent(tree->viewport(), &release);
+                wait(1200);
+                m_discardOnPrompt = false;
+            };
+            // Cmd e Shift tenuti per tutto il clic, e Cmd lasciato prima del tasto.
+            // Col Cmd il preset a schermo esce dalla selezione e resta grigio (un
+            // Delete non lo deve prendere); lo Shift prende l'intervallo, lui compreso.
+            const struct { Qt::KeyboardModifiers press, release; const char *name; bool range; } gestures[] = {
+                { Qt::ControlModifier, Qt::ControlModifier, "Cmd", false },
+                { Qt::ShiftModifier, Qt::ShiftModifier, "Shift", true },
+                { Qt::ControlModifier, Qt::NoModifier, "Cmd (lasciato prima del tasto)", false },
+            };
+            for (const auto &g : gestures) {
+                click(g.press, g.release);
+                // Lo Shift parte dall'ultima voce premuta (qui il Cmd+clic di prima):
+                // del preset a schermo si guarda solo che resti corrente.
+                const bool selected = second->isSelected() && (g.range || !leaf->isSelected())
+                                      && tree->currentItem() == leaf;
+                check(selected && m_mw->m_lastLoadedLibraryItem == leaf,
+                      QStringLiteral("%1+clic su un altro preset -> %2, il preset a schermo corrente, nessun load")
+                          .arg(QString::fromLatin1(g.name),
+                               g.range ? QStringLiteral("selezionato l'intervallo")
+                                       : QStringLiteral("selezionato lui solo, il preset a schermo fuori dalla selezione")));
+                tree->selectionModel()->clearSelection();
+                tree->setCurrentItem(leaf);
+                wait(200);
+            }
+            // Il clic che arriva con due preset selezionati: nessun load, qualunque
+            // cosa dicano i modificatori (la selezione e' la prova che non sbaglia).
+            {
+                second->setSelected(true);
+                m_discardOnPrompt = true;
+                emit tree->itemClicked(second, 0);
+                wait(1200);
+                m_discardOnPrompt = false;
+                check(m_mw->m_lastLoadedLibraryItem == leaf,
+                      QStringLiteral("clic con due preset selezionati -> nessun load"));
+                tree->selectionModel()->clearSelection();
+                tree->setCurrentItem(leaf);
+                wait(200);
+            }
+            click(Qt::NoModifier, Qt::NoModifier);
+            check(m_mw->m_lastLoadedLibraryItem == second && second->isSelected() && !leaf->isSelected(),
+                  QStringLiteral("clic semplice sull'altro preset -> caricato"));
+            // Di nuovo il primo, per il resto della sezione.
+            m_discardOnPrompt = true;
+            tree->setCurrentItem(leaf);
+            emit tree->itemClicked(leaf, 0);
+            wait(1200);
+            m_discardOnPrompt = false;
+        } else {
+            check(false, QStringLiteral("la cartella del preset non ne ha un secondo"));
+        }
     }
 
     // Tap su mobile: il press seleziona la cartella, poi onExampleItemClicked la
@@ -7158,6 +7227,27 @@ void ScenarioTest::runLibraryFolderScenarios()
                rightClick(otherPos, QString()), other->text(0));
     onScreenOk(QStringLiteral("tasto destro su un altro preset, Copy"),
                rightClick(otherPos, QStringLiteral("Copy")), other->text(0));
+    // SELEZIONE MULTIPLA E MENU: Cmd+clic su un altro preset (il grigio resta
+    // sul preset a schermo), Copy dal menu; alla chiusura resta il solo preset
+    // a schermo (prima restavano evidenziati tutti, col grigio sull'ultimo).
+    {
+        const QPoint global = tree->viewport()->mapToGlobal(otherPos);
+        QMouseEvent press(QEvent::MouseButtonPress, otherPos, global, Qt::LeftButton, Qt::LeftButton, Qt::ControlModifier);
+        QMouseEvent release(QEvent::MouseButtonRelease, otherPos, global, Qt::LeftButton, Qt::NoButton, Qt::ControlModifier);
+        QCoreApplication::sendEvent(tree->viewport(), &press);
+        QCoreApplication::sendEvent(tree->viewport(), &release);
+        wait(200);
+        check(!leaf->isSelected() && other->isSelected() && tree->currentItem() == leaf,
+              QStringLiteral("Cmd+clic su un altro preset: selezionato lui, il preset a schermo fuori dalla "
+                             "selezione e grigio"));
+        const QStringList during = rightClick(otherPos, QStringLiteral("Copy"));
+        check(tree->selectedItems() == QList<QTreeWidgetItem *>{ leaf } && tree->currentItem() == leaf
+                  && during.contains(other->text(0)) && !during.contains(name)
+                  && during.contains(QStringLiteral("corrente: %1 (grigio)").arg(name)),
+              QStringLiteral("selezione col Cmd, Copy: durante il menu il bersaglio e' la sola voce scelta, il preset "
+                             "a schermo grigio [%1]; a menu chiuso il solo preset a schermo (%2 voci evidenziate)")
+                  .arg(during.join(QStringLiteral(", "))).arg(tree->selectedItems().size()));
+    }
     // Area vuota: rami chiusi, cosi' sotto le cartelle c'e' spazio libero.
     tree->collapseAll();
     wait(200);
@@ -7166,6 +7256,19 @@ void ScenarioTest::runLibraryFolderScenarios()
         check(false, QStringLiteral("nessuna area vuota nell'albero delle Surfaces a rami chiusi"));
     } else {
         onScreenOk(QStringLiteral("tasto destro su un'area vuota"), rightClick(emptyPos, QString()), QString());
+        // Clic SINISTRO sul vuoto con una selezione multipla: resta il solo
+        // preset a schermo (prima si toglieva tutto, e il grigio restava dove
+        // l'avevano lasciato l'ultimo Cmd+clic o un Incolla).
+        other->setSelected(true);
+        const QPoint global = tree->viewport()->mapToGlobal(emptyPos);
+        QMouseEvent press(QEvent::MouseButtonPress, emptyPos, global, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent release(QEvent::MouseButtonRelease, emptyPos, global, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(tree->viewport(), &press);
+        QCoreApplication::sendEvent(tree->viewport(), &release);
+        wait(200);
+        check(tree->selectedItems() == QList<QTreeWidgetItem *>{ leaf } && tree->currentItem() == leaf,
+              QStringLiteral("clic sinistro sul vuoto con due preset selezionati -> resta il solo preset a schermo "
+                             "(%1 voci evidenziate)").arg(tree->selectedItems().size()));
     }
     for (QTreeWidgetItem *p = folder; p; p = p->parent()) p->setExpanded(true);
 }

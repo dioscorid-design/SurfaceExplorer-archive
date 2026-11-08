@@ -20,6 +20,11 @@
 // Finito il trascinamento l'evidenziazione torna sul preset a schermo, come
 // dopo un comando del menu contestuale (startDrag).
 
+// I modificatori della selezione multipla: Cmd su macOS e Ctrl altrove
+// (ControlModifier), Shift, e Ctrl su macOS (MetaModifier: li' e' il tasto
+// destro, che apre il menu).
+static constexpr Qt::KeyboardModifiers kMultiSelection = Qt::ControlModifier | Qt::ShiftModifier | Qt::MetaModifier;
+
 bool LibraryTreeWidget::isFolder(const QModelIndex &index) const
 {
     if (!index.isValid()) return false;
@@ -34,14 +39,57 @@ QItemSelectionModel::SelectionFlags LibraryTreeWidget::selectionCommand(const QM
     return QTreeWidget::selectionCommand(index, event);
 }
 
+// Rimette l'elemento corrente su `current` senza toccare la selezione. Senza
+// autoscroll: spostarlo fa scrollTo, che riapre i genitori chiusi.
+void LibraryTreeWidget::keepCurrent(const QPersistentModelIndex &current)
+{
+    if (!current.isValid() || currentIndex() == current) return;
+    const bool autoScroll = hasAutoScroll();
+    setAutoScroll(false);
+    selectionModel()->setCurrentIndex(current, QItemSelectionModel::NoUpdate);
+    setAutoScroll(autoScroll);
+}
+
 void LibraryTreeWidget::mousePressEvent(QMouseEvent *event)
 {
     const QModelIndex index = indexAt(event->position().toPoint());
-    if (event->button() == Qt::LeftButton) m_pressHighlight = LibraryTreeFocus::highlightOf(this);
-    const Qt::KeyboardModifiers multi = Qt::ControlModifier | Qt::ShiftModifier | Qt::MetaModifier;
-    m_folderPress = event->button() == Qt::LeftButton && !(event->modifiers() & multi) && isFolder(index);
+    const bool left = event->button() == Qt::LeftButton;
+    const bool multi = event->modifiers() & kMultiSelection;
+    if (left) m_pressHighlight = LibraryTreeFocus::highlightOf(this);
+    // CLIC SINISTRO SUL VUOTO: toglie la selezione multipla e rimette quella
+    // a riposo, il preset a schermo (l'elemento corrente). Qt toglieva tutto e
+    // lasciava il grigio dove l'avevano messo l'ultimo Cmd+clic o un Incolla:
+    // il preset a schermo non era piu' indicato, e un altro sembrava esserlo.
+    if (left && !multi && !index.isValid()) {
+        m_folderPress = false;
+        m_pressMulti = false;
+        QTreeWidgetItem *current = currentItem();
+        clearSelection();
+        if (current) current->setSelected(true);
+        event->accept();
+        return;
+    }
+    m_folderPress = left && !multi && isFolder(index);
+    m_pressMulti = left && multi;
     if (!m_folderPress) {
+        // CMD/SHIFT+CLIC: la selezione cresce, ma l'elemento corrente (il
+        // grigio) resta sul preset a schermo. Qt lo portava sulla voce cliccata,
+        // e il menu e i ripristini, che lo leggono come preset a schermo,
+        // evidenziavano poi quella.
+        const QPersistentModelIndex current = currentIndex();
+        // IL PRIMO CMD+CLIC dalla selezione a riposo (il solo preset a schermo):
+        // il preset a schermo esce dalla selezione e resta grigio, cosi' i
+        // comandi (Delete!) agiscono sulle sole voci scelte. Per metterlo nella
+        // selezione basta un Cmd+clic anche su di lui. Shift+clic no: un
+        // intervallo comprende la voce da cui parte.
+        if (m_pressMulti && (event->modifiers() & (Qt::ControlModifier | Qt::MetaModifier))
+            && index.isValid() && current.isValid() && index != QModelIndex(current)) {
+            const QList<QTreeWidgetItem *> selected = selectedItems();
+            if (selected.size() == 1 && selected.first() == itemFromIndex(current))
+                selectionModel()->select(current, QItemSelectionModel::Deselect | QItemSelectionModel::Rows);
+        }
         QTreeWidget::mousePressEvent(event);
+        if (m_pressMulti) keepCurrent(current);
         return;
     }
     m_folder = index;
@@ -51,12 +99,7 @@ void LibraryTreeWidget::mousePressEvent(QMouseEvent *event)
     // Senza autoscroll: spostarlo fa scrollTo, che riapre i genitori chiusi.
     const QPersistentModelIndex current = currentIndex();
     QTreeWidget::mousePressEvent(event);
-    if (current.isValid() && currentIndex() != current) {
-        const bool autoScroll = hasAutoScroll();
-        setAutoScroll(false);
-        selectionModel()->setCurrentIndex(current, QItemSelectionModel::NoUpdate);
-        setAutoScroll(autoScroll);
-    }
+    keepCurrent(current);
 }
 
 void LibraryTreeWidget::mouseMoveEvent(QMouseEvent *event)
@@ -80,7 +123,16 @@ void LibraryTreeWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     // Ancora col clic sulla cartella acceso: Qt chiede la selezione anche al
     // rilascio, e deve ricevere NoUpdate.
+    // CMD/CTRL+CLIC E SHIFT+CLIC SU UN PRESET: la selezione multipla, non un
+    // load. Qt emette itemClicked dentro questo rilascio, anche coi
+    // modificatori, e il preset si caricava subito: il flag lo dice a chi lo
+    // riceve, e vale solo qui dentro. Basta il modificatore alla pressione: Cmd
+    // lasciato un attimo prima del tasto e' lo stesso clic.
+    m_multiSelectionRelease = event->button() == Qt::LeftButton
+                              && ((event->modifiers() & kMultiSelection) || m_pressMulti);
     QTreeWidget::mouseReleaseEvent(event);
+    m_multiSelectionRelease = false;
+    m_pressMulti = false;
     m_folderPress = false;
 }
 
@@ -106,7 +158,8 @@ void LibraryTreeWidget::startDrag(Qt::DropActions supportedActions)
     // sulla cartella trascinata anche lasciandola dov'era. Il rilascio puo'
     // aver ricostruito l'albero (refreshAndFocusPaths): si rimette per
     // percorso, seguendo il preset se si e' spostato con la cartella.
-    LibraryTreeFocus::Highlight before = m_pressHighlight;
+    // Una selezione multipla trascinata: finito, resta il solo preset a schermo.
+    LibraryTreeFocus::Highlight before = LibraryTreeFocus::resting(m_pressHighlight);
     QStringList dragged;
     for (QTreeWidgetItem *item : selectedItems()) dragged << LibraryTreeFocus::itemPath(item);
     QTreeWidget::startDrag(supportedActions);

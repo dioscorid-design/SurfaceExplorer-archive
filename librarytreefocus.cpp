@@ -193,6 +193,15 @@ void LibraryTreeFocus::setCurrentQuietly(QTreeWidget *tree, QTreeWidgetItem *ite
     tree->setAutoScroll(autoScroll);
 }
 
+LibraryTreeFocus::Highlight LibraryTreeFocus::resting(const Highlight &h)
+{
+    if (h.paths.size() <= 1) return h;
+    Highlight r;
+    r.current = h.current;
+    if (!h.current.isEmpty()) r.paths << h.current;
+    return r;
+}
+
 void LibraryTreeFocus::restoreHighlight(QTreeWidget *tree, const Highlight &h)
 {
     QList<QTreeWidgetItem *> items;

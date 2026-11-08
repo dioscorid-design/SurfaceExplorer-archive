@@ -57,9 +57,11 @@ void LibraryMenuController::showMenu(QTreeWidget *senderTree, const QPoint &pos)
     // Non nei rientri da ricostruzione della libreria (vedi i moti, piu'
     // sotto): li' non c'e' un menu dell'utente da chiudere.
     const bool keepHighlight = !m_mainWindow->libraryRebuildInProgress();
+    // Una selezione multipla (Cmd/Shift+clic) e' per il comando: alla chiusura
+    // resta il solo preset a schermo (LibraryTreeFocus::resting).
     const LibraryTreeFocus::Highlight before = !keepHighlight ? LibraryTreeFocus::Highlight{}
-                           : m_pressHighlight.contains(senderTree) ? m_pressHighlight.take(senderTree)
-                                                                   : LibraryTreeFocus::highlightOf(senderTree);
+        : LibraryTreeFocus::resting(m_pressHighlight.contains(senderTree) ? m_pressHighlight.take(senderTree)
+                                                                          : LibraryTreeFocus::highlightOf(senderTree));
 
     QPoint localPos = pos;
     QPoint globalMenuPos = senderTree->mapToGlobal(pos);
