@@ -45,7 +45,8 @@ Highlight highlightOf(QTreeWidget *tree);
 // LA SELEZIONE A RIPOSO: una selezione multipla (Cmd/Shift+clic) serve a un
 // comando; finito il comando, o il trascinamento, resta il solo preset a
 // schermo, cioe' l'elemento corrente (che Cmd/Shift+clic non spostano,
-// LibraryTreeWidget::mousePressEvent). Una selezione singola resta com'e'.
+// LibraryTreeWidget::mousePressEvent), anche quando la selezione e' una voce
+// sola ma un'altra. Senza elemento corrente resta la selezione.
 Highlight resting(const Highlight &h);
 // Rimette selezione ed elemento corrente. Se nessuna delle voci c'e' piu'
 // (cancellata, rinominata, altra libreria) resta cio' che ha deciso il comando.

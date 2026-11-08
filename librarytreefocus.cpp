@@ -195,7 +195,10 @@ void LibraryTreeFocus::setCurrentQuietly(QTreeWidget *tree, QTreeWidgetItem *ite
 
 LibraryTreeFocus::Highlight LibraryTreeFocus::resting(const Highlight &h)
 {
-    if (h.paths.size() <= 1) return h;
+    // Senza elemento corrente non c'e' un preset a schermo: resta la selezione.
+    // Con: lui solo, anche quando la selezione e' una voce sola ma un'altra (il
+    // primo Cmd+clic toglie il preset a schermo dalla selezione).
+    if (h.current.isEmpty()) return h;
     Highlight r;
     r.current = h.current;
     if (!h.current.isEmpty()) r.paths << h.current;

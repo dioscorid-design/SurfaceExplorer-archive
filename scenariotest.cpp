@@ -7128,12 +7128,14 @@ void ScenarioTest::runLibraryFolderScenarios()
             click(Qt::NoModifier, Qt::NoModifier);
             check(m_mw->m_lastLoadedLibraryItem == second && second->isSelected() && !leaf->isSelected(),
                   QStringLiteral("clic semplice sull'altro preset -> caricato"));
-            // Di nuovo il primo, per il resto della sezione.
+            // Di nuovo il primo, per il resto della sezione, e la texture
+            // evidenziata nell'altro albero (il load di una Shape la toglie).
             m_discardOnPrompt = true;
             tree->setCurrentItem(leaf);
             emit tree->itemClicked(leaf, 0);
             wait(1200);
             m_discardOnPrompt = false;
+            if (tex) ui->treeTextures->setCurrentItem(tex);
         } else {
             check(false, QStringLiteral("la cartella del preset non ne ha un secondo"));
         }
