@@ -313,6 +313,7 @@ public:
         for (const RatioItem &it : m_items) m_ratioCombo->addItem(it.label);
         m_ratioCombo->setCurrentIndex(qBound(0, st.value("imageRatioIndex", 0).toInt(), m_items.size() - 1));
         form->addRow(tr("Aspect ratio:"), m_ratioCombo);
+        m_ratioLabel = form->labelForField(m_ratioCombo);
 
         auto *customRow = new QWidget;
         auto *customLay = new QHBoxLayout(customRow);
@@ -328,16 +329,21 @@ public:
         m_customRow = customRow;
         form->addRow(QString(), customRow);
 
-        // --- MODO: pixel o misura di stampa (non su telefono) ---
+        // --- MODO: lato lungo in pixel, misura di stampa (non su telefono), o
+        // larghezza e altezza in pixel. Il dato di ogni voce e' il modo (ModeLong,
+        // ModePrint, ModeExact), anche in "imageSizeMode": sul telefono manca la
+        // stampa, e l'indice non direbbe piu' il modo.
         m_phone = isPhone();
-        m_modeCombo = new QComboBox(this);
-        m_modeCombo->addItems({ tr("Pixels"), tr("Print size") });
-        m_modeCombo->hide();
-        if (!m_phone) {
-            m_modeCombo->setCurrentIndex(qBound(0, st.value("imageSizeMode", 0).toInt(), 1));
-            form->addRow(tr("Size by:"), m_modeCombo);
-            m_modeCombo->setVisible(true);
-        }
+        m_modeCombo = new QComboBox;
+        m_modeCombo->addItem(tr("Long side (px)"), ModeLong);
+        if (!m_phone) m_modeCombo->addItem(tr("Print size"), ModePrint);
+        // Larghezza e altezza scritte una per una: un rapporto fra lati di
+        // migliaia di pixel non si scrive coi numeri fino a 999 di Custom (e
+        // 5461 x 5734, chiesto dall'utente, non ha fattori comuni).
+        m_modeCombo->addItem(tr("Width × height (px)"), ModeExact);
+        const int savedMode = m_modeCombo->findData(st.value("imageSizeMode", ModeLong).toInt());
+        m_modeCombo->setCurrentIndex(savedMode >= 0 ? savedMode : 0);
+        form->addRow(tr("Size by:"), m_modeCombo);
 
         // --- PIXEL ---
         m_longSpin = new QSpinBox;
@@ -358,6 +364,24 @@ public:
         pixLay->addWidget(m_presetCombo);
         form->addRow(tr("Long side (px):"), m_pixelRow);
         m_pixelLabel = form->labelForField(m_pixelRow);
+
+        // --- LARGHEZZA E ALTEZZA ---
+        const int texMax = std::max(16, m_maxTex);
+        m_exactW = new QSpinBox; m_exactW->setRange(16, texMax);
+        m_exactH = new QSpinBox; m_exactH->setRange(16, texMax);
+        m_exactW->setObjectName(QStringLiteral("imageExactW"));
+        m_exactH->setObjectName(QStringLiteral("imageExactH"));
+        m_exactW->setValue(qBound(16, st.value("imageExactW", 3840).toInt(), texMax));
+        m_exactH->setValue(qBound(16, st.value("imageExactH", 2160).toInt(), texMax));
+        m_exactRow = new QWidget;
+        auto *exLay = new QHBoxLayout(m_exactRow);
+        exLay->setContentsMargins(0, 0, 0, 0);
+        exLay->addWidget(m_exactW);
+        exLay->addWidget(new QLabel(QStringLiteral("×")));
+        exLay->addWidget(m_exactH);
+        exLay->addStretch(1);
+        form->addRow(tr("Width × height:"), m_exactRow);
+        m_exactLabel = form->labelForField(m_exactRow);
 
         // --- STAMPA ---
         m_printLen = new QDoubleSpinBox;
@@ -422,6 +446,8 @@ public:
         connect(m_wireCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, update);
         connect(m_customW, QOverload<int>::of(&QSpinBox::valueChanged), this, update);
         connect(m_customH, QOverload<int>::of(&QSpinBox::valueChanged), this, update);
+        connect(m_exactW, QOverload<int>::of(&QSpinBox::valueChanged), this, update);
+        connect(m_exactH, QOverload<int>::of(&QSpinBox::valueChanged), this, update);
         // Il menu mostra il preset che corrisponde al valore, "Preset..." (il titolo,
         // non una misura) se nessuno.
         auto syncPreset = [this]() {
@@ -447,7 +473,7 @@ public:
     double ratio() const { return m_ratio; }
     double wireFactor() const { return m_wireCombo->currentData().toDouble(); }
     // I dpi scelti, se l'immagine e' a misura di stampa (0 = a pixel).
-    int dpi() const { return (!m_phone && m_modeCombo->currentIndex() == 1) ? m_dpiSpin->value() : 0; }
+    int dpi() const { return mode() == ModePrint ? m_dpiSpin->value() : 0; }
     QSize size() const { return m_size; }
 
     void saveSettings() const
@@ -456,7 +482,9 @@ public:
         st.setValue("imageRatioIndex", m_ratioCombo->currentIndex());
         st.setValue("imageCustomW", m_customW->value());
         st.setValue("imageCustomH", m_customH->value());
-        st.setValue("imageSizeMode", m_modeCombo->currentIndex());
+        st.setValue("imageSizeMode", mode());
+        st.setValue("imageExactW", m_exactW->value());
+        st.setValue("imageExactH", m_exactH->value());
         st.remove("imageWireWidth");   // non si ricorda piu': si riparte da Normal
         st.setValue("imageLongSide", m_longSpin->value());
         st.setValue("imagePrintLength", m_printLen->value());
@@ -465,30 +493,49 @@ public:
     }
 
 private:
+    enum Mode { ModeLong = 0, ModePrint = 1, ModeExact = 2 };
+    int mode() const { return m_modeCombo->currentData().toInt(); }
+
     void refresh()
     {
+        const bool print = mode() == ModePrint;
+        const bool exact = mode() == ModeExact;
+
+        // A larghezza e altezza il rapporto viene dai due lati: menu del rapporto
+        // nascosto, e il riquadro guida segue i due numeri.
         const int idx = m_ratioCombo->currentIndex();
         const bool custom = (m_items[idx].ratio == 0.0);
-        m_customRow->setVisible(custom);
-        m_ratio = custom ? double(m_customW->value()) / double(m_customH->value()) : m_items[idx].ratio;
+        m_ratioCombo->setVisible(!exact);
+        if (m_ratioLabel) m_ratioLabel->setVisible(!exact);
+        m_customRow->setVisible(custom && !exact);
+        if (exact)
+            m_ratio = double(m_exactW->value()) / double(m_exactH->value());
+        else
+            m_ratio = custom ? double(m_customW->value()) / double(m_customH->value()) : m_items[idx].ratio;
 
-        const bool print = !m_phone && m_modeCombo->currentIndex() == 1;
-        m_pixelRow->setVisible(!print);
-        if (m_pixelLabel) m_pixelLabel->setVisible(!print);
-        m_printRow->setVisible(print && !m_phone);
-        if (m_printLabel) m_printLabel->setVisible(print && !m_phone);
+        m_pixelRow->setVisible(!print && !exact);
+        if (m_pixelLabel) m_pixelLabel->setVisible(!print && !exact);
+        m_printRow->setVisible(print);
+        if (m_printLabel) m_printLabel->setVisible(print);
+        m_exactRow->setVisible(exact);
+        if (m_exactLabel) m_exactLabel->setVisible(exact);
 
         qint64 longSide;
         if (print) {
             const double inches = (m_unitCombo->currentIndex() == 0) ? m_printLen->value() / 2.54
                                                                       : m_printLen->value();
             longSide = qint64(std::llround(inches * m_dpiSpin->value()));
+        } else if (exact) {
+            longSide = std::max(m_exactW->value(), m_exactH->value());
         } else {
             longSide = m_longSpin->value();
         }
         const bool tooBig = longSide > m_maxTex;
         longSide = std::clamp<qint64>(longSide, 16, m_maxTex);
-        m_size = ImageCapture::sizeFor(m_ratio, int(longSide));
+        // I due lati scritti, esatti: sizeFor dal rapporto potrebbe arrotondare
+        // di un pixel. (I campi non superano il limite della GPU.)
+        m_size = exact ? QSize(m_exactW->value(), m_exactH->value())
+                       : ImageCapture::sizeFor(m_ratio, int(longSide));
         bool memLimited = false;
         while (qint64(m_size.width()) * m_size.height() > maxPixels() && longSide > 16) {
             longSide = longSide * 95 / 100;
@@ -518,6 +565,8 @@ private:
         const double gb = double(m_size.width()) * m_size.height() * 4.0 * 3.0 / 1e9;   // colore, profondita', copia
         QString text = tr("<b>%1 &times; %2 px</b> (%3 megapixel)")
                            .arg(m_size.width()).arg(m_size.height()).arg(mp, 0, 'f', 1);
+        if (exact)
+            text += tr("<br>Aspect ratio %1 : 1, as shown by the frame in the view.").arg(m_ratio, 0, 'f', 4);
         if (tooBig)
             text += tr("<br><span style='color:#e8a030'>Limited to %1 px, the largest side the GPU can render.</span>").arg(m_maxTex);
         else
@@ -562,10 +611,10 @@ private:
     bool m_phone = false;
     QVector<RatioItem> m_items;
     QComboBox *m_ratioCombo, *m_modeCombo, *m_presetCombo, *m_unitCombo, *m_wireCombo;
-    QSpinBox *m_customW, *m_customH, *m_longSpin, *m_dpiSpin;
+    QSpinBox *m_customW, *m_customH, *m_longSpin, *m_dpiSpin, *m_exactW, *m_exactH;
     QDoubleSpinBox *m_printLen;
-    QWidget *m_customRow, *m_pixelRow, *m_printRow;
-    QWidget *m_pixelLabel = nullptr, *m_printLabel = nullptr;
+    QWidget *m_customRow, *m_pixelRow, *m_printRow, *m_exactRow;
+    QWidget *m_ratioLabel = nullptr, *m_pixelLabel = nullptr, *m_printLabel = nullptr, *m_exactLabel = nullptr;
     QLabel *m_info;
     double m_ratio = 1.0;
     QSize m_size;

@@ -5799,26 +5799,34 @@ void ScenarioTest::runImageCaptureScenarios()
         QFile::remove(out);
         ImageCapture::setTestSavePath(out);
         QString dialogPng = m_outDir + QStringLiteral("/image-capture-dialog.png");
-        {   // Il test non deve dipendere da cio' che una prova a mano ha salvato.
+        // Le chiavi che il dialogo ricorda: il test non deve dipendere da cio' che
+        // una prova a mano ha salvato.
+        auto clearImageSettings = [] {
             QSettings st;
-            for (const char *k : { "imagePrintLength", "imagePrintUnit", "imageDpi", "imageSizeMode", "imageLongSide", "imageRatioIndex" })
+            for (const char *k : { "imagePrintLength", "imagePrintUnit", "imageDpi", "imageSizeMode", "imageLongSide",
+                                   "imageRatioIndex", "imageExactW", "imageExactH" })
                 st.remove(QString::fromLatin1(k));
-        }
+        };
+        clearImageSettings();
+        // Il menu "Size by": lato lungo, stampa (non su telefono), larghezza x altezza.
+        auto setSizeMode = [](QDialog *d, const QString &item) {
+            for (QComboBox *c : d->findChildren<QComboBox *>())
+                if (c->findText(QStringLiteral("Print size")) >= 0 || c->findText(QStringLiteral("Width × height (px)")) >= 0)
+                    c->setCurrentIndex(std::max(0, c->findText(item)));
+        };
         bool sawDialog = false;
         QString printText;
         ImageCapture::setTestDialogHandler([&](QDialog *d) {
             sawDialog = true;
             d->grab().save(dialogPng);
             // La misura di stampa (desktop e iPad): 50 cm a 300 dpi sono 5906 pixel.
-            for (QComboBox *c : d->findChildren<QComboBox *>())
-                if (c->count() == 2 && c->itemText(1) == QStringLiteral("Print size")) c->setCurrentIndex(1);
+            setSizeMode(d, QStringLiteral("Print size"));
             QCoreApplication::processEvents();
             d->grab().save(m_outDir + QStringLiteral("/image-capture-dialog-print.png"));
             for (QLabel *l : d->findChildren<QLabel *>())
                 if (l->text().contains(QStringLiteral("megapixel"))) printText = l->text();
             // Si torna ai pixel per lo scatto vero.
-            for (QComboBox *c : d->findChildren<QComboBox *>())
-                if (c->count() == 2 && c->itemText(1) == QStringLiteral("Print size")) c->setCurrentIndex(0);
+            setSizeMode(d, QStringLiteral("Long side (px)"));
             d->accept();
         });
         const bool done = ImageCapture::run(gl, m_mw, m_outDir);
@@ -5834,9 +5842,8 @@ void ScenarioTest::runImageCaptureScenarios()
         // A misura di stampa i dpi vanno nel file: 10 cm a 300 dpi.
         const QString outPrint = m_outDir + QStringLiteral("/image-capture-print.png");
         ImageCapture::setTestSavePath(outPrint);
-        ImageCapture::setTestDialogHandler([](QDialog *d) {
-            for (QComboBox *c : d->findChildren<QComboBox *>())
-                if (c->count() == 2 && c->itemText(1) == QStringLiteral("Print size")) c->setCurrentIndex(1);
+        ImageCapture::setTestDialogHandler([&](QDialog *d) {
+            setSizeMode(d, QStringLiteral("Print size"));
             for (QDoubleSpinBox *s : d->findChildren<QDoubleSpinBox *>()) s->setValue(10.0);
             QCoreApplication::processEvents();
             d->accept();
@@ -5849,11 +5856,32 @@ void ScenarioTest::runImageCaptureScenarios()
                   && printed.width() == 1181,
               QStringLiteral("misura di stampa nel PNG: %1 punti al metro (300 dpi), %2 pixel di lato")
                   .arg(printed.dotsPerMeterX()).arg(printed.width()));
-        {
-            QSettings st;
-            for (const char *k : { "imagePrintLength", "imagePrintUnit", "imageDpi", "imageSizeMode", "imageLongSide", "imageRatioIndex" })
-                st.remove(QString::fromLatin1(k));
-        }
+        // LARGHEZZA E ALTEZZA scritte una per una: lati senza fattori comuni (come
+        // i 5461 x 5734 chiesti dall'utente, che nessun rapporto Custom fino a 999
+        // esprime), e il PNG deve uscire esattamente di quei pixel. Piccoli, per
+        // la velocita' del test.
+        const QString outExact = m_outDir + QStringLiteral("/image-capture-exact.png");
+        QFile::remove(outExact);
+        ImageCapture::setTestSavePath(outExact);
+        bool ratioHidden = false;
+        ImageCapture::setTestDialogHandler([&](QDialog *d) {
+            setSizeMode(d, QStringLiteral("Width × height (px)"));
+            if (auto *w = d->findChild<QSpinBox *>(QStringLiteral("imageExactW"))) w->setValue(1203);
+            if (auto *h = d->findChild<QSpinBox *>(QStringLiteral("imageExactH"))) h->setValue(1301);
+            QCoreApplication::processEvents();
+            for (QComboBox *c : d->findChildren<QComboBox *>())
+                if (c->findText(QStringLiteral("16:9")) >= 0) ratioHidden = !c->isVisible();
+            d->grab().save(m_outDir + QStringLiteral("/image-capture-dialog-exact.png"));
+            d->accept();
+        });
+        const bool doneExact = ImageCapture::run(gl, m_mw, m_outDir);
+        ImageCapture::setTestSavePath(QString());
+        ImageCapture::setTestDialogHandler(nullptr);
+        const QSize exactOnDisk = QImageReader(outExact).size();
+        check(doneExact && exactOnDisk == QSize(1203, 1301) && ratioHidden,
+              QStringLiteral("larghezza x altezza: PNG di %1x%2 px (chiesti 1203x1301), menu del rapporto nascosto %3")
+                  .arg(exactOnDisk.width()).arg(exactOnDisk.height()).arg(ratioHidden));
+        clearImageSettings();
     }
 
     // DERIVATE IN PIXEL DELLO SCHERMO. La texture Wireframe (Ray Marching) tiene
