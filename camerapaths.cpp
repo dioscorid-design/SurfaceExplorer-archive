@@ -273,8 +273,8 @@ void CameraPaths::applyCamera4DAt(float t)
     // l'utente ha mosso con i TASTI a scatto: il path (e le rotazioni) muovono
     // la stessa camera, e riscrivere i campi mentre corrono faceva ballare sette
     // numeri che l'utente non stava toccando, perdendo per giunta il conto degli
-    // scatti dati. L'unico aggiornamento sta in onNavTimerTick, il tick dei
-    // tasti premuti.
+    // scatti dati. L'unico aggiornamento sta in MainWindow::stepNavActions,
+    // lo scatto dei tasti premuti.
 }
 
 void CameraPaths::applyCamera3DAt(float t)

@@ -5985,8 +5985,10 @@ void ScenarioTest::runRollScenarios()
         const QImage before = gl->grabFramebuffer();
         const float rollBefore = gl->framing().roll;
         const bool enabled = ui->btnRollLeft->isEnabled();
+        // 1100 ms: la ripetizione continua parte dopo 400 ms di pressione
+        // (connectNavButton), e restano i 700 ms di rollio di prima.
         emit ui->btnRollLeft->pressed();
-        wait(700);
+        wait(1100);
         emit ui->btnRollLeft->released();
         wait(300);
         const QImage after = gl->grabFramebuffer();
@@ -6019,6 +6021,35 @@ void ScenarioTest::runRollScenarios()
                   .arg(QFileInfo(rel).baseName(), rc.record ? QStringLiteral("record") : QStringLiteral("Shape"))
                   .arg(pct, 0, 'f', 1).arg(onOff(enabled)).arg(rollBefore, 0, 'f', 1).arg(gl->framing().roll, 0, 'f', 1)
                   .arg(onOff(gl->m_isPathFollowing), onOff(moving())).arg(turn, 0, 'f', 2));
+    }
+
+    // UN CLIC = UNO SCATTO (connectNavButton). Prima il timer di ripetizione
+    // partiva alla pressione e scattava ogni 30 ms: un clic dava da 1 a 5
+    // scatti e non si tornava all'angolo di partenza (T3 Villarceau, Psi).
+    // Psi+ e Psi- cliccati una volta ciascuno devono riportare Psi dov'era;
+    // tenuto premuto, il tasto deve ancora scorrere.
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Tasti a scatto: un clic, uno scatto =="));
+    if (loadSurface(QStringLiteral("surfaces/Implicit/Cross Sections/T3.json"))) {
+        wait(800);
+        if (gl->isAnimating()) { m_mw->performMasterStop(); wait(600); }
+        const bool enabled = ui->btnPsiAhead->isEnabled() && ui->btnPsiRear->isEnabled();
+        const float step = 2.0f * m_mw->pathSpeed4D();   // rotSpeed di virtualMove
+        auto press = [this](QPushButton *b, int ms) {
+            emit b->pressed(); wait(ms); emit b->released(); wait(100);
+        };
+        const float psi0 = gl->getPsi();
+        press(ui->btnPsiAhead, 150);   // un clic normale: meno dell'attesa di ripetizione
+        const float psi1 = gl->getPsi();
+        press(ui->btnPsiRear, 150);
+        const float psi2 = gl->getPsi();
+        check(enabled && qAbs((psi1 - psi0) - step) < 1e-5f && qAbs(psi2 - psi0) < 1e-5f,
+              QStringLiteral("Psi+ poi Psi-, un clic ciascuno: uno scatto e ritorno esatto (passo %1, Psi %2 -> %3 -> %4, tasti %5)")
+                  .arg(step, 0, 'f', 4).arg(psi0, 0, 'f', 6).arg(psi1, 0, 'f', 6).arg(psi2, 0, 'f', 6).arg(onOff(enabled)));
+        press(ui->btnPsiAhead, 1000);  // tenuto premuto: ripetizione dopo 400 ms
+        const float steps = step > 0.0f ? (gl->getPsi() - psi2) / step : 0.0f;
+        check(enabled && steps > 5.0f,
+              QStringLiteral("Psi+ tenuto premuto 1 s: il valore scorre (%1 scatti)").arg(steps, 0, 'f', 1));
     }
 }
 

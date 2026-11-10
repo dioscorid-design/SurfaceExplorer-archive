@@ -1063,7 +1063,14 @@ private:
     // MOTION & PATHS
     // ==========================================================
     QTimer *navTimer;
+    // Attesa fra lo scatto della pressione e la ripetizione continua di
+    // navTimer (vedi connectNavButton): un clic e' UNO scatto esatto.
+    QTimer *m_navRepeatDelay = nullptr;
     QSet<int> activeNavActions;
+    // Uno scatto delle azioni date, con la misura dei delta del readout 4D:
+    // onNavTimerTick lo chiama su tutte le azioni attive, la pressione di un
+    // tasto sulla sola azione di quel tasto.
+    void stepNavActions(const QSet<int> &actions);
     // Tasti di spostamento a click dei dock 3D/4D (X±, Y±, left, right, roll, ...),
     // raccolti in connectNavButton per abilitarli/disabilitarli in blocco: durante
     // un path la telecamera segue il percorso e questi comandi non hanno senso.

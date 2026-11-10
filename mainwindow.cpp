@@ -1972,26 +1972,27 @@ void MainWindow::connectNavButton(QPushButton *btn, int action)
     // telecamera segue un percorso).
     m_navButtons.append(btn);
 
-    // Quando PREMI un bottone
+    // PRESSIONE: uno scatto subito, della sola azione di questo tasto. La
+    // ripetizione continua parte solo se il tasto resta premuto oltre
+    // m_navRepeatDelay. Prima navTimer partiva alla pressione e scattava ogni
+    // 30 ms: un clic normale (100-150 ms) dava da 1 a 5 scatti a caso, e
+    // contando i clic non si tornava al punto di partenza (segnalato
+    // dall'utente su T3 Villarceau: Psi non tornava all'angolo esatto, con
+    // il readout a due decimali che segnava comunque +0.00).
     connect(btn, &QPushButton::pressed, this, [this, action]() {
-        // Se è il primo tasto che premo, avvio il timer
+        // Primo tasto premuto: parte l'attesa della ripetizione.
         if (activeNavActions.isEmpty()) {
-            navTimer->start();
+            m_navRepeatDelay->start();
         }
-        // Aggiungo questa azione alla lista delle azioni attive
         activeNavActions.insert(action);
-
-        // (Opzionale) Eseguo subito uno scatto per reattività immediata
-        onNavTimerTick();
+        stepNavActions({action});
     });
 
-    // Quando RILASCI un bottone
+    // RILASCIO: nessun tasto premuto, si ferma tutto (attesa e ripetizione).
     connect(btn, &QPushButton::released, this, [this, action]() {
-        // Rimuovo l'azione dalla lista
         activeNavActions.remove(action);
-
-        // Se non ci sono più tasti premuti, fermo il timer
         if (activeNavActions.isEmpty()) {
+            m_navRepeatDelay->stop();
             navTimer->stop();
         }
     });

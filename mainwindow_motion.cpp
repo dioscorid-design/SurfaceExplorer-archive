@@ -45,6 +45,14 @@ void MainWindow::setupMotionDocks()
 
     navTimer = new QTimer(this); navTimer->setInterval(30);
     connect(navTimer, &QTimer::timeout, this, &MainWindow::onNavTimerTick);
+    // Tenuto premuto oltre 400 ms (come le frecce degli spinbox, vedi
+    // UiStyleManager) il tasto passa alla ripetizione continua.
+    m_navRepeatDelay = new QTimer(this);
+    m_navRepeatDelay->setSingleShot(true);
+    m_navRepeatDelay->setInterval(400);
+    connect(m_navRepeatDelay, &QTimer::timeout, this, [this] {
+        if (!activeNavActions.isEmpty()) navTimer->start();
+    });
 
     // I path della camera: orologi, tempi, posa e camera (camerapaths.h).
     // Fermi durante il REC: li avanza il recorder, col dt del suo frame.
@@ -482,7 +490,12 @@ void MainWindow::resetMotions(std::optional<CameraPaths::Path> camPath)
 
 void MainWindow::onNavTimerTick()
 {
-    if (activeNavActions.isEmpty()) return;
+    stepNavActions(activeNavActions);
+}
+
+void MainWindow::stepNavActions(const QSet<int> &actions)
+{
+    if (actions.isEmpty()) return;
 
     // Stato 4D PRIMA degli scatti di questo tick. La differenza col dopo e'
     // quanto hanno prodotto i tasti -- e solo loro, perche' fra queste due
@@ -496,7 +509,7 @@ void MainWindow::onNavTimerTick()
     const float phiBefore   = ui->glWidget->getPhi();
     const float psiBefore   = ui->glWidget->getPsi();
 
-    for (int action : activeNavActions) {
+    for (int action : actions) {
         ui->glWidget->virtualMove(static_cast<GLWidget::MoveDir>(action), pathSpeed3D(), pathSpeed4D());
     }
 
