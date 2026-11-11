@@ -8105,6 +8105,52 @@ void ScenarioTest::runScriptDockScenarios()
                   .arg(briefCode(m_mw->surfaceTextureScript())));
         setScriptMode(MainWindow::ScriptModeSurface);
     }
+
+    // COSTANTI IN UNA TEXTURE SHADERTOY. Lo script e' mainImage, una funzione a
+    // parte da quella generata che dichiara le costanti: D citata dava
+    // "undeclared identifier", mentre lo slider D si sbloccava lo stesso. La
+    // Nebula della libreria, che per compilare leggeva ubuf.u_mathParams2,
+    // aveva invece gli slider D/E/F bloccati. Una lettera che lo script
+    // dichiara da se' ("vec2 F") resta sua e deve compilare ancora.
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Dock Script: costanti in una texture Shadertoy (superficie e sfondo) =="));
+    const QString kStToyD = QStringLiteral(
+        "void mainImage(out vec4 fragColor, in vec2 fragCoord) {\n"
+        "    fragColor = vec4(vec3(0.25 * D), 1.0);\n"
+        "}");
+    const QString kStToyOwnF = QStringLiteral(
+        "void mainImage(out vec4 fragColor, in vec2 fragCoord) {\n"
+        "    vec2 F = fragCoord / iResolution.xy;\n"
+        "    fragColor = vec4(F, 0.25 * D, 1.0);\n"
+        "}");
+    auto runShadertoy = [&](const QString &step, const QString &code, bool background) {
+        const qsizetype errorsBefore = ShaderCompileLog::pending().size();
+        type(code);
+        m_mw->onRunCurrentScript();  wait(800);
+        const qsizetype errors = ShaderCompileLog::pending().size() - errorsBefore;
+        const QString applied = background ? m_mw->m_scene.bgTextureCode : m_mw->surfaceTextureScript();
+        check(errors == 0 && applied.contains(QLatin1String("0.25 * D")) && ui->dSlider->isEnabled(),
+              QStringLiteral("%1 -> compila (errori: %2), applicata (%3), slider D sbloccato (%4)")
+                  .arg(step).arg(errors).arg(briefCode(applied), onOff(ui->dSlider->isEnabled())));
+    };
+    if (loadSurface(kTorus)) {
+        check(!ui->dSlider->isEnabled(), QStringLiteral("toro -> slider D bloccato (nessuno lo usa)"));
+        setScriptMode(MainWindow::ScriptModeTexture);
+        runShadertoy(QStringLiteral("superficie, mainImage con D"), kStToyD, false);
+        runShadertoy(QStringLiteral("superficie, mainImage con D e una sua F"), kStToyOwnF, false);
+        // Lo sfondo da solo: la superficie torna a una texture senza D.
+        if (selectTexture(QStringLiteral("textures/Procedurals/Plasma.json")))
+            check(!ui->dSlider->isEnabled(),
+                  QStringLiteral("superficie di nuovo Plasma -> slider D bloccato"));
+        click(ui->radioBackground);
+        if (selectTexture(QStringLiteral("textures/Procedurals/Plasma.json"))) {
+            setScriptMode(MainWindow::ScriptModeTexture);
+            runShadertoy(QStringLiteral("sfondo, mainImage con D"), kStToyD, true);
+            runShadertoy(QStringLiteral("sfondo, mainImage con D e una sua F"), kStToyOwnF, true);
+        }
+        click(ui->radioSurface);
+        setScriptMode(MainWindow::ScriptModeSurface);
+    }
 }
 
 void ScenarioTest::runMeshClockScenarios()

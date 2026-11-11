@@ -7585,6 +7585,42 @@ QString GLWidget::createImplicitFragmentShader()
     return finalSource;
 }
 
+// LE COSTANTI A..F e S DENTRO mainImage (ramo Shadertoy di sfondo e superficie).
+// Negli altri rami lo script e' il corpo della funzione generata, che le
+// dichiara come locali; qui invece lo script e' una funzione a parte
+// (mainImage), chiamata dalla generata: le locali non le arrivano e una
+// lettera citata dava "undeclared identifier". Intanto updateConstantsUIState
+// contava la lettera come uso e sbloccava lo slider: rilevazione e compilazione
+// non coincidevano (la texture Nebula, letti D/E/F da ubuf, aveva gli slider
+// bloccati; nominandoli non compilava).
+// Si fanno GLOBALI, una per riga ("float D;": il rinominatore per mesh le
+// raccoglie come le altre globali dello script), assegnate in testa alla
+// funzione generata. Una lettera che lo script dichiara gia' (con qualunque
+// tipo o come struct, a qualunque livello: "vec2 F = fragCoord", "out vec4 O,
+// vec2 C") o definisce come macro resta sua: non e' la costante, come per
+// glslUsesConstant, e una globale omonima colliderebbe con la sua.
+// La locale omonima che `helpers` dichiara va tolta (removeFrom), altrimenti
+// l'assegnazione colpirebbe lei e non la globale.
+static void addShadertoyConstantGlobals(const QString &code, QString &globals, QString &inits,
+                                        QString &removeFrom)
+{
+    static const struct { const char *letter; const char *field; } kConsts[] = {
+        {"A", "ubuf.u_mathParams.x"}, {"B", "ubuf.u_mathParams.y"}, {"C", "ubuf.u_mathParams.z"},
+        {"S", "ubuf.u_mathParams.w"},
+        {"D", "ubuf.u_mathParams2.x"}, {"E", "ubuf.u_mathParams2.y"}, {"F", "ubuf.u_mathParams2.z"},
+    };
+    for (const auto &k : kConsts) {
+        const QString letter = QLatin1String(k.letter);
+        const QRegularExpression reOwn(
+            "\\b(?:float|int|uint|bool|[biu]?vec[234]|mat[234](?:x[234])?|sampler\\w*|void|struct)\\s+"
+            + letter + "\\b|#\\s*define\\s+" + letter + "\\b");
+        if (code.contains(reOwn)) continue;
+        globals += "float " + letter + ";\n";
+        inits += "    " + letter + " = " + QLatin1String(k.field) + ";\n";
+        removeFrom.remove("    float " + letter + " = " + QLatin1String(k.field) + ";\n");
+    }
+}
+
 QString GLWidget::createBackgroundFragmentShader(bool isTextureMode, const QString &customCode)
 {
     QString fsSource;
@@ -7757,6 +7793,7 @@ QString GLWidget::createBackgroundFragmentShader(bool isTextureMode, const QStri
             QString stLocalHelpers = helpers;
             stLocalHelpers.remove("    vec3 u_col1 = ubuf.u_col1;\n");
             stLocalHelpers.remove("    vec3 u_col2 = ubuf.u_col2;\n");
+            addShadertoyConstantGlobals(safeCode, stHelpers, initVars, stLocalHelpers);
 
             dynamicBody = stHelpers + safeCode + "\n"
                                                  "vec3 getCustomColor(vec2 in_uv) {\n"
@@ -8141,6 +8178,7 @@ QString GLWidget::buildTextureFunction(const QString &customLogic, const QString
         QString stLocalHelpers = helpers;
         stLocalHelpers.remove("    vec3 u_col1 = ubuf.u_col1;\n");
         stLocalHelpers.remove("    vec3 u_col2 = ubuf.u_col2;\n");
+        addShadertoyConstantGlobals(safeLogic, stHelpers, initVars, stLocalHelpers);
 
         QString stBody = stHelpers + safeLogic + "\n"
                          "vec3 " + funcName + "(vec2 in_uv) {\n"
