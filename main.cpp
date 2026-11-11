@@ -11,6 +11,8 @@
 #include "scenariotest.h"
 #include "imagetest.h"
 #include "testactivity.h"
+#include <QWindow>
+#include <QScreen>
 #endif
 
 int main(int argc, char *argv[])
@@ -122,6 +124,27 @@ int main(int argc, char *argv[])
                      Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint |
                      Qt::WindowCloseButtonHint);
 
+#ifdef SE_SELF_TESTS
+    // I TEST SU UNO SCHERMO SCELTO: SE_TEST_SCREEN=<nome> (o una sua parte,
+    // come lo scrive QScreen::name, es. "HP") apre la finestra su quello
+    // schermo, cosi' l'altro resta libero mentre la suite gira. Se non c'e',
+    // gli schermi nel log e si resta sul principale.
+    w.winId();
+    if (const QString want = qEnvironmentVariable("SE_TEST_SCREEN"); !want.isEmpty() && w.windowHandle()) {
+        QScreen *chosen = nullptr;
+        QStringList names;
+        for (QScreen *s : QGuiApplication::screens()) {
+            names << s->name();
+            if (!chosen && s->name().contains(want, Qt::CaseInsensitive)) chosen = s;
+        }
+        if (chosen) {
+            w.windowHandle()->setScreen(chosen);
+            w.move(chosen->availableGeometry().topLeft() + QPoint(20, 20));
+        } else {
+            qWarning().noquote() << "SE_TEST_SCREEN: nessuno schermo" << want << "fra" << names.join(QStringLiteral(", "));
+        }
+    }
+#endif
     // 2. Impostiamo una dimensione di partenza ragionevole
     w.resize(1200, 800);
 
