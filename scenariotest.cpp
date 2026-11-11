@@ -2158,7 +2158,7 @@ void ScenarioTest::run()
     const QString kDispRecord = QStringLiteral("records/Animations/Implicit/3D/Blistered Gyroid.json");
     const QString kLimestone  = QStringLiteral("textures/Ray Marching/Materials/Limestone.json");
     const QString kFbm        = QStringLiteral("textures/Ray Marching/Fractal Noise FBm.json");
-    const QString kFractal    = QStringLiteral("textures/Ray Marching/Fractal Noise.json");
+    const QString kFractal    = QStringLiteral("textures/Ray Marching/Materials/Fractal Noise.json");
     m_lines.append(QString());
     m_lines.append(QStringLiteral("== Displacement: Ray Marching (%1) ==").arg(kDispRecord));
     if (loadRecord(kDispRecord)) {
@@ -4662,7 +4662,7 @@ void ScenarioTest::runBorderScenarios()
                   QStringLiteral("immagine col bersaglio Border -> immagine sul bordo, ferma"));
         const QString imageCode = gl->borderTextureCode();
         const int popups = m_popupsClosed;
-        selectTexture(QStringLiteral("textures/Ray Marching/Fractal Noise.json"));
+        selectTexture(QStringLiteral("textures/Ray Marching/Materials/Fractal Noise.json"));
         check(gl->borderTextureCode() == imageCode && m_popupsClosed == popups + 1 && !m_mw->implicitMode(),
               QStringLiteral("texture Ray Marching col bersaglio Border -> rifiutata con un avviso, niente cambio di modalita'"));
 
