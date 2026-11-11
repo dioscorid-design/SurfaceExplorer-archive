@@ -1992,21 +1992,24 @@ void MainWindow::updateRenderState()
     // così i suoi blocchi indipendenti (campo a prodotto, vista 2D) sopravvivono
     // al passaggio per il wireframe.
     //
-    // In wireframe i due slider tornano anche al DEFAULT (opaco, luce 100%): lo
-    // shader usa comunque ubuf.alpha sulle linee, e un alpha stantio (< 1) le
-    // renderebbe sbiadite con lo slider ormai bloccato. Reset incondizionato
-    // finché mode == 2, non solo alla transizione: copre anche il load di un
-    // preset wireframe con alpha salvato < 1 (setValue del load, poi questa
-    // chiamata lo riporta a 1). A slider disabilitati nessun input utente da
-    // preservare; uscendo dal wireframe restano ai default.
+    // In wireframe la TRASPARENZA torna anche al DEFAULT (opaco): lo shader usa
+    // comunque ubuf.alpha sulle linee, e un alpha stantio (< 1) le renderebbe
+    // sbiadite con lo slider ormai bloccato. Reset incondizionato finché
+    // mode == 2, non solo alla transizione: copre anche il load di un preset
+    // wireframe con alpha salvato < 1 (setValue del load, poi questa chiamata
+    // lo riporta a 1).
+    // La LUCE invece NON si tocca: il ramo wireframe dello shader non legge
+    // u_lightIntensity, quindi un valore diverso da 100% non si vede sulle
+    // linee, e azzerarla faceva perdere la scelta dell'utente al ritorno su
+    // Base/Phong (segnalato dall'utente, 11-11: lo slider tornava al default).
     // Il reset riguarda lo stato GLOBALE, quindi si fa solo quando e' il
     // globale a essere in wireframe (m_scene.renderMode), NON quando e'
     // semplicemente la mesh selezionata a esserlo: li' le altre mesh sono
-    // ancora solide e azzerarne trasparenza e luce cancellerebbe l'aspetto
+    // ancora solide e azzerarne la trasparenza cancellerebbe l'aspetto
     // per-mesh appena impostato.
     if (mode == 2 && m_scene.renderMode == 2) {
-        // Questi due sono reset AUTOMATICI del motore, non scelte dell'utente su
-        // una singola mesh: vanno sullo stato globale. Senza il bypass, con una
+        // E' un reset AUTOMATICO del motore, non una scelta dell'utente su
+        // una singola mesh: va sullo stato globale. Senza il bypass, con una
         // mesh selezionata nello spinbox finivano scritti su QUELLA parte (che
         // smetteva di ereditare) e il giro di segnali che ne seguiva poteva
         // inchiodare il selettore. Si manifestava solo TORNANDO in wireframe,
@@ -2025,7 +2028,6 @@ void MainWindow::updateRenderState()
             ui->glWidget->pinInheritedAlphas();
         if (ui->glWidget) ui->glWidget->setMeshAppearanceBypass(true);
         resetTransparency();
-        ui->lightSlider->setValue(100);   // valueChanged aggiorna intensità e label
         if (ui->glWidget) ui->glWidget->setMeshAppearanceBypass(oldBypass);
     }
     // Il FOV vive ORA dentro panelTransp (scelta di layout), ma NON deve

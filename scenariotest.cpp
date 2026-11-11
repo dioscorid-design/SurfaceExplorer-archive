@@ -8694,6 +8694,27 @@ void ScenarioTest::runMeshCountScenarios()
         }
     }
 
+    // LUCE ATTRAVERSO IL WIREFRAME. In wireframe lo slider Light e' spento (il
+    // ramo wireframe dello shader non usa la luce), ma il valore resta: tornando
+    // su Basic/Phong deve essere quello scelto prima (segnalato: tornava a 100%,
+    // il default, perche' updateRenderState lo azzerava insieme all'alpha).
+    if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Equations/R3/Torus.json"))) {
+        if (m_mw->editingBackground()) click(ui->radioSurface);
+        for (QAbstractButton *solid : { static_cast<QAbstractButton *>(ui->radioBasic),
+                                        static_cast<QAbstractButton *>(ui->radioPhong) }) {
+            click(solid);  wait(200);
+            ui->lightSlider->setValue(60);  wait(200);
+            click(ui->radioWF);  wait(300);
+            const int inWire = ui->lightSlider->value();
+            click(solid);  wait(300);
+            const float engine = gl->globalLightIntensity();
+            check(inWire == 60 && ui->lightSlider->value() == 60 && qAbs(engine - 0.6f) < 1e-4f,
+                  QStringLiteral("Light 60% in %1, poi Wireframe (slider %2) e di nuovo %1 -> slider %3, motore %4")
+                      .arg(solid->text()).arg(inWire).arg(ui->lightSlider->value()).arg(engine));
+        }
+        ui->lightSlider->setValue(100);  wait(200);
+    }
+
     // RAY MARCHING: niente copie.
     ui->tabModeSelector->setCurrentIndex(1);  wait(1500);
     check(!ui->lineMeshCount->isEnabled(), QStringLiteral("Ray Marching -> campo Meshes spento"));
