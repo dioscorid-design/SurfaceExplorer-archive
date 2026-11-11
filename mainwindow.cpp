@@ -1592,6 +1592,26 @@ void MainWindow::setupStatusBar()
                                { m_renderProgress, m_statusLabel });
 }
 
+// La vista a dock chiusi e' la vista di adesso piu' lo spazio che le tolgono i
+// dock AGGANCIATI: il rettangolo che coprono insieme al widget centrale, meno il
+// widget centrale (i suoi margini attorno alla vista restano). I dock flottanti
+// non tolgono niente. Si misura in coda a viewResized: durante il layout della
+// finestra la vista puo' avere gia' la misura nuova e i dock ancora la vecchia.
+// I dock come figli diretti della finestra: tutti, senza elenco da tenere
+// aggiornato (e lo stesso codice nella 2.0, che ha anche Objects).
+void MainWindow::updateFullViewAspect()
+{
+    if (!ui->glWidget || !centralWidget()) return;
+    const QRect central = centralWidget()->geometry();
+    QRect all = central;
+    for (QDockWidget *dock : findChildren<QDockWidget*>(QString(), Qt::FindDirectChildrenOnly))
+        if (dock->isVisible() && !dock->isFloating())
+            all |= dock->geometry();
+    const int w = ui->glWidget->width() + all.width() - central.width();
+    const int h = ui->glWidget->height() + all.height() - central.height();
+    if (w > 0 && h > 0) ui->glWidget->setFullViewAspect(float(w) / float(h));
+}
+
 // Ultimi allineamenti dell'avvio. Parte del costruttore, nell'ordine in cui la chiama.
 void MainWindow::finishStartup()
 {

@@ -6313,6 +6313,88 @@ void ScenarioTest::runShapeBackgroundScenarios()
         modeTab(0);
         pressNew();
     }
+
+    // TEXTURE PROCEDURALI A SCHERMO INTERO E DOCK: lo sfondo fisso e la vista
+    // 2D della texture di superficie. Il dominio dello script e' alto 1 e largo
+    // quanto le proporzioni della vista A DOCK CHIUSI (setFullViewAspect): a
+    // dock chiusi una scacchiera ha le caselle quadrate, con un dock aperto si
+    // stringono in larghezza come un'immagine. Prima era il contrario: quadrate
+    // solo con la vista quasi quadrata (dock aperto), allungate a dock chiusi
+    // (segnalato dall'utente, 11-11, in vista 2D con il dock Script aperto).
+    // Da guardare: docks-bg-*.png, docks-flat-*.png.
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Texture procedurali a schermo intero: le proporzioni della vista a dock chiusi =="));
+    if (loadSurface(kTorus)) {
+        Ui::MainWindow *ui = m_mw->ui;
+        if (m_mw->editingBackground()) ui->radioSurface->click();
+        // Larghezza e altezza medie delle caselle lungo il bordo alto e quello
+        // sinistro (sullo sfondo il toro sta al centro): la distanza fra il primo
+        // e l'ultimo cambio di colore divisa per le caselle intere che ci stanno.
+        // Il canale verde separa le due scacchiere (bianco/nero, verde/nero).
+        const auto cells = [](const QImage &img) {
+            const auto mean = [&img](bool horizontal) {
+                const int n = horizontal ? img.width() : img.height();
+                QList<int> edges;
+                bool prev = false;
+                for (int i = 0; i < n; ++i) {
+                    const QColor c = horizontal ? img.pixelColor(i, 3) : img.pixelColor(3, i);
+                    const bool light = c.green() > 100;
+                    if (i > 0 && light != prev) edges << i;
+                    prev = light;
+                }
+                return edges.size() < 2 ? 0.0 : double(edges.last() - edges.first()) / (edges.size() - 1);
+            };
+            return QPointF(mean(true), mean(false));
+        };
+        const auto docks = m_mw->findChildren<QDockWidget*>(QString(), Qt::FindDirectChildrenOnly);
+        // Caselle a dock chiusi e poi con `dock` aperto.
+        const auto docksCase = [&](const QString &what, const QString &file, QDockWidget *dock) {
+            const auto shot = [&](const QString &name) {
+                wait(600);
+                const QImage img = gl->grabFramebuffer();
+                img.save(m_outDir + QStringLiteral("/docks-%1-%2.png").arg(file, name));
+                return cells(img);
+            };
+            for (QDockWidget *d : docks) d->hide();
+            const QPointF closed = shot(QStringLiteral("closed"));
+            const float closedRef = gl->fullViewAspect();
+            const float closedView = float(gl->width()) / float(gl->height());
+            dock->show();
+            const QPointF open = shot(QStringLiteral("open"));
+            const float openRef = gl->fullViewAspect();
+            const float openView = float(gl->width()) / float(gl->height());
+            for (QDockWidget *d : docks) d->hide();
+            wait(300);
+            const double closedRatio = closed.y() > 0.0 ? closed.x() / closed.y() : 0.0;
+            const double openRatio = open.y() > 0.0 ? open.x() / open.y() : 0.0;
+            check(std::abs(closedRatio - 1.0) < 0.05 && std::abs(closedRef - closedView) < 0.01,
+                  QStringLiteral("%1, dock chiusi: caselle %2 x %3 px (rapporto %4, atteso 1), proporzioni di riferimento %5 = vista %6")
+                      .arg(what).arg(closed.x(), 0, 'f', 1).arg(closed.y(), 0, 'f', 1).arg(closedRatio, 0, 'f', 3)
+                      .arg(closedRef, 0, 'f', 3).arg(closedView, 0, 'f', 3));
+            const double expected = openView / closedRef;
+            check(openView < closedView - 0.05 && std::abs(openRef - closedRef) < 0.01
+                      && std::abs(openRatio - expected) < 0.05,
+                  QStringLiteral("%1, %2 aperto: caselle %3 x %4 px (rapporto %5, atteso %6 come un'immagine), riferimento %7 (prima %8)")
+                      .arg(what, dock->objectName()).arg(open.x(), 0, 'f', 1).arg(open.y(), 0, 'f', 1)
+                      .arg(openRatio, 0, 'f', 3).arg(expected, 0, 'f', 3).arg(openRef, 0, 'f', 3).arg(closedRef, 0, 'f', 3));
+        };
+
+        gl->setBackgroundSkyMode(GLWidget::BgFixed);
+        gl->setBackgroundFraming(1.0f, QVector2D(), 0.0f);
+        gl->loadBackgroundScript(QStringLiteral("return vec3(mod(floor(u * 8.0) + floor(v * 8.0), 2.0));"));
+        gl->setBackgroundTextureEnabled(true);
+        docksCase(QStringLiteral("sfondo fisso"), QStringLiteral("bg"), ui->dockRenders);
+        gl->setBackgroundTextureEnabled(false);
+
+        // Il caso segnalato: la scacchiera della libreria sulla superficie,
+        // vista 2D, dock Script.
+        selectTexture(QStringLiteral("textures/Procedurals/Animated Checkerboard.json"));
+        wait(600);
+        ui->btnFlatPreview->setChecked(true);
+        docksCase(QStringLiteral("vista 2D della superficie"), QStringLiteral("flat"), ui->dockScripts);
+        ui->btnFlatPreview->setChecked(false);
+        wait(300);
+    }
 }
 
 void ScenarioTest::runBorderAuditScenarios()

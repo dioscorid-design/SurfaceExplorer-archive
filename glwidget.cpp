@@ -2032,6 +2032,12 @@ void GLWidget::render(QRhiCommandBuffer *cb)
         m_model.setToIdentity();
         mvp = rhi()->clipSpaceCorrMatrix();
         mv.setToIdentity();
+        // VISTA 2D: il quad a schermo intero non usa u_mvMatrix, che porta
+        // invece in [0][0] la LARGHEZZA del dominio di una texture procedurale
+        // (alta 1): le proporzioni della vista intera. La legge la funzione
+        // texture degli script (buildTextureFunction); un'immagine si stira
+        // sulla vista e la ignora. Vedi setFullViewAspect.
+        mv(0, 0) = fullViewTextureWidth();
     } else {
         m_projection.setToIdentity();
         // Piani near/far scalati con la distanza della camera. Un far fisso a
@@ -2687,6 +2693,16 @@ void GLWidget::render(QRhiCommandBuffer *cb)
                                / float(m_backgroundTexture->pixelSize().height())
                              : 1.0f;
             }
+            // MODALITA' FISSA (e vista piatta 2D, che mostra lo sfondo fisso):
+            // il 3x3 della direzione non serve, e (0,0) -- in GLSL
+            // u_mvpMatrix[0][0] -- porta la LARGHEZZA del dominio della texture
+            // sulla vista, alto 1 (bgBaseUV). Un'immagine si stira sulla vista:
+            // 1. Uno script ha le proporzioni della vista intera (a dock chiusi,
+            // setFullViewAspect), quindi coi dock aperti si stringe come
+            // l'immagine. Lo script che disegna con la sua void main() legge
+            // v_texCoord da se' e resta com'era.
+            if (m_bgSkyMode == BgFixed || m_isFlatView)
+                skyRay(0, 0) = m_bgIsScript ? fullViewTextureWidth() : 1.0f;
             memcpy(bgUboData.mvpMatrix, skyRay.constData(), 64);
 
             resourceUpdates->updateDynamicBuffer(m_bgUbo, 0, sizeof(UboData), &bgUboData);
@@ -5705,6 +5721,17 @@ void GLWidget::setBackgroundColor(const QColor &c) {
 }
 
 
+void GLWidget::resizeEvent(QResizeEvent *e) {
+    QRhiWidget::resizeEvent(e);
+    emit viewResized();
+}
+
+float GLWidget::fullViewTextureWidth() const {
+    if (m_fullViewAspect > 0.0f) return m_fullViewAspect;
+    const QSize s = renderTarget() ? renderTarget()->pixelSize() : size();
+    return s.height() > 0 ? float(s.width()) / float(s.height()) : 1.0f;
+}
+
 void GLWidget::setBackgroundTexture(const QString &path) {
     setBackgroundImage(path);
     m_bgIsScript = false;
@@ -7586,6 +7613,10 @@ QString GLWidget::createBackgroundFragmentShader(bool isTextureMode, const QStri
     // La matrice e' in u_mvpMatrix di questa copia dell'UBO (vedi render()): il
     // 3x3 porta il pixel (ndc.x, ndc.y, 1) alla direzione nel mondo, [3][3] e' la
     // modalita' (GLWidget::BgSkyMode) e [3][1] le proporzioni dell'immagine.
+    //   FISSO    -- la posizione sullo schermo; [0][0] e' la larghezza del
+    //               dominio sulla vista (1 per l'immagine, che si stira; per uno
+    //               script le proporzioni della vista intera, vedi
+    //               setFullViewAspect), centrata: l'altezza resta 0..1.
     // La forma decide solo come le DIREZIONI diventano coordinate d'immagine:
     //   SFERA    -- equirettangolare: longitudine su u, latitudine su v. Il
     //               formato dei panorami 360 (2:1); stirata ai poli.
@@ -7610,7 +7641,7 @@ QString GLWidget::createBackgroundFragmentShader(bool isTextureMode, const QStri
     const QString bgBaseUVFunc =
         "vec2 bgBaseUV() {\n"
         "    float _mode = ubuf.u_mvpMatrix[3][3];\n"
-        "    if (_mode < 0.5) return v_texCoord;\n"
+        "    if (_mode < 0.5) return vec2((v_texCoord.x - 0.5) * ubuf.u_mvpMatrix[0][0] + 0.5, v_texCoord.y);\n"
         "    vec2 _ndc = v_texCoord * 2.0 - 1.0;\n"
         "    vec3 _d = normalize(mat3(ubuf.u_mvpMatrix) * vec3(_ndc, 1.0));\n"
         "    if (_mode > 2.5) {\n"
@@ -8028,6 +8059,17 @@ QString GLWidget::buildTextureFunction(const QString &customLogic, const QString
     if (!safeLogic.contains(QRegularExpression("\\bvec3\\s+u_col1\\b"))) helpers += "    vec3 u_col1 = ubuf.u_col1;\n";
     if (!safeLogic.contains(QRegularExpression("\\bvec3\\s+u_col2\\b"))) helpers += "    vec3 u_col2 = ubuf.u_col2;\n";
 
+    // VISTA 2D DI UNO SCRIPT: il dominio a schermo e' alto 1 e largo quanto
+    // le proporzioni della vista intera (u_mvMatrix[0][0], scritta solo in
+    // vista 2D: vedi render() e setFullViewAspect), centrato. Prima di
+    // zoom/pan/rotazione, che cosi' agiscono su coordinate a misura e la
+    // rotazione non deforma. Sulla superficie (u_isFlat 0) niente cambia.
+    // L'immagine (codice vuoto, ramo qui sotto) no: si stira sulla vista.
+    const QString scriptFlatDomain =
+        "    if (ubuf.u_isFlat != 0) in_uv.x = (in_uv.x - 0.5) * ubuf.u_mvMatrix[0][0] + 0.5;\n";
+    const QString imageHelpers = helpers;
+    helpers.prepend(scriptFlatDomain);
+
     QString codeToInject;
 
     // NB: la dichiarazione del sampler NON sta qui. E' una uniform di modulo e
@@ -8040,7 +8082,7 @@ QString GLWidget::buildTextureFunction(const QString &customLogic, const QString
         // cade sulla scacchiera procedurale mix(u_col1,u_col2), coerente col
         // ramo Shadertoy e con gli slider Color 1/2 che la governano.
         codeToInject = "vec3 " + funcName + "(vec2 in_uv) {\n" +
-                       helpers +
+                       imageHelpers +
                        "\n    return _st_sampleTex(uv).rgb;\n}";
     }
     else if (safeLogic.contains("mainImage")) {
@@ -8260,6 +8302,7 @@ QString GLWidget::buildTextureFunction(const QString &customLogic, const QString
         // shader non compilerebbe, facendo sparire la superficie. E' la trappola
         // gia' nota del leak delle #define.
         const QString uvTransform =
+            scriptFlatDomain +
             "    float _rad = radians(ubuf.u_rotation);\n"
             "    float _c = cos(_rad); float _s = sin(_rad);\n"
             "    vec2 _centered = in_uv - 0.5;\n"

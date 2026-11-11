@@ -865,6 +865,22 @@ public:
         m_bgTexCol2 = QVector3D(c2.redF(), c2.greenF(), c2.blueF());
         m_bgTexColorsSet = true;
     }
+    // PROPORZIONI DELLA VISTA INTERA, larghezza/altezza della vista A DOCK
+    // CHIUSI: le scrive MainWindow (updateFullViewAspect) a ogni cambio di
+    // misura della vista. Servono alle texture PROCEDURALI mostrate a schermo
+    // intero -- lo sfondo in modalita' fissa (bgBaseUV) e la vista 2D di
+    // superficie e bordo (buildTextureFunction): il loro dominio e' alto 1 e
+    // largo quanto queste proporzioni, come un'immagine fatta per la vista
+    // intera. Giusta a dock chiusi, stretta con un dock aperto: lo stesso
+    // comportamento delle immagini, che si stirano sulla vista. Prima il
+    // dominio era il quadrato [0,1]^2 stirato sulla vista: giusto solo con la
+    // vista quasi quadrata (un dock aperto), allungato a dock chiusi
+    // (segnalato dall'utente, 11-11).
+    void setFullViewAspect(float aspect) { if (m_fullViewAspect == aspect) return; m_fullViewAspect = aspect; update(); }
+    float fullViewAspect() const { return m_fullViewAspect; }
+    // La larghezza di quel dominio: le proporzioni della vista intera, o quelle
+    // della vista corrente finche' MainWindow non le ha scritte.
+    float fullViewTextureWidth() const;
     void setFlatPan(float x, float y);
 
     // TRASFORMAZIONE 2D GLOBALE della texture di superficie, per la PERSISTENZA.
@@ -1252,11 +1268,16 @@ signals:
     // AUTOMATICO (advanceRotationsBy) e quindi non distingue chi ha mosso cosa.
     // MainWindow lo usa per marcare il lavoro non salvato.
     void userMovedView();
+    // Il widget ha cambiato misura (finestra ridimensionata, dock aperto o
+    // chiuso). MainWindow ricalcola le proporzioni della vista intera
+    // (setFullViewAspect); va collegato in coda, a layout dei dock finito.
+    void viewResized();
 
 protected:
     void initialize(QRhiCommandBuffer *cb) override;
     void render(QRhiCommandBuffer *cb) override;
     void releaseResources() override;
+    void resizeEvent(QResizeEvent *e) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
@@ -1757,6 +1778,7 @@ private:
     bool m_useBackgroundTexture = false;
     int m_bgSkyMode = BgFixed;      // vedi setBackgroundSkyMode
     bool m_bgIsScript = false;
+    float m_fullViewAspect = 0.0f;  // vedi setFullViewAspect
     QString m_bgImagePath;          // vedi backgroundImagePath
     QVector3D m_bgColor = QVector3D(0.3f, 0.3f, 0.3f);
     int m_lightingMode4D = 0;

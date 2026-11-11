@@ -1461,6 +1461,10 @@ private:
     void setupLibraryDock();
     void finishStartup();
     void setupDesktopFilters();
+    // Proporzioni che la vista avrebbe A DOCK CHIUSI (GLWidget::setFullViewAspect,
+    // per la texture procedurale di sfondo): ricalcolate a ogni cambio di misura
+    // della vista (GLWidget::viewResized).
+    void updateFullViewAspect();
     void connectSidePanels();
     void connectNavButton(QPushButton *btn, int action);
     // Abilita/disabilita in blocco i tasti di spostamento dei dock 3D/4D e blocca i

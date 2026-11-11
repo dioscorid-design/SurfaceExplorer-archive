@@ -797,6 +797,11 @@ void MainWindow::setupRendererDock()
     connect(ui->glWidget, &GLWidget::borderAvailabilityChanged, this,
             [this] { updateBorderControlsGate(); }, Qt::QueuedConnection);
 
+    // Proporzioni della vista a dock chiusi, per la texture procedurale di
+    // sfondo: in coda, a layout dei dock finito (vedi updateFullViewAspect).
+    connect(ui->glWidget, &GLWidget::viewResized, this,
+            [this] { updateFullViewAspect(); }, Qt::QueuedConnection);
+
     // SHADER CHE NON COMPILA: la superficie SPARISCE (buildPipeline azzera le
     // pipeline) e finora l'unica traccia era un qWarning sulla console, che
     // l'utente non vede -- restava solo lo schermo vuoto, senza spiegazione.
