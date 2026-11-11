@@ -129,12 +129,28 @@
             border-top: 1px solid var(--border);
             padding-top: 20px;
         }
+        /* TOP button at the bottom of the page: back to the bar at the top. */
+        html { scroll-behavior: smooth; }
+        .to-top {
+            display: block;
+            width: max-content;
+            margin: 48px auto 0;
+            padding: 8px 26px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--accent);
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-decoration: none;
+        }
+        .to-top:hover { border-color: var(--accent); }
     </style>
 </head>
 <body>
 <div class="wrap">
 
-    <nav>
+    <nav id="top">
         <a href="index.html">Home</a>
         <a href="gallery.html">Gallery</a>
         <a href="videos.html" class="here">Videos</a>
@@ -2340,6 +2356,8 @@
                licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/" target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>.</p>
         </div>
     </div>
+
+    <a class="to-top" href="#top">TOP</a>
 
     <footer>
         <p>Surface Explorer 4D &mdash; Developed by Gaetano Moschetti &mdash; GNU GPL v3</p>

@@ -87,12 +87,28 @@
             border-top: 1px solid var(--border);
             padding-top: 20px;
         }
+        /* TOP button at the bottom of the page: back to the bar at the top. */
+        html { scroll-behavior: smooth; }
+        .to-top {
+            display: block;
+            width: max-content;
+            margin: 48px auto 0;
+            padding: 8px 26px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--accent);
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-decoration: none;
+        }
+        .to-top:hover { border-color: var(--accent); }
     </style>
 </head>
 <body>
 <div class="wrap">
 
-    <nav>
+    <nav id="top">
         <a href="index.html">Home</a>
         <a href="gallery.html" class="here">Gallery</a>
         <a href="videos.html">Videos</a>
@@ -830,6 +846,8 @@
         </figure>
 
     </div>
+
+    <a class="to-top" href="#top">TOP</a>
 
 </div>
 </body>
