@@ -4,7 +4,9 @@ cmake_minimum_required(VERSION 3.16)
 # dialogo About stampa. Prima il numero era scritto a mano anche in
 # mainwindow.cpp e restava indietro a ogni bump (bump-version.sh non poteva
 # raggiungerlo e si limitava a stampare un promemoria).
-# Info.plist resta un file a parte, aggiornato da ExC/Mac/bump-version.sh.
+# Info.plist e Info-macos.plist non contengono numeri: CFBundleShortVersionString
+# e CFBundleVersion arrivano da qui (${MACOSX_BUNDLE_SHORT_VERSION_STRING},
+# ${MACOSX_BUNDLE_BUNDLE_VERSION}, sostituiti da CMake anche col generatore Xcode).
 project(SurfaceExplorer VERSION 1.5 LANGUAGES CXX)
 
 if(WIN32)
@@ -235,9 +237,9 @@ if (IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
         VERSION "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_BUNDLE_VERSION "64"
+        MACOSX_BUNDLE_BUNDLE_VERSION "65"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-        XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "64"
+        XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "65"
         XCODE_ATTRIBUTE_MARKETING_VERSION "${PROJECT_VERSION}"
     )
 
@@ -353,11 +355,11 @@ elseif (APPLE)
     set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${SE_MACOS_BUNDLE_ID}")
 
     set_target_properties(SurfaceExplorer PROPERTIES
-        # Build number e versione marketing: stessi campi che il bump di
-        # release_testflight_mac.sh tiene allineati con Info.plist.
-        MACOSX_BUNDLE_BUNDLE_VERSION "64"
+        # Build number e versione marketing: il build number lo incrementa
+        # release_testflight_mac.sh; Info-macos.plist li legge da qui.
+        MACOSX_BUNDLE_BUNDLE_VERSION "65"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-        XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "64"
+        XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "65"
         XCODE_ATTRIBUTE_MARKETING_VERSION "${PROJECT_VERSION}"
 
         # Sandbox: obbligatoria sull'App Store. Xcode firma con questi
