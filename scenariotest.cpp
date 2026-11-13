@@ -5918,6 +5918,166 @@ void ScenarioTest::runImageCaptureScenarios()
             check(false, QStringLiteral("immagine piu' grande della vista: rendering fallito %1").arg(e));
         }
     }
+    // IL RIQUADRO TRASCINATO (FrameGuide, GLWidget::setCaptureShift): l'immagine
+    // e' la parte della vista sotto il riquadro. Prima la logica pura; poi, su
+    // ogni scena, lo stesso pezzo di un'immagine col rapporto della vista: larga
+    // la meta' col riquadro tutto a destra (a sinistra) e' la sua meta' destra
+    // (sinistra); larga il doppio, in basso (in alto), la meta' di sotto (sopra).
+    // Mesh, ray marching (anche in stereografica), i cieli a sfera e a cubo:
+    // ognuno ricava i raggi a modo suo (u_mvpMatrix, la sua inversa, la matrice
+    // dei raggi del cielo).
+    m_lines.append(QString());
+    m_lines.append(QStringLiteral("== Riquadro trascinato: l'immagine e' la parte della vista sotto di lui =="));
+    {
+        const QSize view(1200, 800);
+        const QRect right = ImageCapture::guideRect(view, 1.0, QPointF(1.0, 0.0));
+        const QRect left = ImageCapture::guideRect(view, 1.0, QPointF(-1.0, 0.7));    // y non conta
+        const QRect bottom = ImageCapture::guideRect(view, 3.0, QPointF(0.4, 1.0));   // x non conta
+        const QPointF toRight = ImageCapture::captureShiftFor(1.0, 1.5, QPointF(1.0, 0.0));
+        const QPointF toBottom = ImageCapture::captureShiftFor(3.0, 1.5, QPointF(0.0, 1.0));
+        check(right == QRect(400, 0, 800, 800) && left == QRect(0, 0, 800, 800) && bottom == QRect(0, 400, 1200, 400)
+                  && ImageCapture::guideRect(view, 1.0, QPointF()) == ImageCapture::guideRect(view, 1.0)
+                  && qFuzzyCompare(toRight.x(), -0.5) && toRight.y() == 0.0
+                  && toBottom.x() == 0.0 && qFuzzyCompare(toBottom.y(), 1.0)
+                  && ImageCapture::captureShiftFor(1.0, 1.5, QPointF()).isNull(),
+              QStringLiteral("guideRect e captureShiftFor: il riquadro si sposta solo lungo il lato libero, fino ai "
+                             "bordi; spostamento in NDC -0.5 a destra (1:1 in 3:2), +1 in basso (3:1 in 3:2), zero al centro"));
+    }
+    const auto sameAsPart = [&](const QString &what, const QString &tag, bool wider = true) {
+        gl->stopAllTimers();
+        wait(500);
+        const double vr = double(gl->width()) / double(std::max(1, gl->height()));
+        const int h = 600;
+        int w = int(std::lround(h * vr));
+        w -= w % 2;
+        QString e;
+        const QImage full = ImageCapture::render(gl, QSize(w, h), vr, &e);
+        if (full.isNull()) {
+            check(false, QStringLiteral("%1: rendering col rapporto della vista fallito %2").arg(what, e));
+            return;
+        }
+        full.save(m_outDir + QStringLiteral("/image-frame-%1-full.png").arg(tag));
+        // Percentuale di pixel diversi di piu' di 48 livelli in un canale.
+        const auto differ = [](const QImage &part, const QImage &whole, const QPoint &at) {
+            qint64 n = 0;
+            for (int y = 0; y < part.height(); ++y)
+                for (int x = 0; x < part.width(); ++x) {
+                    const QRgb a = part.pixel(x, y), b = whole.pixel(x + at.x(), y + at.y());
+                    if (std::max({ std::abs(qRed(a) - qRed(b)), std::abs(qGreen(a) - qGreen(b)),
+                                   std::abs(qBlue(a) - qBlue(b)) }) > 48) ++n;
+                }
+            return 100.0 * double(n) / std::max(1.0, double(part.width()) * part.height());
+        };
+        struct Part { QString name; QSize size; double ratio; QPointF position; QPoint at; };
+        const QList<Part> parts = {
+            { QStringLiteral("destra"), QSize(w / 2, h), vr / 2.0, QPointF(1.0, 0.0), QPoint(w - w / 2, 0) },
+            { QStringLiteral("sinistra"), QSize(w / 2, h), vr / 2.0, QPointF(-1.0, 0.0), QPoint(0, 0) },
+            { QStringLiteral("sotto"), QSize(w, h / 2), vr * 2.0, QPointF(0.0, 1.0), QPoint(0, h - h / 2) },
+            { QStringLiteral("sopra"), QSize(w, h / 2), vr * 2.0, QPointF(0.0, -1.0), QPoint(0, 0) },
+        };
+        QStringList report, bad;
+        for (const Part &p : parts) {
+            if (!wider && p.ratio > vr) continue;
+            const QImage img = ImageCapture::render(gl, p.size, p.ratio, &e, 1.0, p.position);
+            img.save(m_outDir + QStringLiteral("/image-frame-%1-%2.png").arg(tag, p.name));
+            const double pct = img.isNull() ? 100.0 : differ(img, full, p.at);
+            report << QStringLiteral("%1 %2%").arg(p.name).arg(pct, 0, 'f', 2);
+            if (pct > 1.0) bad << p.name;
+        }
+        // Lo spostamento non resta addosso alla vista.
+        const bool reset = gl->m_captureShift.isNull();
+        check(bad.isEmpty() && reset,
+              QStringLiteral("%1: col riquadro ai bordi l'immagine e' il pezzo della vista sotto di lui (pixel diversi: %2)%3")
+                  .arg(what, report.join(QStringLiteral(", ")), reset ? QString() : QStringLiteral("; spostamento rimasto")));
+    };
+    sameAsPart(QStringLiteral("Gyroid (ray marching)"), QStringLiteral("gyroid"));
+    if (loadRecord(QStringLiteral("records/Rotations/Implicit/Cross Sections/S2xS1/Splitting Torus.json"))) {
+        sameAsPart(QStringLiteral("Splitting Torus (ray marching, cielo a cubo)"), QStringLiteral("splitting"));
+        // In stereografica il ray marching ha un campo visivo suo, fisso (45
+        // gradi, raymarch_template.txt): non segue la riduzione del campo
+        // verticale delle immagini piu' larghe della vista, gia' a riquadro
+        // centrato. Qui si guardano le sole immagini piu' strette.
+        gl->setProjectionMode(2);
+        sameAsPart(QStringLiteral("Splitting Torus in stereografica (immagini piu' strette della vista)"),
+                   QStringLiteral("splitting-stereo"), false);
+        gl->setProjectionMode(1);
+    }
+    if (loadRecord(QStringLiteral("records/Rotations/Parametric/Surfaces/Multi Meshes/Torus Necklace Spin.json")))
+        sameAsPart(QStringLiteral("Torus Necklace Spin (mesh, cielo a sfera)"), QStringLiteral("necklace"));
+    // IL FLUSSO, col riquadro trascinato dal mouse: il dialogo non e' modale,
+    // il riquadro riceve il trascinamento, il resto della finestra principale
+    // no (un clic sul GO va perso). L'immagine salvata e' quella del riquadro.
+    {
+        const QString out = m_outDir + QStringLiteral("/image-capture-dragged.png");
+        QFile::remove(out);
+        // Le chiavi che il dialogo ricorda (come nei flussi qui sopra).
+        const auto clearImageSettings = [] {
+            QSettings st;
+            for (const char *k : { "imagePrintLength", "imagePrintUnit", "imageDpi", "imageSizeMode", "imageLongSide",
+                                   "imageRatioIndex", "imageExactW", "imageExactH" })
+                st.remove(QString::fromLatin1(k));
+        };
+        clearImageSettings();
+        ImageCapture::setTestSavePath(out);
+        QPointF dragged;
+        bool goIgnored = false, dialogNonModal = false;
+        ImageCapture::setTestDialogHandler([&](QDialog *d) {
+            dialogNonModal = !d->isModal() && d->windowModality() == Qt::NonModal;
+            // 1:1, piu' stretto della vista: il riquadro si sposta in orizzontale.
+            for (QComboBox *c : d->findChildren<QComboBox *>())
+                if (c->findText(QStringLiteral("1:1")) >= 0) { c->setCurrentIndex(c->findText(QStringLiteral("1:1"))); break; }
+            QCoreApplication::processEvents();
+            QWidget *guide = gl->findChild<QWidget *>(QStringLiteral("imageFrameGuide"));
+            if (guide) {
+                const QPointF from(guide->width() / 2.0, guide->height() / 2.0);
+                const QPointF to = from + QPointF(guide->width() / 8.0, 0.0);
+                QMouseEvent press(QEvent::MouseButtonPress, from, guide->mapToGlobal(from), Qt::LeftButton,
+                                  Qt::LeftButton, Qt::NoModifier);
+                QMouseEvent move(QEvent::MouseMove, to, guide->mapToGlobal(to), Qt::NoButton, Qt::LeftButton,
+                                 Qt::NoModifier);
+                QMouseEvent release(QEvent::MouseButtonRelease, to, guide->mapToGlobal(to), Qt::LeftButton,
+                                    Qt::NoButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(guide, &press);
+                QCoreApplication::sendEvent(guide, &move);
+                QCoreApplication::sendEvent(guide, &release);
+                dragged = guide->property("framePosition").toPointF();
+                guide->grab().save(m_outDir + QStringLiteral("/image-capture-dragged-guide.png"));
+            }
+            // Un clic sul GO della finestra principale: col dialogo aperto non arriva.
+            QPushButton *go = m_mw->ui->btnStart_2;
+            const QString before = go ? go->text() : QString();
+            const bool animating = gl->isAnimating();
+            if (go) {
+                const QPointF c(go->width() / 2.0, go->height() / 2.0);
+                QMouseEvent p(QEvent::MouseButtonPress, c, go->mapToGlobal(c), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+                QMouseEvent r(QEvent::MouseButtonRelease, c, go->mapToGlobal(c), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+                QCoreApplication::sendEvent(go, &p);
+                QCoreApplication::sendEvent(go, &r);
+                QCoreApplication::processEvents();
+                goIgnored = go->text() == before && gl->isAnimating() == animating;
+            }
+            d->accept();
+        });
+        const bool done = ImageCapture::run(gl, m_mw, m_outDir);
+        ImageCapture::setTestSavePath(QString());
+        ImageCapture::setTestDialogHandler(nullptr);
+        const QImage saved(out);
+        QString e;
+        const QImage expected = saved.isNull() ? QImage() : ImageCapture::render(gl, saved.size(), 1.0, &e, 1.0, dragged);
+        const QImage centred = saved.isNull() ? QImage() : ImageCapture::render(gl, saved.size(), 1.0, &e);
+        const auto same = [](const QImage &a, const QImage &b) {
+            return !a.isNull() && a.size() == b.size()
+                   && a.convertToFormat(QImage::Format_RGB32) == b.convertToFormat(QImage::Format_RGB32);
+        };
+        check(done && dialogNonModal && dragged.x() > 0.1 && dragged.y() == 0.0 && goIgnored
+                  && same(saved, expected) && !same(saved, centred),
+              QStringLiteral("flusso col riquadro trascinato: dialogo non modale %1, riquadro a %2 (trascinato a destra), "
+                             "clic sul GO ignorato %3, PNG uguale all'immagine del riquadro %4 e diverso da quella centrata %5")
+                  .arg(dialogNonModal).arg(dragged.x(), 0, 'f', 2).arg(goIgnored)
+                  .arg(same(saved, expected)).arg(!same(saved, centred)));
+        clearImageSettings();
+        pressNew();
+    }
     gl->setClocksDrivenByRecorder(false);
 }
 

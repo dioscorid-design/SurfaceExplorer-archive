@@ -1,6 +1,8 @@
 #include "imagecapture.h"
 #include "glwidget.h"
 
+#include <QAction>
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDateTime>
@@ -18,14 +20,20 @@
 #include <QGuiApplication>
 #include <QImageWriter>
 #include <QLabel>
+#include <QMenu>
+#include <QMenuBar>
+#include <QMouseEvent>
 #include <QMessageBox>
 #include <QPainter>
+#include <QPointer>
 #include <QProgressDialog>
 #include <limits>
 #include <QScreen>
 #include <QSettings>
 #include <QSpinBox>
 #include <QTimer>
+#include <QTouchEvent>
+#include <QVector2D>
 #include <QVBoxLayout>
 #include <QtConcurrent>
 #include <algorithm>
@@ -52,14 +60,33 @@ float ImageCapture::verticalScaleFor(double ratio, double viewRatio)
     return float(viewRatio / ratio);
 }
 
-QRect ImageCapture::guideRect(const QSize &view, double ratio)
+QRect ImageCapture::guideRect(const QSize &view, double ratio, const QPointF &position)
 {
     if (view.isEmpty() || ratio <= 0.0) return QRect();
     const double viewRatio = double(view.width()) / double(view.height());
     int w, h;
     if (ratio <= viewRatio) { h = view.height(); w = int(std::lround(h * ratio)); }
     else                    { w = view.width();  h = int(std::lround(w / ratio)); }
-    return QRect((view.width() - w) / 2, (view.height() - h) / 2, w, h);
+    // Dal centro di sempre, spostato di una frazione dello spazio libero (zero
+    // lungo il lato che il riquadro occupa tutto).
+    const auto placed = [](int room, double p) {
+        const int centred = room / 2;
+        return qBound(0, centred + int(std::lround(qBound(-1.0, p, 1.0) * room / 2.0)), std::max(0, room));
+    };
+    return QRect(placed(view.width() - w, position.x()), placed(view.height() - h, position.y()), w, h);
+}
+
+QPointF ImageCapture::captureShiftFor(double ratio, double viewRatio, const QPointF &position)
+{
+    if (ratio <= 0.0 || viewRatio <= 0.0) return QPointF();
+    // Piu' stretta della vista: l'immagine e' alta come la vista e larga ratio /
+    // viewRatio di lei. Il riquadro spostato di p * (spazio libero) / 2 porta al
+    // centro dell'immagine il punto della vista che stava li': nelle NDC
+    // dell'immagine, -p * (viewRatio / ratio - 1).
+    if (ratio <= viewRatio) return QPointF(-qBound(-1.0, position.x(), 1.0) * (viewRatio / ratio - 1.0), 0.0);
+    // Piu' larga: larga come la vista, alta viewRatio / ratio di lei (col campo
+    // verticale ridotto). In basso nella vista = y negativa nelle NDC.
+    return QPointF(0.0, qBound(-1.0, position.y(), 1.0) * (ratio / viewRatio - 1.0));
 }
 
 bool ImageCapture::isSingleColor(const QImage &im)
@@ -115,10 +142,12 @@ static double wireScaleFor(GLWidget *gl, const QSize &size, double ratio)
                                 : size.width() / std::max(1.0, gl->width() * dpr);
 }
 
-QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QString *error, double wireFactor)
+QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QString *error, double wireFactor,
+                            const QPointF &position)
 {
     const double viewRatio = double(gl->width()) / double(std::max(1, gl->height()));
     const float verticalScale = verticalScaleFor(ratio, viewRatio);
+    const QVector2D shift(captureShiftFor(ratio, viewRatio, position));
     // Le linee del wireframe sono larghe un pixel qualunque sia la dimensione:
     // si ispessiscono in proporzione a quanto l'immagine e' piu' grande della vista
     // (nel verso che resta fisso: l'altezza se si taglia ai lati, la larghezza se
@@ -151,13 +180,15 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
     bool singleColor = false;
     for (;;) {
         gl->setCaptureVerticalScale(verticalScale);
+        gl->setCaptureShift(shift);
         gl->setCaptureLineWidth(lineWidth);
         gl->beginHiResCapture(size.width(), size.height());
         img = gl->getFrameForVideo(size.width(), size.height(), true);
-        // Campo visivo e spessore tornano normali PRIMA di chiudere la cattura:
-        // endHiResCapture ridisegna subito la vista, e con i valori della cattura
-        // restava a schermo un wireframe fitto fino al primo click.
+        // Campo visivo, spostamento e spessore tornano normali PRIMA di chiudere
+        // la cattura: endHiResCapture ridisegna subito la vista, e con i valori
+        // della cattura restava a schermo un wireframe fitto fino al primo click.
         gl->setCaptureVerticalScale(1.0f);
+        gl->setCaptureShift(QVector2D());
         gl->setCaptureLineWidth(1);
         gl->endHiResCapture();
         if (s_testBlankFrames > 0) {
@@ -174,9 +205,11 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
     if (singleColor) {
         const QSize probe = sizeFor(ratio, 320);
         gl->setCaptureVerticalScale(verticalScale);
+        gl->setCaptureShift(shift);
         gl->beginHiResCapture(probe.width(), probe.height());
         const QImage small = gl->getFrameForVideo(probe.width(), probe.height(), true);
         gl->setCaptureVerticalScale(1.0f);
+        gl->setCaptureShift(QVector2D());
         gl->endHiResCapture();
         if (!small.isNull() && !isSingleColor(small)) img = QImage();
     }
@@ -221,12 +254,23 @@ class FrameGuide : public QWidget
 public:
     explicit FrameGuide(QWidget *view) : QWidget(view), m_view(view)
     {
-        setAttribute(Qt::WA_TransparentForMouseEvents);
+        // Riceve mouse e dita: il riquadro si trascina (la vista sotto, che li
+        // userebbe per girare la scena, non li vede).
+        setObjectName(QStringLiteral("imageFrameGuide"));
         setAttribute(Qt::WA_NoSystemBackground);
+        setAttribute(Qt::WA_AcceptTouchEvents);
         view->installEventFilter(this);
         setGeometry(view->rect());
+        publish();
     }
-    void setRatio(double ratio) { m_ratio = ratio; update(); }
+    void setRatio(double ratio)
+    {
+        m_ratio = ratio;
+        updateCursor();
+        update();
+    }
+    // Dove sta il riquadro lungo il lato libero (ImageCapture::guideRect).
+    QPointF position() const { return m_position; }
 
 protected:
     bool eventFilter(QObject *obj, QEvent *ev) override
@@ -234,10 +278,55 @@ protected:
         if (obj == m_view && ev->type() == QEvent::Resize) setGeometry(m_view->rect());
         return QWidget::eventFilter(obj, ev);
     }
+    bool event(QEvent *ev) override
+    {
+        // IL DITO (telefono e tablet): lo stesso trascinamento del mouse, col
+        // primo punto. Accettato qui, il tocco non arriva alla vista.
+        switch (ev->type()) {
+        case QEvent::TouchBegin:
+        case QEvent::TouchUpdate:
+        case QEvent::TouchEnd:
+        case QEvent::TouchCancel: {
+            auto *te = static_cast<QTouchEvent *>(ev);
+            if (!te->points().isEmpty()) {
+                const QPointF at = te->points().first().position();
+                if (ev->type() == QEvent::TouchBegin) beginDrag(at);
+                else if (ev->type() == QEvent::TouchUpdate) dragTo(at);
+                else endDrag();
+            }
+            ev->accept();
+            return true;
+        }
+        default:
+            return QWidget::event(ev);
+        }
+    }
+    void mousePressEvent(QMouseEvent *e) override
+    {
+        if (e->button() == Qt::LeftButton) beginDrag(e->position());
+        e->accept();
+    }
+    void mouseMoveEvent(QMouseEvent *e) override
+    {
+        if (m_dragging) dragTo(e->position());
+        e->accept();
+    }
+    void mouseReleaseEvent(QMouseEvent *e) override
+    {
+        if (e->button() == Qt::LeftButton) endDrag();
+        e->accept();
+    }
+    // Doppio clic: di nuovo al centro.
+    void mouseDoubleClickEvent(QMouseEvent *e) override
+    {
+        m_position = QPointF();
+        changed();
+        e->accept();
+    }
     void paintEvent(QPaintEvent *) override
     {
         if (m_ratio <= 0.0) return;
-        const QRect r = ImageCapture::guideRect(size(), m_ratio);
+        const QRect r = ImageCapture::guideRect(size(), m_ratio, m_position);
         QPainter p(this);
         p.setPen(Qt::NoPen);
         p.setBrush(QColor(0, 0, 0, 120));
@@ -252,8 +341,62 @@ protected:
     }
 
 private:
+    // Lo spazio libero lungo i due lati (zero lungo quello che il riquadro occupa tutto).
+    QSize room() const
+    {
+        const QRect r = ImageCapture::guideRect(size(), m_ratio);
+        return r.isValid() ? QSize(width() - r.width(), height() - r.height()) : QSize();
+    }
+    bool movable() const
+    {
+        const QSize free = room();
+        return free.width() > 0 || free.height() > 0;
+    }
+    void updateCursor()
+    {
+        if (!movable()) unsetCursor();
+        else setCursor(m_dragging ? Qt::ClosedHandCursor : Qt::OpenHandCursor);
+    }
+    void beginDrag(const QPointF &at)
+    {
+        if (!movable()) return;
+        m_dragging = true;
+        m_pressAt = at;
+        m_pressPosition = m_position;
+        updateCursor();
+    }
+    // Il riquadro segue il puntatore: lo spostamento in pixel, in frazione di
+    // meta' dello spazio libero (la posizione va da -1 a +1).
+    void dragTo(const QPointF &at)
+    {
+        if (!m_dragging) return;
+        const QSize free = room();
+        QPointF p = m_pressPosition;
+        if (free.width() > 0) p.setX(qBound(-1.0, p.x() + 2.0 * (at.x() - m_pressAt.x()) / free.width(), 1.0));
+        if (free.height() > 0) p.setY(qBound(-1.0, p.y() + 2.0 * (at.y() - m_pressAt.y()) / free.height(), 1.0));
+        if (p == m_position) return;
+        m_position = p;
+        changed();
+    }
+    void endDrag()
+    {
+        m_dragging = false;
+        updateCursor();
+    }
+    void changed()
+    {
+        publish();
+        update();
+    }
+    // Per i test: la posizione si legge come proprieta' (la classe e' privata del file).
+    void publish() { setProperty("framePosition", m_position); }
+
     QWidget *m_view;
     double m_ratio = 0.0;
+    QPointF m_position;          // vedi ImageCapture::guideRect
+    bool m_dragging = false;
+    QPointF m_pressAt;
+    QPointF m_pressPosition;
 };
 
 // Telefono (e non tablet): su iPhone e Android in verticale la finestra offre solo
@@ -600,6 +743,8 @@ private:
         }
         if (qAbs(m_ratio - m_viewRatio) > 0.02 && m_ratio > m_viewRatio)
             text += tr("<br>Wider than the view: the vertical field of view is reduced so the frame shows what the guide shows.");
+        if (qAbs(m_ratio - m_viewRatio) > 0.02)
+            text += tr("<br>Drag the frame in the view to choose what goes in the image; double-click it to centre it again.");
         m_info->setText(text);
     }
 
@@ -618,6 +763,125 @@ private:
     QLabel *m_info;
     double m_ratio = 1.0;
     QSize m_size;
+};
+
+}   // namespace
+
+// ==========================================================
+// LA SESSIONE DEL DIALOGO
+// ==========================================================
+namespace {
+
+// LA SESSIONE DEL DIALOGO. Il dialogo non e' modale perche' il riquadro nella
+// vista si possa trascinare: un dialogo modale blocca tutta la finestra della
+// vista, riquadro compreso. Il resto della finestra principale resta fermo come
+// con un dialogo modale, e lo tiene fermo questo filtro dell'applicazione:
+//  - mouse, dita, rotella, menu contestuali e trascinamenti vanno solo al riquadro;
+//  - tastiera e scorciatoie solo al dialogo (si giudicano al widget che le
+//    riceve, o che possiede l'azione: la QWindow le passa al widget col fuoco);
+//  - le voci della barra dei menu si spengono (sul Mac la barra sta fuori dalla
+//    finestra, e i clic li' non passano da un evento);
+//  - la finestra principale non si chiude;
+//  - il dialogo resta davanti: cliccare la vista porta avanti la sua finestra.
+// Tutto torna com'era quando la sessione finisce.
+class CaptureSession : public QObject
+{
+public:
+    CaptureSession(QWidget *mainWindow, QWidget *guide, QWidget *dialog)
+        : m_main(mainWindow), m_guide(guide), m_dialog(dialog)
+    {
+        if (QMenuBar *bar = m_main ? m_main->findChild<QMenuBar *>() : nullptr) disableActions(bar->actions());
+        qApp->installEventFilter(this);
+    }
+    ~CaptureSession() override
+    {
+        qApp->removeEventFilter(this);
+        for (const Disabled &d : m_disabled)
+            if (d.action) d.action->setEnabled(d.wasEnabled);
+    }
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *ev) override
+    {
+        switch (ev->type()) {
+        case QEvent::MouseButtonPress:
+        case QEvent::MouseButtonRelease:
+        case QEvent::MouseButtonDblClick:
+        case QEvent::MouseMove:
+        case QEvent::Wheel:
+        case QEvent::ContextMenu:
+        case QEvent::TouchBegin:
+        case QEvent::TouchUpdate:
+        case QEvent::TouchEnd:
+        case QEvent::TouchCancel:
+        case QEvent::TabletPress:
+        case QEvent::TabletMove:
+        case QEvent::TabletRelease:
+        case QEvent::NativeGesture:
+        case QEvent::Gesture:
+        case QEvent::DragEnter:
+        case QEvent::DragMove:
+        case QEvent::Drop:
+            return inMainWindow(obj) && !inGuide(obj);
+        case QEvent::KeyPress:
+        case QEvent::KeyRelease:
+        case QEvent::ShortcutOverride:
+        case QEvent::Shortcut:
+            return widgetOf(obj) && !inDialog(obj);
+        case QEvent::Close:
+            if (obj == m_main) {
+                ev->ignore();
+                return true;
+            }
+            break;
+        case QEvent::WindowActivate:
+            if (obj == m_main && m_dialog) {
+                QPointer<QWidget> dialog = m_dialog;
+                QTimer::singleShot(0, dialog, [dialog]() { if (dialog) dialog->raise(); });
+            }
+            break;
+        default:
+            break;
+        }
+        return false;
+    }
+
+private:
+    // Il widget che riceve l'evento, o che possiede l'azione o la scorciatoia.
+    static QWidget *widgetOf(QObject *obj)
+    {
+        for (QObject *o = obj; o; o = o->parent())
+            if (o->isWidgetType()) return static_cast<QWidget *>(o);
+        return nullptr;
+    }
+    bool inMainWindow(QObject *obj) const
+    {
+        QWidget *w = widgetOf(obj);
+        return m_main && w && w->window() == m_main;
+    }
+    bool inGuide(QObject *obj) const
+    {
+        QWidget *w = widgetOf(obj);
+        return m_guide && w && (w == m_guide || m_guide->isAncestorOf(w));
+    }
+    bool inDialog(QObject *obj) const
+    {
+        QWidget *w = widgetOf(obj);
+        return m_dialog && w && w->window() == m_dialog;
+    }
+    void disableActions(const QList<QAction *> &actions)
+    {
+        for (QAction *a : actions) {
+            if (!a || a->isSeparator()) continue;
+            m_disabled.append({ a, a->isEnabled() });
+            a->setEnabled(false);
+            if (a->menu()) disableActions(a->menu()->actions());
+        }
+    }
+
+    QPointer<QWidget> m_main, m_guide, m_dialog;
+    struct Disabled { QPointer<QAction> action; bool wasEnabled = true; };
+    QList<Disabled> m_disabled;
 };
 
 }   // namespace
@@ -643,8 +907,23 @@ bool ImageCapture::run(GLWidget *gl, QWidget *parent, const QString &defaultDir)
     guide->raise();
 
     ImageDialog dlg(gl, secPerMp, guide, parent);
-    if (s_testDialogHandler) QTimer::singleShot(0, &dlg, [&dlg]() { s_testDialogHandler(&dlg); });
-    const bool accepted = (dlg.exec() == QDialog::Accepted);
+    bool accepted = false;
+    {
+        // NON MODALE, cosi' il riquadro si trascina; CaptureSession tiene fermo
+        // il resto della finestra principale finche' il dialogo e' aperto.
+        CaptureSession session(gl->window(), guide, &dlg);
+        dlg.setWindowModality(Qt::NonModal);
+        QEventLoop loop;
+        QObject::connect(&dlg, &QDialog::finished, &loop, &QEventLoop::quit);
+        if (s_testDialogHandler) QTimer::singleShot(0, &dlg, [&dlg]() { s_testDialogHandler(&dlg); });
+        dlg.show();
+        dlg.raise();
+        dlg.activateWindow();
+        loop.exec();
+        accepted = (dlg.result() == QDialog::Accepted);
+    }
+    // Dove l'utente ha lasciato il riquadro: l'inquadratura dell'immagine.
+    const QPointF framePosition = guide->position();
     delete guide;
     if (!accepted) return false;
     dlg.saveSettings();
@@ -689,7 +968,7 @@ bool ImageCapture::run(GLWidget *gl, QWidget *parent, const QString &defaultDir)
         busy.setMinimumDuration(0);
         busy.show();
         QCoreApplication::processEvents();
-        img = render(gl, size, ratio, &error, wireFactor);
+        img = render(gl, size, ratio, &error, wireFactor, framePosition);
     }
     if (img.isNull()) {
         QMessageBox::warning(parent, QObject::tr("Capture Image"), error);

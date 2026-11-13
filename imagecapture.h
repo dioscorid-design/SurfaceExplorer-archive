@@ -11,9 +11,16 @@
 // nell'immagine: per un rapporto piu' stretto della vista si taglia ai lati, per
 // uno piu' largo si riduce il campo visivo verticale (GLWidget::
 // setCaptureVerticalScale), cosi' l'orizzontale resta quello della vista.
+// Il riquadro occupa sempre tutta l'altezza o tutta la larghezza della vista, e
+// lungo l'altro lato si TRASCINA col mouse o col dito (doppio clic: di nuovo al
+// centro): l'immagine e' la parte della vista sotto di lui, una finestra
+// decentrata dello stesso campo visivo (GLWidget::setCaptureShift). Per poterlo
+// trascinare il dialogo non e' modale; il resto della finestra principale e'
+// fermo finche' resta aperto (CaptureSession in imagecapture.cpp).
 #pragma once
 
 #include <QImage>
+#include <QPointF>
 #include <QRect>
 #include <QSize>
 #include <QString>
@@ -47,7 +54,14 @@ public:
     // una vista di rapporto `viewRatio` (1 se l'immagine e' piu' stretta).
     static float verticalScaleFor(double ratio, double viewRatio);
     // Il riquadro, nelle coordinate della vista, di cio' che entra nell'immagine.
-    static QRect guideRect(const QSize &view, double ratio);
+    // `position`: dove sta lungo il lato libero, da -1 (tutto a sinistra, o in
+    // alto) a +1 (a destra, o in basso), 0 = al centro. Conta x per i rapporti
+    // piu' stretti della vista, y per quelli piu' larghi.
+    static QRect guideRect(const QSize &view, double ratio, const QPointF &position = QPointF());
+    // Lo spostamento del riquadro in `position` per GLWidget::setCaptureShift: la
+    // traslazione, nelle NDC dell'immagine (y in alto), che porta nell'immagine la
+    // parte della vista sotto il riquadro. Zero al centro.
+    static QPointF captureShiftFor(double ratio, double viewRatio, const QPointF &position);
     // Tutti i pixel di un colore: il sintomo di un fotogramma fallito sulla GPU.
     static bool isSingleColor(const QImage &im);
     // Un wireframe di `segments` segmenti largo `width` pixel sta nei limiti del
@@ -56,9 +70,10 @@ public:
     // Rende l'immagine di dimensione `size` fuori schermo. Vuota (con `error`) se
     // la GPU non ce la fa.
     // `wireFactor`: spessore del wireframe rispetto a quello proporzionale alla vista
-    // (1 = come a schermo, 0.5 sottile, 2 spesso).
+    // (1 = come a schermo, 0.5 sottile, 2 spesso). `position`: il riquadro
+    // trascinato (guideRect).
     static QImage render(GLWidget *gl, const QSize &size, double ratio, QString *error = nullptr,
-                         double wireFactor = 1.0);
+                         double wireFactor = 1.0, const QPointF &position = QPointF());
     // Secondi per megapixel, misurati su un fotogramma di prova: serve a stimare
     // il tempo di un'immagine grande (e ad avvisare se la scena e' pesante).
     static double secondsPerMegapixel(GLWidget *gl);

@@ -2075,6 +2075,14 @@ void GLWidget::render(QRhiCommandBuffer *cb)
         } else {
             m_projection.perspective(effectiveCameraFov(), aspect, nearPlane, farPlane);
         }
+        // IL RIQUADRO SPOSTATO di una cattura d'immagine (setCaptureShift): la
+        // stessa proiezione, traslata nel clip space. A zero niente cambia.
+        if (!m_captureShift.isNull()) {
+            QMatrix4x4 shift;
+            shift(0, 3) = m_captureShift.x();
+            shift(1, 3) = m_captureShift.y();
+            m_projection = shift * m_projection;
+        }
 
         m_view.setToIdentity();
         if (m_isPathFollowing) {
@@ -2684,6 +2692,12 @@ void GLWidget::render(QRhiCommandBuffer *cb)
                 eyeFromNdc(0, 0) = tanHalf * aspect;
                 eyeFromNdc(1, 1) = tanHalf;
                 eyeFromNdc(2, 2) = -1.0f;               // la camera guarda verso -Z
+                // Il riquadro spostato (setCaptureShift): il pixel guarda dove
+                // guarderebbe ndc - spostamento senza la traslazione.
+                if (!m_captureShift.isNull()) {
+                    eyeFromNdc(0, 2) = -tanHalf * aspect * m_captureShift.x();
+                    eyeFromNdc(1, 2) = -tanHalf * m_captureShift.y();
+                }
                 skyRay = viewRotInv * eyeFromNdc;
                 skyRay(3, 3) = float(m_bgSkyMode);
                 const bool isImage = !m_bgIsScript && m_backgroundTexture

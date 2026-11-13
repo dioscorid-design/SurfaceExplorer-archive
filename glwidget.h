@@ -1160,6 +1160,15 @@ public:
     // quello della vista e il riquadro guida (la parte della vista che entra
     // nell'immagine) dice la verita'. Si rimette a 1 a cattura finita.
     void setCaptureVerticalScale(float scale);
+    // Cattura di un'IMMAGINE col riquadro guida SPOSTATO (trascinato nella vista,
+    // ImageCapture::captureShiftFor): l'immagine e' la parte della vista sotto il
+    // riquadro, cioe' una finestra decentrata dello stesso campo visivo. E' una
+    // traslazione nel clip space (x += dx * w, y += dy * w; NDC di OpenGL, y in
+    // alto) dopo la proiezione: la ricevono le mesh, il ray marching (che ricava
+    // i raggi dall'inversa di u_mvpMatrix) e il cielo dello sfondo, che ha la sua
+    // matrice dei raggi. Zero = centrato, il disegno di sempre. Si rimette a zero
+    // a cattura finita.
+    void setCaptureShift(const QVector2D &ndc) { m_captureShift = ndc; }
     // Spessore, in pixel dell'immagine, con cui si disegnano le linee dei wireframe
     // durante una cattura (1 = linea nativa della GPU). Le linee della GPU sono
     // sempre larghe un pixel: in un'immagine molto piu' grande della vista
@@ -1850,6 +1859,7 @@ private:
     int m_captureLineWidth = 1;            // vedi setCaptureLineWidth
     QVector<QPoint> wireframeOffsets() const;
     float m_captureVerticalScale = 1.0f;   // vedi setCaptureVerticalScale
+    QVector2D m_captureShift;              // vedi setCaptureShift
     // Il campo visivo verticale con cui si disegna: m_cameraFov, scalato in
     // tangente durante una cattura d'immagine.
     float effectiveCameraFov() const;

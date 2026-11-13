@@ -652,7 +652,15 @@ void main() {
         mat4 projMatrix = ubuf.u_mvpMatrix * inverse(ubuf.u_mvMatrix);
         float aspect = abs(projMatrix[1][1] / projMatrix[0][0]);
 
-        vec2 uv_stereo = vec2(ndc.x * aspect, ndc.y);
+        // RIQUADRO SPOSTATO di una cattura d'immagine (GLWidget::setCaptureShift):
+        // la proiezione e' traslata, e il centro della vista e' dove proietta
+        // l'asse della camera. Senza spostamento quel punto e' 0 (a meno degli
+        // arrotondamenti, che la soglia lascia fuori: ndc resta quello di sempre).
+        vec4 axisClip = projMatrix * vec4(0.0, 0.0, -1.0, 0.0);
+        vec2 axisNdc = axisClip.xy / axisClip.w;
+        vec2 ndcView = (dot(axisNdc, axisNdc) > 1e-8) ? ndc - axisNdc : ndc;
+
+        vec2 uv_stereo = vec2(ndcView.x * aspect, ndcView.y);
 
         // Angolo di campo (45 gradi in radianti)
         float fov = 0.785398;
