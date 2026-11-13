@@ -1,0 +1,13 @@
+{
+    "code": "void mainImage(out vec4 fragColor, in vec2 fragCoord) {\n    vec2 res = (iResolution.xy == vec2(0.0)) ? vec2(1024.0) : iResolution.xy;\n    vec2 uv = fragCoord / res;\n\n    float d = length(uv - 0.5);\n    float ring = 0.5 + 0.5 * sin(40.0 * d - 4.0 * iTime);\n\n    vec3 colA = u_col1;\n    vec3 colB = u_col2;\n    // Fallback if the UI colors are both (almost) white/equal\n    if (length(colA - colB) < 0.05) {\n        colA = vec3(0.1, 0.2, 0.8);\n        colB = vec3(1.0, 0.6, 0.1);\n    }\n\n    fragColor = vec4(mix(colA, colB, ring), 1.0);\n}",
+    "color1": "#3fcc45",
+    "color2": "#ab2328",
+    "hasCustomColors": true,
+    "isImplicitMode": false,
+    "name": "Shadertoy Style",
+    "pan_x": 0,
+    "pan_y": 0,
+    "rotation": 0,
+    "type": "custom_texture",
+    "zoom": 1
+}

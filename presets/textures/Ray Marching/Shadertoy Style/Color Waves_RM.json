@@ -1,0 +1,15 @@
+{
+    "code": "// Color Waves - color only, ANIMATED. Runs INSIDE shadeSurface().\n// Three point sources wander slowly through space, each sending out spherical\n// ripples; where the ripples meet they interfere. The wave height picks between\n// the dock colors and drives a rainbow that drifts with time; the crests glow.\n// Measured in 3D, so there are no seams on any surface.\n// No displacement: one evaluation per pixel, cheap at any resolution.\n// In scope: pModel, t. Dock colors: u_col1 = crests, u_col2 = troughs.\n\nfloat FREQ    = 14.0 * max(E, 0.05);   // slider E   // ripples per unit      [4 .. 40]\nfloat SPEED   = 2.0 * F;               // slider F   // wave speed            [0 .. 6]\nfloat RAINBOW = 0.55;   // 0 = dock colors only, 1 = full spectrum              [0 .. 1]\nfloat GLOW    = 0.35;   // brightness of the crests                             [0 .. 1]\n\nvec3 s1 = 0.9 * vec3(sin(0.31 * t),       cos(0.23 * t),       sin(0.17 * t + 1.0));\nvec3 s2 = 0.9 * vec3(cos(0.27 * t + 2.0), sin(0.19 * t + 0.5), cos(0.29 * t));\nvec3 s3 = 0.9 * vec3(sin(0.21 * t + 4.0), sin(0.33 * t + 3.0), cos(0.15 * t + 2.0));\n\nfloat w = sin(FREQ * length(pModel - s1) - SPEED * t)\n        + sin(FREQ * length(pModel - s2) - SPEED * t * 1.13)\n        + sin(FREQ * length(pModel - s3) - SPEED * t * 0.87);\nw /= 3.0;   // [-1, 1]\n\nvec3 dock    = mix(ubuf.u_col2, ubuf.u_col1, 0.5 + 0.5 * w);\nvec3 rainbow = 0.5 + 0.5 * cos(6.2832 * (0.35 * w + 0.04 * t + vec3(0.0, 0.33, 0.67)));\nvec3 col = mix(dock, rainbow * (0.4 + 0.6 * dock), RAINBOW);\ncol += GLOW * smoothstep(0.55, 0.95, w) * vec3(1.0);\n\ntextureCol = col;\n",
+    "color1": "#3fcc45",
+    "color2": "#ab2328",
+    "hasCustomColors": true,
+    "isImplicitMode": true,
+    "name": "Color Waves_RM",
+    "pan_x": 0,
+    "pan_y": 0,
+    "rotation": 0,
+    "type": "custom_texture",
+    "zoom": 1,
+    "hintText": "Sliders\nE: density of the ripples (1 = default, higher = finer)\nF: speed of the waves (0 = still)",
+    "hintSeconds": 6
+}

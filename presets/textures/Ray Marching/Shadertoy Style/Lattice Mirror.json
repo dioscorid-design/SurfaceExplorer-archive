@@ -1,0 +1,15 @@
+{
+    "code": "// Lattice Mirror - color only, ANIMATED. Runs INSIDE shadeSurface().\n// The object becomes a mirror flying through an endless lattice of beams that\n// vibrate like plucked strings. For every pixel the view ray is reflected on the\n// surface (real normal, so a displaced or bumpy object reflects accordingly) and\n// marched through the lattice: the color is the beam it meets, fogged with\n// distance, plus the glow of the beams it passes close to.\n// This is a SMALL ray march inside the texture: 48 steps, once per pixel (not in\n// map()), so it stays cheap even at high resolution.\n// In scope: pModel, n_model, viewDir_model, t.\n// Dock colors: u_col1 = beams and glow, u_col2 = the deep background.\n\nfloat BEAM  = 0.045 * max(E, 0.05);  // slider E   // beam radius (cells)   [0.01 .. 0.15]\nfloat SPEED = 0.6 * F;               // slider F   // flight speed          [0 .. 3]\nfloat SWING = 0.05;    // amplitude of the vibration (cells)                 [0 .. 0.12]\nfloat FOG   = 0.18;    // how fast the lattice fades with distance           [0.05 .. 0.5]\nconst int STEPS = 48;\n\nvec3 R  = reflect(-viewDir_model, n_model);\nvec3 ro = vec3(0.5, 0.5, SPEED * t) + pModel * 0.5;   // the mirror flies along z\n\nfloat tm = 0.0;\nfloat glow = 0.0;\nfloat hitD = 1e9;\nfor (int i = 0; i < STEPS; i++) {\n    vec3 qp = ro + R * tm;\n    vec3 c  = fract(qp) - 0.5;\n    vec3 id = floor(qp);\n    // each beam is displaced by a wave running along it (plucked string)\n    vec2 wx = SWING * vec2(sin(6.2832 * qp.x + 3.0 * t + 1.7 * id.y), cos(6.2832 * qp.x + 2.3 * t + 1.3 * id.z));\n    vec2 wy = SWING * vec2(sin(6.2832 * qp.y + 2.7 * t + 1.1 * id.z), cos(6.2832 * qp.y + 3.1 * t + 0.9 * id.x));\n    vec2 wz = SWING * vec2(sin(6.2832 * qp.z + 2.5 * t + 1.9 * id.x), cos(6.2832 * qp.z + 2.9 * t + 0.7 * id.y));\n    float bx = length(c.yz + wx) - BEAM;\n    float by = length(c.zx + wy) - BEAM;\n    float bz = length(c.xy + wz) - BEAM;\n    float d = min(bx, min(by, bz));\n    glow += exp(-max(d, 0.0) * 40.0) * exp(-FOG * tm) * 0.05;\n    if (d < 0.002) { hitD = tm; break; }\n    tm += max(d * 0.7, 0.01);    // 0.7: the vibration makes d a little optimistic\n    if (tm > 14.0) break;\n}\n\nvec3 col = ubuf.u_col2;\nif (hitD < 1e8) {\n    float fog = exp(-FOG * hitD);\n    // beams shaded by how squarely the reflected ray meets them (cheap fake light)\n    col = mix(ubuf.u_col2, ubuf.u_col1 * (0.55 + 0.45 * fog), fog);\n}\ncol += ubuf.u_col1 * glow;\n// Fresnel: grazing angles reflect more, facing angles show more of the deep tone\nfloat fres = 0.35 + 0.65 * pow(1.0 - max(dot(n_model, viewDir_model), 0.0), 2.0);\ncol = mix(ubuf.u_col2 * 0.6, col, fres);\n\ntextureCol = col;\n",
+    "color1": "#ffffff",
+    "color2": "#0b1430",
+    "hasCustomColors": true,
+    "isImplicitMode": true,
+    "name": "Lattice Mirror",
+    "pan_x": 0,
+    "pan_y": 0,
+    "rotation": 0,
+    "type": "custom_texture",
+    "zoom": 1,
+    "hintText": "Sliders\nE: thickness of the beams (1 = default)\nF: speed of the flight (0 = still)",
+    "hintSeconds": 6
+}

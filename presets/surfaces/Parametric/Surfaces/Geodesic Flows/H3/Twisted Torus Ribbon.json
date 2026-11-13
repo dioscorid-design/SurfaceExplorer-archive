@@ -76,6 +76,7 @@
     "name": "Twisted Torus Ribbon",
     "projectionMode": 1,
     "renderMode": 1,
+    "space": "H3",
     "steps": 633,
     "type": "surface",
     "use4DLighting": false,

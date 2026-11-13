@@ -76,6 +76,7 @@
     "name": "Whitney Umbrella",
     "projectionMode": 1,
     "renderMode": 1,
+    "space": "H3",
     "steps": 604,
     "type": "surface",
     "use4DLighting": false,

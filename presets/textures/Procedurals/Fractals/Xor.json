@@ -1,0 +1,12 @@
+{
+    "code": "// --- PARAMETRI ---\nfloat zoom = 10.0;  // <--- RAISED FROM 1.0 TO 20.0 TO REDUCE THE BLOCKS\nfloat s = 512.0;    // Risoluzione virtuale\n\n// --- XOR LOGIC ---\n// We convert u, v (0.0-1.0) into scaled integer coordinates\n// Original C++ formula: int xx = x * z / 5;\n// Here we multiply by a high zoom to get a dense pattern\nint xx = int(u * s * zoom / 5.0);\nint yy = int(v * s * zoom / 5.0);\n\n// Formula XOR bitwise\nint val = (xx ^ yy) % 256;\n\n// Mappiamo a 0.0-1.0\nfloat tit = float(val) / 255.0;\n\n// --- PSYCHEDELIC COLOR GENERATION (inline) ---\n// tit * 3.0 makes 3 full turns of the spectrum\nfloat time = tit * 3.0; \nfloat freq = 6.283; // 2 * PI\n\n// RGB components computed with the original phases (0.00, 0.33, 0.67)\nfloat r_psy = 0.5 + 0.5 * cos(freq * time + 0.00);\nfloat g_psy = 0.5 + 0.5 * cos(freq * time + 0.33); \nfloat b_psy = 0.5 + 0.5 * cos(freq * time + 0.67); \n\nvec3 psyColor = vec3(r_psy, g_psy, b_psy);\n\n// --- FINAL MIX ---\n// We blend the psychedelic result with the base tint (Color 1)\nreturn (psyColor + u_col1) * 0.5;",
+    "color1": "#33cc33",
+    "color2": "#000000",
+    "hasCustomColors": true,
+    "name": "Xor",
+    "pan_x": 0,
+    "pan_y": 0,
+    "rotation": 0,
+    "type": "custom_texture",
+    "zoom": 1
+}

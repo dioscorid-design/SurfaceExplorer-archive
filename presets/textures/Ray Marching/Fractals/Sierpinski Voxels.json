@@ -1,0 +1,15 @@
+{
+    "code": "// Sierpinski Voxels - color only, ANIMATED. Runs INSIDE shadeSurface().\n// Pascal's pyramid modulo 2: a voxel (x, y, z) belongs to the Sierpinski\n// tetrahedron when x, y and z share no bit (no carry when adding them). Every\n// other voxel sits in a hole whose size is the highest shared bit, so the holes\n// come in octaves -- 1, 2, 4, 8... voxels. The surface shows where it cuts the\n// fractal; holes are colored by size and a brightness wave runs through the scales.\n// No displacement: one evaluation per pixel. Integer bit operations (GLSL 4.5).\n// In scope: pModel, t. Dock colors: u_col1 = the tetrahedron, u_col2 = big holes.\n\nfloat CELLS = 24.0 * max(E, 0.05);   // slider E   // voxels per unit        [8 .. 64]\nfloat WAVE  = 0.5 * F;               // slider F   // speed of the wave      [0 .. 2]\nconst int BITS = 4;                  // repeats every 2^BITS voxels          [3 .. 6]\n\nint   MASK = (1 << BITS) - 1;\nvec3  vp = pModel * CELLS;\nivec3 ic = ivec3(floor(vp)) & MASK;\nvec3  fp = fract(vp);\n\nint carry = (ic.x & ic.y) | (ic.y & ic.z) | (ic.z & ic.x);\nint lvl   = findMSB(carry);          // -1 on the tetrahedron, 0..BITS-1 in a hole\n\nvec3 col;\nif (lvl < 0) {\n    // the tetrahedron itself, with a thin bevel at the voxel faces\n    vec3 e3 = min(fp, 1.0 - fp);\n    float gridD = min(e3.x, min(e3.y, e3.z));\n    col = ubuf.u_col1 * (0.8 + 0.2 * smoothstep(0.0, 0.12, gridD));\n} else {\n    float size = float(lvl) / float(BITS - 1);   // 0 = smallest holes, 1 = biggest\n    vec3 pal = 0.5 + 0.5 * cos(6.2832 * (0.55 * size + vec3(0.0, 0.33, 0.67)));\n    col = mix(ubuf.u_col1 * 0.6, ubuf.u_col2, size);\n    col = mix(col, pal * mix(ubuf.u_col1, vec3(1.0), 0.3), 0.45);\n    // brightness wave running from the small holes to the big ones\n    col *= 0.65 + 0.55 * (0.5 + 0.5 * sin(1.4 * float(lvl) - 2.0 * WAVE * t));\n}\n\ntextureCol = col;\n",
+    "color1": "#fff2d0",
+    "color2": "#1c1240",
+    "hasCustomColors": true,
+    "isImplicitMode": true,
+    "name": "Sierpinski Voxels",
+    "pan_x": 0,
+    "pan_y": 0,
+    "rotation": 0,
+    "type": "custom_texture",
+    "zoom": 1,
+    "hintText": "Sliders\nE: size of the voxels (1 = default, higher = smaller)\nF: speed of the wave through the scales (0 = still)",
+    "hintSeconds": 7
+}

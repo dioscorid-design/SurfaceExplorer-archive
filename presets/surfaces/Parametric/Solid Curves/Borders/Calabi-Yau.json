@@ -1,0 +1,180 @@
+{
+    "angles": {
+        "omega": 0,
+        "phi": 0,
+        "psi": 0
+    },
+    "background": {
+        "color": "#fb0e04"
+    },
+    "border": {
+        "b": 1,
+        "g": 0.8549019694328308,
+        "mode": 0,
+        "r": 0.364705890417099,
+        "thickness": 0.05277012288570404,
+        "wireAlong": 8,
+        "wireAround": 2
+    },
+    "camera3D": {
+        "pitch": 0,
+        "roll": -12.600011825561523,
+        "rot_w": 0.5571279525756836,
+        "rot_x": -0.06918871402740479,
+        "rot_y": 0.6909046173095703,
+        "rot_z": 0.4554911255836487,
+        "x": -0.25,
+        "y": 0.15000002086162567,
+        "yaw": 0,
+        "z": 7.13999605178833
+    },
+    "cameraFov": 45,
+    "colors": {
+        "alpha": 0,
+        "b": 0.20000000298023224,
+        "g": 0.800000011920929,
+        "r": 0.20000000298023224
+    },
+    "constants": {
+        "A": 5,
+        "B": 1,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
+    },
+    "discreteConstants": {
+        "A": [
+            2,
+            5
+        ]
+    },
+    "equations": {
+        "p": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "hintSeconds": 6,
+    "hintText": "Slider A: degree of the quintic (2 to 5)",
+    "isImplicitMode": false,
+    "lightIntensity": 1,
+    "lightingMode": 0,
+    "limits": {
+        "uMax": 0,
+        "uMin": 0,
+        "vMax": 0,
+        "vMin": 0,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshCount": "floor(A+0.5)^2",
+    "meshParts": [
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        },
+        {
+            "alpha": 1
+        }
+    ],
+    "meshScopeAll": true,
+    "name": "Calabi-Yau",
+    "projectionMode": 0,
+    "renderMode": 0,
+    "scriptCode": "//MESH_BEGIN\nu: 0, pi/2, 40\nv: -1, 1, 40\n//MESH_END\n\n// Calabi-Yau: 2D section of the Fermat quintic, degree n chosen by the slider.\n//   z1^n + z2^n = 1,  with z1,z2 complex\n// For each pair of n-th roots of unity (k1,k2) there is a patch:\n//   z1 = e^(2 pi i k1/n) * (cos w)^(2/n)\n//   z2 = e^(2 pi i k2/n) * (sin w)^(2/n)     with w = u + i v\n// With n = 5 it is the canonical figure of the string theory illustrations.\n//\n// INTEGER DEGREE: one patch per mesh, n*n of them, set by the Meshes field of the\n// Multi Mesh panel (floor(A+0.5)^2): changing the degree creates exactly the\n// patches it needs. The indices are computed on the live grid (k1 = mesh % n,\n// k2 = mesh / n).\n//\n// TRUE 4D SURFACE: the fourth coordinate is not mixed in here.\n// Im(z2) comes out as the w component of the vec4, so the 4D projection and\n// rotations stay with the interface.\n\nA := int(2,5);          // grado della quintica: slider a scatti interi\n\nfloat n  = clamp(floor(A + 0.5), 2.0, 5.0);\n// COMPACT NUMBERING: patch `mesh` carries the pair (k1, k2) = (mesh % n, mesh / n).\nfloat k1 = mod(float(mesh), n);\nfloat k2 = floor(float(mesh) / n);\nfloat p  = 2.0 / n;\n\n// w = u + i v;  cos(w) e sin(w) complessi\nvec2 cw = vec2( cos(u) * cosh(v), -sin(u) * sinh(v));\nvec2 sw = vec2( sin(u) * cosh(v),  cos(u) * sinh(v));\n\n// Complex power in polar form. On the declared domain Re(cos w) and\n// Re(sin w) stay POSITIVE: the argument lies in (-pi/2, pi/2), far from the\n// atan jump, so there is no branch cut and no seams between patches.\nfloat rc = safePow(length(cw), p);\nfloat tc = p * atan(cw.y, cw.x);\nfloat rs = safePow(length(sw), p);\nfloat ts = p * atan(sw.y, sw.x);\n\n// Radici n-esime dell'unita': e^(2 pi i k/n)\nfloat a1 = 2.0 * pi * k1 / n;\nfloat a2 = 2.0 * pi * k2 / n;\n\nvec2 z1 = rc * vec2(cos(tc + a1), sin(tc + a1));\nvec2 z2 = rs * vec2(cos(ts + a2), sin(ts + a2));\n\n// (Re z1, Re z2, Im z1) in R^3 + Im z2 as the fourth coordinate\nreturn vec4(z1.x, z2.x, z1.y, z2.y);\n",
+    "steps": 160,
+    "type": "surface",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}

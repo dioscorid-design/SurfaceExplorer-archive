@@ -69,7 +69,7 @@
         "w0": ""
     },
     "hintSeconds": 7,
-    "hintText": "Sliders\nA: size\nB: strength of the Iwasawa shear\nC: radius of the loop in the group",
+    "hintText": "Sliders\nA: size\nB: stretch along the diagonal subgroup\nC: radius of the loop in the group",
     "isImplicitMode": false,
     "lightIntensity": 1,
     "lightingMode": 1,

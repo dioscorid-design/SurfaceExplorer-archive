@@ -1,0 +1,14 @@
+{
+    "code": "// Fractal Noise - wires the COLORS to the dock sliders (u_col1 / u_col2).\n// Rebuilds the SAME fractal used in the displacement (same constant factors\n// 2/4/8/16 and same t*0.5 scroll), so the color follows the relief:\n// u_col2 in the valleys, u_col1 on the ridges.\n// Runs INSIDE shadeSurface() -> no functions, everything inline. 't' and\n// 'sys_noise' are available (t = texture clock; sys_noise lives in common.glsl).\n// NB: CONSTANT factors and not NoiseW(), to avoid faulting the Adreno (see displacement).\n\nfloat n1 = sys_noise(pModel * 2.0  + vec3(0.0, t * 0.5, 0.0));\nfloat n2 = sys_noise(pModel * 4.0  + vec3(0.0, t * 0.5, 0.0));\nfloat n3 = sys_noise(pModel * 8.0  + vec3(0.0, t * 0.5, 0.0));\nfloat n4 = sys_noise(pModel * 16.0 + vec3(0.0, t * 0.5, 0.0));\nfloat fractal = (n1 + n2 * 0.5 + n3 * 0.25 + n4 * 0.125) / 1.875;\n\n// contrast: crisper ridges\nfloat tcol = smoothstep(0.35, 0.75, fractal);\n\n// DOCK COLORS: u_col2 = valleys, u_col1 = ridges\ntextureCol = mix(ubuf.u_col2, ubuf.u_col1, tcol);\n",
+    "color1": "#d8c9a6",
+    "color2": "#3c3222",
+    "displacement": "// Animated fractal (fbm, 4 octaves, lacunarity 2, gain 0.5).\n// NB: we do NOT use NoiseW(). Cause confirmed via logcat + isolation test on the\n// device (Galaxy Tab S9 Ultra, Adreno): NoiseW calls sys_noise(p * frequency) with\n// 'frequency' growing at RUNTIME inside its loop; with a runtime argument the Adreno\n// faults the GPU (gpuSnapshot -> context lost -> app killed). With CONSTANT\n// frequencies the same noise runs fine. Here we unroll the 4 octaves by hand with\n// constant factors (2,4,8,16): identical look, no fault.\nfloat n1 = sys_noise(pModel * 2.0  + vec3(0.0, t * 0.5, 0.0));\nfloat n2 = sys_noise(pModel * 4.0  + vec3(0.0, t * 0.5, 0.0));\nfloat n3 = sys_noise(pModel * 8.0  + vec3(0.0, t * 0.5, 0.0));\nfloat n4 = sys_noise(pModel * 16.0 + vec3(0.0, t * 0.5, 0.0));\nfloat fractal = (n1 + n2 * 0.5 + n3 * 0.25 + n4 * 0.125) / 1.875;\n\n// fractal in [0,1]. Center it between -0.5 and 0.5 and scale its strength.\nfloat bump = (fractal - 0.5) * 0.15;\n\n// Subtract the relief from the surface\nd_surf -= bump;\n\n// RAY MARCHING SAFETY TRICK:\n// Multiplying the distance by 0.5 forces the rays to slow down, preventing them\n// from passing through the fractal tips and becoming invisible!\nd_surf *= 0.5;\n",
+    "hasCustomColors": true,
+    "isImplicitMode": true,
+    "name": "Fractal Noise",
+    "pan_x": 0,
+    "pan_y": 0,
+    "rotation": 0,
+    "type": "custom_texture",
+    "zoom": 1
+}

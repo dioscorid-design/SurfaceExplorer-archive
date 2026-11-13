@@ -1,8 +1,8 @@
 {
     "angles": {
-        "omega": 0.10000000149011612,
-        "phi": 0.10000000149011612,
-        "psi": 0.10000000149011612
+        "omega": 9.999999747378752e-05,
+        "phi": 9.999999747378752e-05,
+        "psi": 9.999999747378752e-05
     },
     "camera3D": {
         "pitch": 0,
@@ -79,6 +79,7 @@
     "name": "NewShape",
     "projectionMode": 1,
     "renderMode": 1,
+    "space": "H3",
     "steps": 101,
     "type": "surface",
     "use4DLighting": true,

@@ -73,6 +73,7 @@
     "name": "Plucker Conoid",
     "projectionMode": 1,
     "renderMode": 0,
+    "space": "H3",
     "showBorder": false,
     "steps": 100,
     "type": "surface",

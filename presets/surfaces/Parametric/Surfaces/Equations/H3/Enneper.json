@@ -16,6 +16,7 @@
         "yaw": 0,
         "z": 4
     },
+    "cameraFov": 45,
     "colors": {
         "alpha": 0.76,
         "b": 0.20000000298023224,
@@ -38,11 +39,14 @@
         "explicitU": "",
         "explicitV": "",
         "explicitW": "",
-        "p": "0.5",
+        "p": "0",
         "x": "U * tanh(sqrt(U^2+V^2+W^2)/2) / (sqrt(U^2+V^2+W^2) + 0.00001)",
         "y": "V * tanh(sqrt(U^2+V^2+W^2)/2) / (sqrt(U^2+V^2+W^2) + 0.00001)",
         "z": "W * tanh(sqrt(U^2+V^2+W^2)/2) / (sqrt(U^2+V^2+W^2) + 0.00001)"
     },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
     "geodesic": {
         "conform": "1.0",
         "du": "",
@@ -69,10 +73,11 @@
         "zMax": 1000,
         "zMin": -1000
     },
+    "meshScopeAll": true,
     "name": "Enneper",
     "projectionMode": 1,
     "renderMode": 1,
-    "showBorder": false,
+    "space": "H3",
     "steps": 648,
     "type": "surface",
     "use4DLighting": false,

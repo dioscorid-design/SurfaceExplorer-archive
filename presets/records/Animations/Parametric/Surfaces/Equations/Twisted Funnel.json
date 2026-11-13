@@ -1,0 +1,143 @@
+{
+    "activeMotion": "rotation",
+    "angles": {
+        "omega": 0.1900000125169754,
+        "phi": 0.10999996960163116,
+        "psi": 0.4999997913837433
+    },
+    "background": {
+        "code": "// --- 1. INPUT ---\nvec3 c1 = u_col1;\nvec3 c2 = u_col2;\n\n// --- 2. FIX BORDI (Il segreto) ---\n// Usiamo la variabile 'u_isFlat' che abbiamo creato oggi.\n// Il taglio nero avviene SOLO nell'anteprima 2D.\nif (u_isFlat && (u < 0.0 || u > 1.0 || v < 0.0 || v > 1.0)) {\n    return vec3(0.0); \n}\n\n// --- 3. LOGICA GRADIENTE ---\nfloat pos = v;\n\n// clamp assicura che sulla superficie 3D i colori si estendano \n// fino ai bordi invece di fare cose strane o invertire il gradiente.\npos = clamp(pos, 0.0, 1.0);\n\n// --- 4. OUTPUT ---\nreturn mix(c1, c2, pos);",
+        "col1": "#334133",
+        "col2": "#000000",
+        "color": "#4d4d4d",
+        "enabled": true,
+        "libName": "Linear Gradient",
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "skyMode": "fixed",
+        "zoom": 1
+    },
+    "camera3D": {
+        "pitch": 0,
+        "roll": 0,
+        "rot_w": 0.617200493812561,
+        "rot_x": -0.08520014584064484,
+        "rot_y": 0.16234201192855835,
+        "rot_z": 0.7651467323303223,
+        "x": 0,
+        "y": 0,
+        "yaw": 0,
+        "z": 7.559998035430908
+    },
+    "cameraFov": 45,
+    "colors": {
+        "alpha": 1,
+        "surfColor": "#33cc33"
+    },
+    "constants": {
+        "A": 1.559999942779541,
+        "B": 1,
+        "C": 1,
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
+    },
+    "equations": {
+        "defU": "u + t * B",
+        "defV": "v + 0.00001",
+        "defW": "sin(u)",
+        "explicitU": "",
+        "explicitV": "",
+        "explicitW": "",
+        "p": "W",
+        "x": "A * (((sin(V) - V*cos(V)) / (V*V)) * cos(U) + ((cos(V) - 1.0 + V*sin(V)) / (V*V)) * sin(U))",
+        "y": "A * (((sin(V) - V*cos(V)) / (V*V)) * sin(U) - ((cos(V) - 1.0 + V*sin(V)) / (V*V)) * cos(U))",
+        "z": "A * (2.0*V - sin(2.0*V)) / (2.0*V*V)"
+    },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
+    "hintSeconds": 6,
+    "hintText": "Sliders\nA: size of the sphere\nB: speed of the turn",
+    "isImplicitMode": false,
+    "lightIntensity": 1,
+    "lightingMode": 0,
+    "limits": {
+        "uMax": 6.28318977355957,
+        "uMin": 0,
+        "vMax": 15,
+        "vMin": 0,
+        "wMax": 0,
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
+    },
+    "meshScopeAll": true,
+    "name": "Twisted Funnel",
+    "observer4D": 4,
+    "path3D": {
+        "roll": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "path4D": {
+        "alpha": "",
+        "beta": "",
+        "gamma": "",
+        "w": "",
+        "x": "",
+        "y": "",
+        "z": ""
+    },
+    "pathMode": 0,
+    "pathMode3D": 0,
+    "projectionMode": 2,
+    "renderMode": 0,
+    "soundLibName": "The Sanctuary",
+    "speeds": {
+        "nutation": 0.10000000149011612,
+        "omega": 0,
+        "path3D": 1,
+        "path4D": 1,
+        "phi": 0,
+        "precession": 0.10000000149011612,
+        "psi": 0,
+        "spin": 0.10000000149011612
+    },
+    "steps": 101,
+    "texture": {
+        "code": "//SOUND_BEGIN\n// =========================================================================\n// Title: The Sanctuary\n// Author: srtuss (2018)\n// Source: https://www.shadertoy.com/view/4ddfWX\n// License: CC BY-NC-SA 3.0\n//\n// Adattamento: Questa versione è stata ottimizzata per Desktop GLSL Audio.\n// Sono stati rinominati i parametri interni per evitare conflitti con le \n// macro del compilatore e ridotto il numero di iterazioni per garantire \n// la stabilità del driver video (GPU).\n// =========================================================================\n\n#define PI_S 3.14159265359\nfloat tempo_val = 2.0;\n\n// Funzioni Hash uniche per evitare conflitti di nomi\nfloat hash_s(float x) { return fract(sin(x) * 897612.531); }\nfloat hsh_s(float x) { return fract(sin(x * 237.234234) * 982734.1235); }\nfloat rnd_s(float x, float mn, float mx) { return mn + floor((mx - mn) * hash_s(floor(x))); }\n\nfloat nse_s(float x) {\n    float y = floor(x);\n    float f = fract(x);\n    f = f * f * (3.0 - 2.0 * f);\n    return mix(hash_s(y), hash_s(y + 1.0), f) - 0.5;\n}\n\n// Strumento: Campana FM\nvec2 inst_bell(float t, float f) {\n    float m = sin(t * f * 80.0) * exp(t * -50.0);\n    float sig = sin(t * f * PI_S * 2.0 + m) * min(t * 800.0, 1.0) * exp(t * -5.0) * 0.25;\n    return vec2(sig);\n}\n\n// Strumento: Vocale \"A\"\nfloat voc_s(float t, float f, float formant) {\n    float x = fract(t * f) / f;\n    return (sin(x * 6.0 * formant) * 0.4 + sin(x * 12.0 * formant) + sin(x * 26.0 * formant) * 0.2) * min(x * 1000.0, 1.0) * exp(x * -200.0);\n}\n\n// Coro Swarm (Ridotto a 4 voci per performance)\nvec2 inst_choir(float t, float f) {\n    vec2 v = vec2(0.0);\n    float formant = 300.0 * exp2(sin(t * 0.1));\n    for(int i = 0; i < 4; ++i) {\n        float h = float(i);\n        float m = voc_s(t + h / 3.0, f + pow(2.01, (h - 8.0) * 0.2), formant);\n        float pan = hash_s(h);\n        v.x += m * pan;\n        v.y += m * (1.0 - pan);\n    }\n    return v * 0.15;\n}\n\n// Strumento secondario (Armoniche)\nvec2 inst_harm(float t, float f) {\n    vec2 v = vec2(0.0);\n    for(int i = 0; i < 4; ++i) {\n        float h = float(i) * 2.0 + 1.0;\n        float m = sin(t * f * 2.0 * PI_S * h) * (1.0 + nse_s(h * 41.0 + t * 10.0)) / h;\n        float pan = hash_s(h);\n        v.x += m * pan;\n        v.y += m * (1.0 - pan);\n    }\n    return v * 0.2;\n}\n\nfloat penta_s(float x) {\n    x /= 5.0;\n    float y = floor(x);\n    float fr = fract(x) * 5.0;\n    return step(1.0, fr) * 2.0 + step(2.0, fr) * 3.0 + step(3.0, fr) * 2.0 + step(4.0, fr) * 2.0 + y * 12.0;\n}\n\nvec2 scene_choir(float time, float n) {\n    vec2 v = inst_choir(time, 140.0 * pow(2.0, n / 12.0));\n    v += inst_choir(-time, 140.0 * pow(2.0, n / 12.0 - 1.0));\n    if(time > 64.0 / tempo_val) {\n        v += inst_harm(time, 140.0 * 3.0 * pow(2.0, (n + 12.0) / 12.0)) * 0.1;\n    }\n    return v;\n}\n\nvec2 snare_s(float t) {\n    if(t < 0.0) return vec2(0.0);\n    t *= 3.0;\n    float env = exp(t * -10.0) + exp(t * -1.0) * 0.07;\n    return vec2(hsh_s(t), hsh_s(t + 0.1)) * env * 0.4;\n}\n\nvec2 echomix_s(float time) {\n    vec2 v = vec2(0.0);\n    float x = mod(time, 8.0 / tempo_val);\n    v += vec2(0.5) * sin(pow(x, 0.9) * 300.0) * min(1.0, x * 200.0) * exp(x * -5.0);\n    float rate = tempo_val * 2.0;\n    if(time > 32.0 / tempo_val)\n        v += inst_bell(fract(time * rate) / rate, 140.0 * 2.0 * pow(2.0, penta_s(rnd_s(time * rate, 0.0, 10.0)) / 12.0)) * 0.4;\n    return v;\n}\n\n// Funzione principale adattata al tuo synthesizer.cpp\nvec2 mainSound(in int samp, float time) {\n    vec2 v = echomix_s(time);\n    float x = mod(time, 32.0 / tempo_val);\n    \n    // Gestione dinamica del coro\n    v += scene_choir(time, -5.0) * clamp(x * tempo_val * 0.5, 0.0, 1.0) * smoothstep(20.0, 15.0, x * tempo_val);\n    \n    if(time >= 30.0) { // Ridotto tempo di attivazione snare per test immediato\n        v += snare_s(mod(time - 0.5, 1.0)) * 0.15;\n    }\n    \n    // Mastering finale con limiter\n    return clamp(v * 0.6, -1.0, 1.0);\n}\n//SOUND_END\n\n// --- PARAMETRI ---\nfloat zoom = 1.0;       // Collegato alla densità/zoom dell'UI\nint max_iter = 100;     // Qualità del dettaglio\n\n// ESPONENTE della formula Z = Z^n + C (slider F), n = 1 + F.\n// Con F = 1 (il valore di partenza degli slider) e' il Mandelbrot classico,\n// n = 2. Alzando F cresce l'ordine di simmetria (n = 3: due lobi, n = 4: tre,\n// ...) e i valori intermedi fondono con continuita' una forma nell'altra.\n// Fra un intero e l'altro compare un taglio a sinistra, lungo il semiasse\n// reale negativo: e' la potenza non intera di un numero complesso, non un\n// errore, e sparisce di nuovo sul valore intero successivo.\n// max(): sotto F = 1 resta il classico. Con n < 2 quel taglio domina la\n// figura, che esce spostata e mozzata.\nfloat power = 1.0 + max(F, 1.0);\n\n// Centro del frattale: -0.5 e' l'inquadratura classica per n = 2; con\n// esponenti piu' alti la figura si raccoglie attorno all'origine.\nvec2 center = vec2(-0.5 / (power - 1.0), 0.0);\n\n// --- MAPPATURA COORDINATE ---\n// Trasformiamo u,v (0.0 - 1.0) nel piano complesso\n// Moltiplichiamo per 3.0 per avere un'inquadratura iniziale classica.\n// Dividiamo per 'zoom' per ingrandire.\nvec2 c = (vec2(u, v) - 0.5) * (3.0 / zoom) + center;\n\n// --- LOGICA MANDELBROT (Z = Z^n + C) ---\nvec2 z = vec2(0.0);\nint iter = 0;\n\nfor (int i = 0; i < 100; i++) { // Loop fisso per GLSL (usa max_iter per il break)\n    if (i >= max_iter) break;\n    \n    // Ottimizzazione: se la distanza al quadrato > 4, è scappato\n    // (raggio di fuga 2, valido per ogni n >= 2)\n    if (dot(z, z) > 4.0) break;\n\n    if (abs(power - 2.0) < 0.001) {\n        // Caso classico, in aritmetica esatta e piu' veloce: (x + iy)^2 + c\n        // Parte Reale: x^2 - y^2 + cx\n        // Parte Immaginaria: 2xy + cy\n        z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;\n    } else {\n        // Esponente qualsiasi, in forma polare: il modulo va alla n,\n        // l'angolo si moltiplica per n. z = 0 (la prima iterazione) va\n        // escluso: atan(0, 0) non e' definito su tutte le GPU.\n        float r = length(z);\n        vec2 zn = vec2(0.0);\n        if (r > 0.0) {\n            float ang = atan(z.y, z.x) * power;\n            zn = pow(r, power) * vec2(cos(ang), sin(ang));\n        }\n        z = zn + c;\n    }\n    iter++;\n}\n\n// --- COLORAZIONE ---\n// Normalizziamo le iterazioni tra 0.0 e 1.0\nfloat tit = float(iter) / float(max_iter);\n\n// Usiamo una radice quadrata (pow 0.5) per rendere il gradiente più visibile\n// e meno \"tutto nero\" ai bordi.\ntit = sqrt(tit);\n\n// Mix tra i colori dell'utente\n// tit=0 (esterno immediato) -> Colore 1\n// tit=1 (interno insieme)   -> Colore 2\nreturn mix(u_col1, u_col2, tit);",
+        "col1": "#1c3664",
+        "col2": "#e28d57",
+        "enabled": true,
+        "libName": "Mandelbrot",
+        "pan_x": 0,
+        "pan_y": 0,
+        "rotation": 0,
+        "zoom": 3.0590248107910156
+    },
+    "textureHintSeconds": 6,
+    "textureHintText": "Sliders\nF: power of the formula, z^(1+F) + c (1 = classic Mandelbrot)",
+    "type": "motion",
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
+}

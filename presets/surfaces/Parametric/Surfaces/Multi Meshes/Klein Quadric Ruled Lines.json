@@ -1,108 +1,108 @@
 {
-    "angles": {
-        "omega": 9.999999747378752e-05,
-        "phi": 9.999999747378752e-05,
-        "psi": 9.999999747378752e-05
+  "angles": {
+    "omega": 9.999999747378752e-05,
+    "phi": 9.999999747378752e-05,
+    "psi": 9.999999747378752e-05
+  },
+  "camera3D": {
+    "pitch": 0,
+    "roll": 0,
+    "rot_w": 0.4612818956375122,
+    "rot_x": 0.4005368947982788,
+    "rot_y": 0.738064706325531,
+    "rot_z": -0.28644323348999023,
+    "x": 0,
+    "y": 0,
+    "yaw": 0,
+    "z": 8.620002746582031
+  },
+  "cameraFov": 45,
+  "colors": {
+    "alpha": 1,
+    "b": 0.20000000298023224,
+    "g": 0.7568627595901489,
+    "r": 0.20000000298023224
+  },
+  "constants": {
+    "A": 1.100000023841858,
+    "B": 2.490000009536743,
+    "C": 0.18000000715255737,
+    "E": 2,
+    "F": 1,
+    "S": 0
+  },
+  "equations": {
+    "p": "",
+    "x": "",
+    "y": "",
+    "z": ""
+  },
+  "fov3D": 45,
+  "fov4D": 45,
+  "geodesic": {
+    "conform": "1.0",
+    "du": "",
+    "dv": "",
+    "dw": "",
+    "u0": "",
+    "v0": "",
+    "w0": ""
+  },
+  "hintSeconds": 9,
+  "hintText": "Sliders\nA: quadric radius\nB: length of the lines\nC: tube thickness\nD: how many to draw\nE: one family of lines or both",
+  "isImplicitMode": false,
+  "lightIntensity": 0.97,
+  "lightingMode": 0,
+  "limits": {
+    "uMax": 0,
+    "uMin": 0,
+    "vMax": 0,
+    "vMin": 0,
+    "wMax": 0,
+    "wMin": 0,
+    "xMax": 1000,
+    "xMin": -1000,
+    "yMax": 1000,
+    "yMin": -1000,
+    "zMax": 1000,
+    "zMin": -1000
+  },
+  "meshParts": [
+    {
+      "b": 0.20000000298023224,
+      "g": 0.7568627595901489,
+      "r": 0.20000000298023224
     },
-    "camera3D": {
-        "pitch": 0,
-        "roll": 0,
-        "rot_w": 0.4612818956375122,
-        "rot_x": 0.4005368947982788,
-        "rot_y": 0.738064706325531,
-        "rot_z": -0.28644323348999023,
-        "x": 0,
-        "y": 0,
-        "yaw": 0,
-        "z": 8.620002746582031
-    },
-    "cameraFov": 45,
-    "colors": {
-        "alpha": 1,
-        "b": 0.20000000298023224,
-        "g": 0.7568627595901489,
-        "r": 0.20000000298023224
-    },
-    "constants": {
-        "A": 1.100000023841858,
-        "B": 2.490000009536743,
-        "C": 0.18000000715255737,
-        "D": 20,
-        "E": 2,
-        "F": 1,
-        "S": 0
-    },
-    "equations": {
-        "p": "",
-        "x": "",
-        "y": "",
-        "z": ""
-    },
-    "fov3D": 45,
-    "fov4D": 45,
-    "geodesic": {
-        "conform": "1.0",
-        "du": "",
-        "dv": "",
-        "dw": "",
-        "u0": "",
-        "v0": "",
-        "w0": ""
-    },
-    "hintSeconds": 9,
-    "hintText": "Sliders\nA: quadric radius\nB: length of the lines\nC: tube thickness\nD: how many to draw\nE: one family of lines or both",
-    "isImplicitMode": false,
-    "lightIntensity": 0.97,
-    "lightingMode": 0,
-    "limits": {
-        "uMax": 0,
-        "uMin": 0,
-        "vMax": 0,
-        "vMin": 0,
-        "wMax": 0,
-        "wMin": 0,
-        "xMax": 1000,
-        "xMin": -1000,
-        "yMax": 1000,
-        "yMin": -1000,
-        "zMax": 1000,
-        "zMin": -1000
-    },
-    "meshParts": [
-        {
-            "b": 0.20000000298023224,
-            "g": 0.7568627595901489,
-            "r": 0.20000000298023224
-        },
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {}
-    ],
-    "name": "Klein Quadric Ruled Lines",
-    "projectionMode": 1,
-    "renderMode": 1,
-    "scriptCode": "// --- LINES OF THE KLEIN QUADRIC AS TUBES ---\n// The Klein quadric (the Plucker hypersurface in P^5 that parametrizes the\n// lines of P^3) intersected with a generic P^3 gives a SMOOTH quadric in 3D:\n// verified that the Klein form has rank 6, and that 200 sections with a random P^3\n// give 200/200 rank 4. Here that section is rendered in its most\n// readable form: the one-sheeted hyperboloid x^2 + y^2 - z^2 = A^2, which is RULED --\n// it contains two families of lines, and that double ruling is exactly the object\n// the Klein quadric parametrizes.\n//\n// THE LINE. Family sheet = +1 or -1, angle a, parameter L along the line:\n//     P(a, L) = (A cos a - sheet L sin a,  A sin a + sheet L cos a,  L)\n// It lies on the quadric by construction: x^2 + y^2 - z^2 = A^2 + L^2 - L^2 = A^2,\n// for EVERY a, L, sheet (max error measured 3.6e-15).\n//\n// PROPERTY SHOWN. Lines of the SAME family are SKEW: minimum distance\n// measured 1.155 (N=4), 0.756 (N=6), 0.562 (N=8), 0.372 (N=12),\n// 0.279 (N=16), 0.223 (N=20) -> the tubes stay disjoint as long as C stays below\n// half that value. The two OPPOSITE families instead DO MEET (minimum distance\n// measured 7e-4, i.e. zero up to sampling): switching on\n// both with E shows the mesh of incidence points, which is the geometric\n// content of the Klein quadric.\n//\n// THE FRAME OF THE TUBE. The line is STRAIGHT, so the frame does not twist and is in\n// closed form (no orthogonalization in the shader):\n//     d  = (-sheet sin a, sheet cos a, 1)/sqrt(2)     direction\n//     n1 = (cos a, sin a, 0)                  already ORTHOGONAL to d\n//     n2 = d x n1 = (-sin a, cos a, -sheet)/sqrt(2)\n// Verified orthonormal to 1.9e-16, and |S - line| = C to 3.1e-16.\n//\n// --- MULTI-MESH: one tube per line ---\n// Twenty //MESH_BEGIN sections, one per line: separate grids, so no\n// quad can connect two lines (stitching them into a single grid would create a\n// joining sheet between different tubes). `mesh` = 0..19 indexes the line.\n// u runs along the line (few steps: it is straight), v around the tube.\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n\n// D = number of lines per family, an INTEGER: the slider snaps to the integer on\n// release. The := directive is read ONLY from the scriptCode.\nD := int(1,20);\n\nfloat N = clamp(floor(D + 0.5), 1.0, 20.0);\n\n// The mesh sections are static text: there are always 20. The copies beyond N\n// collapse into a point instead of being drawn.\nfloat live = step(mesh, N - 0.5);\n\n// FAMILY: E < 0.5 -> only sheet=+1. E >= 0.5 -> the two families alternated\n// (even meshes sheet=+1, odd meshes sheet=-1), which DO MEET: it is the mesh of the\n// double ruling. With two families the lines per family are N/2.\nfloat both = step(0.5, E);\nfloat sheet = mix(1.0, 1.0 - 2.0 * mod(mesh, 2.0), both);\n\n// Index of the line WITHIN its own family, and how many there are.\nfloat idx = mix(mesh, floor(mesh * 0.5), both);\nfloat cnt = mix(N, ceil(N * 0.5), both);\n\nfloat a = 6.28318531 * idx / cnt;\n\n// L along the line: u in [-1,1] rescaled by B (half height of the segment).\nfloat L = B * u;\n\n// Punto sulla retta e frame costante (forma chiusa).\nfloat ca = cos(a);\nfloat sa = sin(a);\nfloat k = 0.70710678;   // 1/sqrt(2)\n\nfloat px = (A * ca - sheet * L * sa) * live;\nfloat py = (A * sa + sheet * L * ca) * live;\nfloat pz = (L) * live;\n\n// n1 = (cos a, sin a, 0);  n2 = (-sin a, cos a, -sheet)/sqrt(2)\nfloat cv = cos(v);\nfloat sv = sin(v);\n\nfloat nx = cv * ca + sv * (-sa * k);\nfloat ny = cv * sa + sv * ( ca * k);\nfloat nz =           sv * (-sheet  * k);\n\n// The body becomes the body of vec4 getRawPosition(...): the return MUST be a\n// vec4, with the fourth component (4D coordinate) at 0 for a surface in R^3.\nreturn vec4(\n    px + C * nx * live,\n    py + C * ny * live,\n    pz + C * nz * live,\n    0.0\n);\n",
-    "steps": 200,
-    "type": "surface",
-    "use4DLighting": false,
-    "wireframe": {
-        "uStep": 4,
-        "vStep": 4
-    }
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+  ],
+  "name": "Klein Quadric Ruled Lines v2",
+  "projectionMode": 1,
+  "renderMode": 1,
+  "scriptCode": "// --- LINES OF THE KLEIN QUADRIC AS TUBES ---\n// The Klein quadric (the Plucker hypersurface in P^5 that parametrizes the\n// lines of P^3) intersected with a generic P^3 gives a SMOOTH quadric in 3D:\n// verified that the Klein form has rank 6, and that 200 sections with a random P^3\n// give 200/200 rank 4. Here that section is rendered in its most\n// readable form: the one-sheeted hyperboloid x^2 + y^2 - z^2 = A^2, which is RULED --\n// it contains two families of lines, and that double ruling is exactly the object\n// the Klein quadric parametrizes.\n//\n// THE LINE. Family sheet = +1 or -1, angle a, parameter L along the line:\n//     P(a, L) = (A cos a - sheet L sin a,  A sin a + sheet L cos a,  L)\n// It lies on the quadric by construction: x^2 + y^2 - z^2 = A^2 + L^2 - L^2 = A^2,\n// for EVERY a, L, sheet (max error measured 3.6e-15).\n//\n// PROPERTY SHOWN. Lines of the SAME family are SKEW: minimum distance\n// measured 1.155 (N=4), 0.756 (N=6), 0.562 (N=8), 0.372 (N=12),\n// 0.279 (N=16), 0.223 (N=20) -> the tubes stay disjoint as long as C stays below\n// half that value. The two OPPOSITE families instead DO MEET (minimum distance\n// measured 7e-4, i.e. zero up to sampling): switching on\n// both with E shows the mesh of incidence points, which is the geometric\n// content of the Klein quadric.\n//\n// THE FRAME OF THE TUBE. The line is STRAIGHT, so the frame does not twist and is in\n// closed form (no orthogonalization in the shader):\n//     d  = (-sheet sin a, sheet cos a, 1)/sqrt(2)     direction\n//     n1 = (cos a, sin a, 0)                  already ORTHOGONAL to d\n//     n2 = d x n1 = (-sin a, cos a, -sheet)/sqrt(2)\n// Verified orthonormal to 1.9e-16, and |S - line| = C to 3.1e-16.\n//\n// --- MULTI-MESH: one tube per line ---\n// One //MESH_BEGIN section, and the Meshes field sets the number of lines: each\n// copy is one tube, its own grid, so no quad can connect two lines (stitching\n// them into a single grid would create a joining sheet between different tubes).\n// `mesh` = 0..meshes-1 indexes the line.\n// u runs along the line (few steps: it is straight), v around the tube.\n//MESH_BEGIN\nu: -1, 1, 8\nv: 0, 6.28318531, 40\n//MESH_END\n\n// N = the Meshes field: the number of lines. Every copy is a line, so all of\n// them are drawn (the count is the field's, from 1 to 64).\nfloat N = max(meshes, 1.0);\n\n// FAMILY: E < 0.5 -> only sheet=+1. E >= 0.5 -> the two families alternated\n// (even meshes sheet=+1, odd meshes sheet=-1), which DO MEET: it is the mesh of the\n// double ruling. With two families the lines per family are N/2.\nfloat both = step(0.5, E);\nfloat sheet = mix(1.0, 1.0 - 2.0 * mod(mesh, 2.0), both);\n\n// Index of the line WITHIN its own family, and how many there are.\nfloat idx = mix(mesh, floor(mesh * 0.5), both);\nfloat cnt = mix(N, ceil(N * 0.5), both);\n\nfloat a = 6.28318531 * idx / cnt;\n\n// L along the line: u in [-1,1] rescaled by B (half height of the segment).\nfloat L = B * u;\n\n// Punto sulla retta e frame costante (forma chiusa).\nfloat ca = cos(a);\nfloat sa = sin(a);\nfloat k = 0.70710678;   // 1/sqrt(2)\n\nfloat px = (A * ca - sheet * L * sa);\nfloat py = (A * sa + sheet * L * ca);\nfloat pz = (L);\n\n// n1 = (cos a, sin a, 0);  n2 = (-sin a, cos a, -sheet)/sqrt(2)\nfloat cv = cos(v);\nfloat sv = sin(v);\n\nfloat nx = cv * ca + sv * (-sa * k);\nfloat ny = cv * sa + sv * ( ca * k);\nfloat nz =           sv * (-sheet  * k);\n\n// The body becomes the body of vec4 getRawPosition(...): the return MUST be a\n// vec4, with the fourth component (4D coordinate) at 0 for a surface in R^3.\nreturn vec4(\n    px + C * nx,\n    py + C * ny,\n    pz + C * nz,\n    0.0\n);\n",
+  "steps": 200,
+  "type": "surface",
+  "use4DLighting": false,
+  "wireframe": {
+    "uStep": 4,
+    "vStep": 4
+  },
+  "meshCount": 20
 }

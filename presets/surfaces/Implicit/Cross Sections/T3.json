@@ -60,7 +60,7 @@
     },
     "hintSeconds": 7,
     "hintText": "Sliders\nA: radius of the main ring\nB: thickness of the inner tube\nC: thickness of the outer tube",
-    "hybridMarcher": false,
+    "hybridMarcher": true,
     "implicitEquation": "x^2 + y^2 + z^2 = 1.0",
     "implicitUsesCrossSection": true,
     "isImplicitMode": true,

@@ -1,8 +1,8 @@
 {
     "angles": {
-        "omega": 0.10000000149011612,
-        "phi": 0.10000000149011612,
-        "psi": 0.10000000149011612
+        "omega": 9.999999747378752e-05,
+        "phi": 9.999999747378752e-05,
+        "psi": 9.999999747378752e-05
     },
     "camera3D": {
         "pitch": 0,
@@ -74,6 +74,7 @@
     "name": "Mobius Strip",
     "projectionMode": 1,
     "renderMode": 2,
+    "space": "H3",
     "showBorder": false,
     "steps": 384,
     "type": "surface",

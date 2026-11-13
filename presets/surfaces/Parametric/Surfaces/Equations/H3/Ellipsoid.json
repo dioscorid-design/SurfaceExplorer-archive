@@ -78,6 +78,7 @@
     "name": "Ellipsoid",
     "projectionMode": 1,
     "renderMode": 1,
+    "space": "H3",
     "steps": 553,
     "type": "surface",
     "use4DLighting": true,

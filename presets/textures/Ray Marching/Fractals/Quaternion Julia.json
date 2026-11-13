@@ -1,0 +1,15 @@
+{
+    "code": "// Quaternion Julia - color only, ANIMATED. Runs INSIDE shadeSurface().\n// The 3D cousin of the Julia set: every point of the surface is a quaternion\n// q = (x, y, z, 0) iterated as q -> q^2 + c. The surface CUTS the 4D fractal, so what\n// you see is the cross-section of the set by your object: a sphere shows one\n// slice, a torus another. c drifts slowly with time and the slice morphs.\n// Colors: smooth escape count (bands) + an orbit trap (glow along the filaments).\n// No displacement: costs one evaluation per pixel, cheap at any resolution.\n// In scope: pModel, n_model, t. Dock colors: u_col1 = light bands, u_col2 = deep tone.\n\nfloat ZOOM  = 0.9 * max(E, 0.05);    // slider E   // size of the slice   [0.5 .. 2]\nfloat MORPH = 0.25 * F;              // slider F   // morph speed         [0 .. 1]\nconst int ITER = 24;                 // detail of the boundary             [12 .. 48]\n\n// c wanders on a small loop around a classic \"dendrite\" value\nvec4 cq = vec4(-0.291, -0.399, 0.339, 0.437)\n        + 0.10 * vec4(sin(MORPH * t), cos(0.73 * MORPH * t), sin(0.51 * MORPH * t + 1.0), 0.0);\n\nvec4 q = vec4(pModel * ZOOM, 0.0);\nfloat trap = 1e9;\nfloat r2 = 0.0;\nfloat n = float(ITER);\nfor (int i = 0; i < ITER; i++) {\n    // quaternion square: (a, v)^2 = (a^2 - v.v, 2 a v)\n    q = vec4(q.x * q.x - dot(q.yzw, q.yzw), 2.0 * q.x * q.yzw) + cq;\n    r2 = dot(q, q);\n    trap = min(trap, abs(q.y) + 0.5 * abs(q.z));\n    if (r2 > 64.0) { n = float(i); break; }\n}\n\nvec3 col;\nif (r2 <= 64.0) {\n    // inside the set: deep tone, lit by the orbit trap along the filaments\n    col = mix(ubuf.u_col2 * 0.6, ubuf.u_col2 * 2.2 + 0.15 * ubuf.u_col1, exp(-4.0 * trap));\n} else {\n    // smooth escape count -> continuous bands instead of rings\n    float sn = n + 1.0 - log2(log2(r2) * 0.5);\n    float k  = clamp(sn / float(ITER), 0.0, 1.0);     // 0 far out .. 1 at the boundary\n    float band = 0.5 + 0.5 * cos(1.1 * sn - 0.6 * MORPH * t);\n    vec3 pal = 0.5 + 0.5 * cos(6.2832 * (0.06 * sn + vec3(0.0, 0.12, 0.30)));\n    col = mix(ubuf.u_col2, ubuf.u_col1, smoothstep(0.0, 0.6, k));\n    col *= 0.7 + 0.3 * band;\n    col = mix(col, pal * ubuf.u_col1, 0.3 * k);\n}\n\ntextureCol = col;\n",
+    "color1": "#ffd27a",
+    "color2": "#1a1440",
+    "hasCustomColors": true,
+    "isImplicitMode": true,
+    "name": "Quaternion Julia",
+    "pan_x": 0,
+    "pan_y": 0,
+    "rotation": 0,
+    "type": "custom_texture",
+    "zoom": 1,
+    "hintText": "Sliders\nE: zoom on the fractal (1 = default, higher = more of the set)\nF: speed of the morphing (0 = still)",
+    "hintSeconds": 7
+}

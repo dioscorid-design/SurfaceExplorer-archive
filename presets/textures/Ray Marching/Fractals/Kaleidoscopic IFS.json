@@ -1,0 +1,15 @@
+{
+    "code": "// Kaleidoscopic IFS - color only, ANIMATED. Runs INSIDE shadeSurface().\n// A kaleidoscopic iterated function system (Knighty's KIFS): fold space into one\n// wedge of a cube's symmetry (abs + sorting of the coordinates), turn it a little,\n// scale it about a corner -- and repeat. Points of the attractor stay close to the\n// corner; the others are flung away. The surface cuts this crystal: facets, nested\n// triangles and squares at every scale. The turn angle drifts with time, so the\n// crystal slowly reorganizes itself.\n// No displacement: one evaluation per pixel, cheap at any resolution.\n// In scope: pModel, t. Dock colors: u_col1 = light facets, u_col2 = deep tone.\n\nfloat ZOOM  = 1.3 * max(E, 0.05);   // slider E   // size of the crystal     [0.5 .. 3]\nfloat TURN  = 0.08 * F;             // slider F   // turning speed           [0 .. 0.4]\nfloat SCALE = 2.0;                  // scale of each fold                    [1.8 .. 2.4]\nvec3  OFFS  = vec3(1.0, 0.9, 0.8);  // the corner the folds scale about\nconst int ITER = 9;\n\nfloat ang = 0.25 + 0.15 * sin(TURN * t);\nfloat ca = cos(ang);\nfloat sa = sin(ang);\n// rotation about the (1,1,1) diagonal: Rodrigues' formula, written out\nvec3  ax = vec3(0.57735);\nmat3  rot = mat3(ca) + sa * mat3(0.0, ax.z, -ax.y,  -ax.z, 0.0, ax.x,  ax.y, -ax.x, 0.0)\n          + (1.0 - ca) * mat3(ax.x * ax, ax.y * ax, ax.z * ax);\n\nvec3 z = pModel * ZOOM;\nvec4 trap = vec4(1e9);\nfor (int i = 0; i < ITER; i++) {\n    z = abs(z);\n    if (z.x < z.y) z.xy = z.yx;\n    if (z.x < z.z) z.xz = z.zx;\n    if (z.y < z.z) z.yz = z.zy;\n    z = rot * z;\n    z = z * SCALE - OFFS * (SCALE - 1.0);\n    trap = min(trap, vec4(abs(z), dot(z, z)));\n}\n// distance to the attractor (the classic KIFS estimate), back in model units\nfloat de = (length(z) - 1.5) * pow(SCALE, -float(ITER)) / ZOOM;\n\n// facets colored by the orbit trap: orbits that stay near the corner (small trap)\n// are the crystal, in the palette; the ones flung away sink toward u_col2\nvec3 pal = 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.2, 0.45) + 0.6 * sqrt(trap.xyz)));\nfloat far = clamp(0.3 * log(1.0 + trap.w), 0.0, 1.0);\nvec3 col = mix(ubuf.u_col1 * (0.45 + 0.85 * pal), ubuf.u_col2, far);\n// bright edges where the surface passes close to the attractor\ncol += ubuf.u_col1 * 0.8 * (1.0 - smoothstep(0.0, 0.006, abs(de)));\ncol *= 0.75 + 0.25 * smoothstep(0.0, 0.05, abs(de));\n\ntextureCol = col;\n",
+    "color1": "#ffe3a8",
+    "color2": "#14203a",
+    "hasCustomColors": true,
+    "isImplicitMode": true,
+    "name": "Kaleidoscopic IFS",
+    "pan_x": 0,
+    "pan_y": 0,
+    "rotation": 0,
+    "type": "custom_texture",
+    "zoom": 1,
+    "hintText": "Sliders\nE: zoom on the fractal (1 = default)\nF: speed of the slow turning (0 = still)",
+    "hintSeconds": 7
+}

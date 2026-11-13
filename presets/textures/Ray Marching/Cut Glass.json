@@ -1,0 +1,16 @@
+{
+    "code": "// Cut Glass - color and sparkle. STATIC (no t/u_time). Runs INSIDE shadeSurface().\n// Glass is nearly colorless: the realism is the facet shading (from the displacement)\n// plus a specular glint on facets facing the light. In scope: pModel, n_model,\n// viewDir_model, mainLight_model. Dock colors: u_col1 = glass tint, u_col2 = glint.\n\nfloat SPARKLE_SHARP = 90.0;   // glint sharpness (exponent)  [30 .. 160]\nfloat SPARKLE_GAIN  = 1.4;    // sparkle intensity           [0.5 .. 3.0]\nfloat FRESNEL_LIFT  = 1.25;   // grazing-edge brightness     [1.0 .. 1.6]\n\n// base glass tint: u_col1, slightly modulated by viewing angle (cheap Fresnel).\nfloat fres = pow(1.0 - max(dot(n_model, viewDir_model), 0.0), 3.0);\nvec3 glass = mix(ubuf.u_col1, ubuf.u_col1 * FRESNEL_LIFT, fres);\n\n// Narrow specular glint computed HERE (independent of the useSpecular toggle).\nvec3 H = normalize(mainLight_model + viewDir_model);\nfloat sparkle = pow(max(dot(n_model, H), 0.0), SPARKLE_SHARP);\n\n// the glint tends toward u_col2 (usually white): added on top of the tint.\nglass += ubuf.u_col2 * sparkle * SPARKLE_GAIN;\n\ntextureCol = glass;\n",
+    "color1": "#00d2d8",
+    "color2": "#ffffff",
+    "displacement": "// Cut Glass - relief (displacement). STATIC (no t/u_time). Runs INSIDE map().\n// Hammered-glass look = dense pattern of sharp-edged micro-facets, produced by a\n// 3D Voronoi (F1: distance to the nearest cell). In scope: d_surf, p, pModel.\n// GPU note: 27 samples inside map() -> heavy on low-end Mali/Adreno; keep DENSITY low there.\n\nfloat DENSITY = 9.0 * E;   // slider E    // facet density   [4 .. 16]\nfloat DEPTH   = 0.05 * F;   // slider F   // relief depth    [0.02 .. 0.09]  (above ~0.09 rays punch through)\n\nvec3 vp = pModel * DENSITY;\nvec3 vi = floor(vp);\nvec3 vf = fract(vp);\n\n// Voronoi 3x3x3: find the nearest cell-point (F1).\nfloat f1 = 8.0;\nfor (int gx = -1; gx <= 1; gx++)\nfor (int gy = -1; gy <= 1; gy++)\nfor (int gz = -1; gz <= 1; gz++) {\n    vec3 g = vec3(float(gx), float(gy), float(gz));\n    // pseudo-random feature point inside the neighbouring cell\n    vec3 o = fract(sin(vec3(\n        dot(vi + g, vec3(127.1, 311.7,  74.7)),\n        dot(vi + g, vec3(269.5, 183.3, 246.1)),\n        dot(vi + g, vec3(113.5, 271.9, 124.6)))) * 43758.5453);\n    vec3 r = g + o - vf;\n    float d = dot(r, r);   // squared distance (cheaper)\n    f1 = min(f1, d);\n}\nf1 = sqrt(f1);   // ~[0,1]: 0 at the cell centre, grows toward the edges\n\n// Each facet is a cone: high at the cell centre, dropping to the edges (micro-pyramids).\nfloat facet = 1.0 - f1;\n\nd_surf -= DEPTH * facet;\n\n// Anti-punch-through trick: slow the rays so they don't overshoot the tips.\nd_surf *= 0.6;\n",
+    "hasCustomColors": true,
+    "isImplicitMode": true,
+    "name": "Cut Glass",
+    "pan_x": 0,
+    "pan_y": 0,
+    "rotation": 0,
+    "type": "custom_texture",
+    "zoom": 1,
+    "hintText": "Sliders\nE: density of the facets (1 = default, higher = finer)\nF: depth of the cuts",
+    "hintSeconds": 7
+}

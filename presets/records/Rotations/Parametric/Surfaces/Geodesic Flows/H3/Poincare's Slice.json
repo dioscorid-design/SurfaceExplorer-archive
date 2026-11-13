@@ -1,9 +1,9 @@
 {
     "activeMotion": "rotation",
     "angles": {
-        "omega": 0.10000000149011612,
-        "phi": 0.10000000149011612,
-        "psi": 84.63312530517578
+        "omega": 9.999999747378752e-05,
+        "phi": 9.999999747378752e-05,
+        "psi": 9.999999747378752e-05
     },
     "background": {
         "code": "//IMG:/Users/dioscorid/Projects/C/presets/textures/Images/8.png\n// =========================================================================\n// Title: Rotating Image  (matrice di ROTAZIONE)\n//\n// Famiglia \"Animated Images\": l'immagine caricata (ambito \"All\") viene\n// campionata via iChannel0 e trasformata da una matrice 2x2 che dipende dal\n// tempo. La matrice agisce sulle COORDINATE del piano della texture, percio'\n// e' 2x2: mappa (x,y) in (x',y').\n//\n// DUE VINCOLI DEL RAMO SHADERTOY di questo motore:\n//  1. gli slider A..F e t NON sono usabili qui: il motore li dichiara come\n//     variabili LOCALI di getCustomColor(), mentre mainImage() e' una\n//     funzione a se' -> \"'A' : undeclared identifier\";\n//  2. niente dichiarazioni a livello di MODULO (const, funzioni, #define):\n//     con due mesh che usano questo script il fragment ne conterrebbe due\n//     copie -> \"redefinition\", e la superficie sparirebbe.\n// Percio' i parametri stanno DENTRO mainImage: li' lo scope e' per-funzione\n// e ogni mesh ha la sua copia.\n// =========================================================================\n//\n// MATRICE DI ROTAZIONE: l'immagine gira attorno al proprio centro senza\n// deformarsi. E' una matrice ORTOGONALE (determinante 1, colonne unitarie e\n// perpendicolari): conserva lunghezze e angoli, quindi non stira nulla.\n\nvoid mainImage(out vec4 Q, vec2 U)\n{\n    // --- PARAMETRI (modificabili qui) ---\n    float speed = 0.12;   // velocita' di rotazione\n\n    // Coordinata centrata: nel ramo Shadertoy iResolution vale 1024,\n    // quindi V va circa in [-0.5, 0.5].\n    vec2 V = U / iResolution.xy - 0.5;\n\n    // Matrice di rotazione di angolo a.\n    float a = iTime * speed;\n    float c = cos(a), s = sin(a);\n    mat2 M = mat2( c, s,\n                  -s, c);\n    V = M * V;\n\n    // Campionamento diretto, senza bias di mip: l'immagine resta nitida.\n    // +0.5 riporta la coordinata in [0,1].\n    Q = texture(iChannel0, V + 0.5);\n}",
@@ -117,7 +117,7 @@
         "path4D": 10,
         "phi": 0,
         "precession": 0.30000001192092896,
-        "psi": 0.10000000149011612,
+        "psi": 0,
         "spin": 0.10000000149011612
     },
     "steps": 851,

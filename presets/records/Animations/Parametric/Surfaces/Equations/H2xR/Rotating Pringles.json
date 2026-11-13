@@ -1,9 +1,9 @@
 {
     "activeMotion": "none",
     "angles": {
-        "omega": 0.10000000149011612,
-        "phi": 0.10000000149011612,
-        "psi": 0.10000000149011612
+        "omega": 9.999999747378752e-05,
+        "phi": 9.999999747378752e-05,
+        "psi": 9.999999747378752e-05
     },
     "background": {
         "code": "// --- 1. INPUT ---\nvec3 c1 = u_col1;\nvec3 c2 = u_col2;\n\n// --- 2. FIX BORDI (Il segreto) ---\n// Usiamo la variabile 'u_isFlat' che abbiamo creato oggi.\n// Il taglio nero avviene SOLO nell'anteprima 2D.\nif (u_isFlat && (u < 0.0 || u > 1.0 || v < 0.0 || v > 1.0)) {\n    return vec3(0.0); \n}\n\n// --- 3. LOGICA GRADIENTE ---\nfloat pos = v;\n\n// clamp assicura che sulla superficie 3D i colori si estendano \n// fino ai bordi invece di fare cose strane o invertire il gradiente.\npos = clamp(pos, 0.0, 1.0);\n\n// --- 4. OUTPUT ---\nreturn mix(c1, c2, pos);",

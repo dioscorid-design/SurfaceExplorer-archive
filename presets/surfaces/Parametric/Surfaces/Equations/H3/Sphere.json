@@ -7,15 +7,16 @@
     "camera3D": {
         "pitch": 0,
         "roll": 0,
-        "rot_w": -0.10777774453163147,
-        "rot_x": 0.6760131120681763,
-        "rot_y": -0.7277899980545044,
-        "rot_z": -0.04137502610683441,
+        "rot_w": -0.5352498888969421,
+        "rot_x": -0.7822639346122742,
+        "rot_y": 0.07334902882575989,
+        "rot_z": -0.31014618277549744,
         "x": 0,
         "y": 0,
         "yaw": 0,
-        "z": 4
+        "z": 3.059999465942383
     },
+    "cameraFov": 45,
     "colors": {
         "alpha": 1,
         "b": 0.20000000298023224,
@@ -23,8 +24,8 @@
         "r": 0.20000000298023224
     },
     "constants": {
-        "A": 7.360000133514404,
-        "B": 4.940000057220459,
+        "A": 4.039999961853027,
+        "B": 2.2200000286102295,
         "C": 1,
         "D": 1,
         "E": 1,
@@ -32,17 +33,20 @@
         "S": 0
     },
     "equations": {
-        "defU": "B+A*sin(v)*cos(u)",
-        "defV": "A*sin(v)*sin(u)",
-        "defW": "A*cos(v)",
+        "defU": "sinh(B)*cosh(A) + cosh(B)*sinh(A)*sin(v)*cos(u)",
+        "defV": "sinh(A)*sin(v)*sin(u)",
+        "defW": "sinh(A)*cos(v)",
         "explicitU": "",
         "explicitV": "",
         "explicitW": "",
-        "p": "0.5",
-        "x": "U * tanh(sqrt(U^2+V^2+W^2)/2) / (sqrt(U^2+V^2+W^2) + 0.00001)",
-        "y": "V * tanh(sqrt(U^2+V^2+W^2)/2) / (sqrt(U^2+V^2+W^2) + 0.00001)",
-        "z": "W * tanh(sqrt(U^2+V^2+W^2)/2) / (sqrt(U^2+V^2+W^2) + 0.00001)"
+        "p": "",
+        "x": "U / (1 + sqrt(1+U^2+V^2+W^2))",
+        "y": "V / (1 + sqrt(1+U^2+V^2+W^2))",
+        "z": "W / (1 + sqrt(1+U^2+V^2+W^2))"
     },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
     "geodesic": {
         "conform": "1.0",
         "du": "",
@@ -71,11 +75,16 @@
         "zMax": 1000,
         "zMin": -1000
     },
+    "meshScopeAll": true,
     "name": "Sphere",
     "projectionMode": 1,
     "renderMode": 1,
-    "showBorder": false,
-    "steps": 619,
+    "space": "H3",
+    "steps": 601,
     "type": "surface",
-    "use4DLighting": false
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
 }

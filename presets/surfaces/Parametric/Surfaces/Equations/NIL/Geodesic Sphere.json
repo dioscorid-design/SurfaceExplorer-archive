@@ -7,10 +7,10 @@
     "camera3D": {
         "pitch": 0,
         "roll": 0,
-        "rot_w": 0.2728087604045868,
-        "rot_x": -0.03210778534412384,
-        "rot_y": 0.955940842628479,
-        "rot_z": -0.10354569554328918,
+        "rot_w": -0.2306981384754181,
+        "rot_x": -0.07342132925987244,
+        "rot_y": 0.9549599885940552,
+        "rot_z": -0.17157849669456482,
         "x": 0,
         "y": 0,
         "yaw": 0,
@@ -24,8 +24,8 @@
         "r": 0.20000000298023224
     },
     "constants": {
-        "A": 1.25,
-        "B": 1,
+        "A": 0.8999999761581421,
+        "B": 8,
         "C": 1,
         "D": 1,
         "E": 1,
@@ -33,17 +33,18 @@
         "S": 0
     },
     "equations": {
-        "defU": "",
-        "defV": "",
-        "defW": "",
+        "defU": "u",
+        "defV": "min(1.0, 6.2831853/max(B, 0.001))*sin(v)",
+        "defW": "B*min(1.0, 6.2831853/max(B, 0.001))*sin(v)",
         "explicitU": "",
         "explicitV": "",
         "explicitW": "",
         "p": "0",
-        "x": "A*(((sin(v+0.00001)-(v+0.00001)*cos(v+0.00001))/((v+0.00001)*(v+0.00001)))*cos(u)+((cos(v+0.00001)-1+(v+0.00001)*sin(v+0.00001))/((v+0.00001)*(v+0.00001)))*sin(u))",
-        "y": "A*(((sin(v+0.00001)-(v+0.00001)*cos(v+0.00001))/((v+0.00001)*(v+0.00001)))*sin(u)-((cos(v+0.00001)-1+(v+0.00001)*sin(v+0.00001))/((v+0.00001)*(v+0.00001)))*cos(u))",
-        "z": "A*(2*(v+0.00001)-sin(2*(v+0.00001)))/(2*(v+0.00001)*(v+0.00001))"
+        "x": "A*sqrt(max(0.0, 1.0 - V*V))*((abs(W) < 0.000001 ? 1.0 : sin(W)/W)*cos(U) - (abs(W) < 0.000001 ? 0.5*W : 2.0*sin(0.5*W)*sin(0.5*W)/W)*sin(U))",
+        "y": "A*sqrt(max(0.0, 1.0 - V*V))*((abs(W) < 0.000001 ? 1.0 : sin(W)/W)*sin(U) + (abs(W) < 0.000001 ? 0.5*W : 2.0*sin(0.5*W)*sin(0.5*W)/W)*cos(U))",
+        "z": "A*(V + 0.5*B*(1.0 - V*V)*(abs(W) < 0.25 ? W*(1.0/6.0 - W*W*(1.0/120.0 - W*W*(1.0/5040.0 - W*W/362880.0))) : (W - sin(W))/(W*W)))"
     },
+    "fillLight": 0,
     "fov3D": 45,
     "fov4D": 45,
     "geodesic": {
@@ -55,16 +56,16 @@
         "v0": "",
         "w0": ""
     },
-    "hintSeconds": 6,
-    "hintText": "Slider A: size",
+    "hintSeconds": 8,
+    "hintText": "Sliders\nA: size\nB: geodesic radius; up to 2π the sphere is smooth, beyond 2π it closes with an inward cusp at each pole, where it meets the cut locus\nThe Riemannian Nil sphere: points at distance B from one point",
     "isImplicitMode": false,
     "lightIntensity": 1,
     "lightingMode": 0,
     "limits": {
         "uMax": 6.28318977355957,
         "uMin": 0,
-        "vMax": 6.28318977355957,
-        "vMin": -6.28318977355957,
+        "vMax": 1.5707963705062866,
+        "vMin": -1.5707963705062866,
         "wMax": 0,
         "wMin": 0,
         "xMax": 1000,

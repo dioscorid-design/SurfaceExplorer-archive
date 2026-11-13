@@ -1,8 +1,8 @@
 {
     "angles": {
-        "omega": 0.10000000149011612,
-        "phi": 0.10000000149011612,
-        "psi": 0.10000000149011612
+        "omega": 9.999999747378752e-05,
+        "phi": 9.999999747378752e-05,
+        "psi": 9.999999747378752e-05
     },
     "camera3D": {
         "pitch": 0,
@@ -16,7 +16,9 @@
         "yaw": 0,
         "z": 4
     },
+    "cameraFov": 45,
     "colors": {
+        "alpha": 1,
         "b": 0.20000000298023224,
         "g": 0.800000011920929,
         "r": 0.20000000298023224
@@ -25,10 +27,10 @@
         "A": 1,
         "B": 0.3400000035762787,
         "C": 0.46000000834465027,
-        "D": 2,
-        "E": 1.5,
-        "F": 0,
-        "S": 3.7899999618530273
+        "D": 1,
+        "E": 1,
+        "F": 1,
+        "S": 0
     },
     "equations": {
         "defU": "u ",
@@ -42,8 +44,21 @@
         "y": "A * tanh(U/2) * sin(V)",
         "z": "B * W"
     },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
+    },
     "hintSeconds": 6,
     "hintText": "Sliders\nA: size\nB: height of the saddle\nC: how much it twists",
+    "isImplicitMode": false,
     "lightIntensity": 1,
     "lightingMode": 0,
     "limits": {
@@ -52,13 +67,23 @@
         "vMax": 6.28318977355957,
         "vMin": 0,
         "wMax": 0,
-        "wMin": 0
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
     },
+    "meshScopeAll": true,
     "name": "Hyperbolic Saddle",
     "projectionMode": 1,
     "renderMode": 1,
-    "showBorder": false,
-    "steps": 272,
+    "steps": 566,
     "type": "surface",
-    "use4DLighting": false
+    "use4DLighting": false,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
 }

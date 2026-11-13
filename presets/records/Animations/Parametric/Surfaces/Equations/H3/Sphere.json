@@ -1,4 +1,5 @@
 {
+    "activeMotion": "none",
     "angles": {
         "omega": 9.999999747378752e-05,
         "phi": 9.999999747378752e-05,
@@ -14,6 +15,7 @@
         "pan_x": 0,
         "pan_y": 0,
         "rotation": 0,
+        "skyMode": "fixed",
         "zoom": 1
     },
     "camera3D": {
@@ -28,34 +30,47 @@
         "yaw": 0,
         "z": 4
     },
+    "cameraFov": 45,
     "colors": {
         "alpha": 1,
-        "bordColor": "#33cc33",
         "surfColor": "#33cc33"
     },
     "constants": {
-        "A": 5.860000133514404,
-        "B": 5.630000114440918,
+        "A": 4.5,
+        "B": 2.5,
         "C": 0.4000000059604645,
-        "D": 0,
-        "E": 0,
-        "F": 0,
+        "D": 1,
+        "E": 1,
+        "F": 1,
         "S": 0
     },
     "equations": {
-        "defU": "B*cos(t) + A*sin(v)*cos(u)",
-        "defV": "B*sin(t)+A*sin(v)*sin(u)",
-        "defW": "C*cos(t)+A*cos(v)",
+        "defU": "sinh(A)*sin(v)*cos(u) + B*cos(t)*((cosh(sqrt(B^2+(C*cos(t))^2))-1)/(B^2+(C*cos(t))^2+0.00001)*sinh(A)*(B*sin(v)*cos(u-t)+C*cos(t)*cos(v)) + sinh(sqrt(B^2+(C*cos(t))^2))/(sqrt(B^2+(C*cos(t))^2)+0.00001)*cosh(A))",
+        "defV": "sinh(A)*sin(v)*sin(u) + B*sin(t)*((cosh(sqrt(B^2+(C*cos(t))^2))-1)/(B^2+(C*cos(t))^2+0.00001)*sinh(A)*(B*sin(v)*cos(u-t)+C*cos(t)*cos(v)) + sinh(sqrt(B^2+(C*cos(t))^2))/(sqrt(B^2+(C*cos(t))^2)+0.00001)*cosh(A))",
+        "defW": "sinh(A)*cos(v) + C*cos(t)*((cosh(sqrt(B^2+(C*cos(t))^2))-1)/(B^2+(C*cos(t))^2+0.00001)*sinh(A)*(B*sin(v)*cos(u-t)+C*cos(t)*cos(v)) + sinh(sqrt(B^2+(C*cos(t))^2))/(sqrt(B^2+(C*cos(t))^2)+0.00001)*cosh(A))",
         "explicitU": "",
         "explicitV": "",
         "explicitW": "",
         "p": "0.5",
-        "x": "U * tanh(sqrt(U^2+V^2+W^2)/2) / (sqrt(U^2+V^2+W^2) + 0.00001)",
-        "y": "V * tanh(sqrt(U^2+V^2+W^2)/2) / (sqrt(U^2+V^2+W^2) + 0.00001)",
-        "z": "W * tanh(sqrt(U^2+V^2+W^2)/2) / (sqrt(U^2+V^2+W^2) + 0.00001)"
+        "x": "U / (1 + sqrt(1+U^2+V^2+W^2))",
+        "y": "V / (1 + sqrt(1+U^2+V^2+W^2))",
+        "z": "W / (1 + sqrt(1+U^2+V^2+W^2))"
+    },
+    "fillLight": 0,
+    "fov3D": 45,
+    "fov4D": 45,
+    "geodesic": {
+        "conform": "1.0",
+        "du": "",
+        "dv": "",
+        "dw": "",
+        "u0": "",
+        "v0": "",
+        "w0": ""
     },
     "hintSeconds": 6,
     "hintText": "Sliders\nA: radius of the sphere\nB and C: travel through the ball",
+    "isImplicitMode": false,
     "lightIntensity": 1,
     "lightingMode": 0,
     "limits": {
@@ -64,8 +79,15 @@
         "vMax": 3.141590118408203,
         "vMin": 0,
         "wMax": 0,
-        "wMin": 0
+        "wMin": 0,
+        "xMax": 1000,
+        "xMin": -1000,
+        "yMax": 1000,
+        "yMin": -1000,
+        "zMax": 1000,
+        "zMin": -1000
     },
+    "meshScopeAll": true,
     "name": "Sphere",
     "observer4D": 4,
     "path3D": {
@@ -84,9 +106,9 @@
         "z": ""
     },
     "pathMode": 0,
+    "pathMode3D": 0,
     "projectionMode": 1,
     "renderMode": 0,
-    "showBorder": false,
     "soundLibName": "Dust Storm",
     "speeds": {
         "nutation": 0,
@@ -98,18 +120,22 @@
         "psi": 0,
         "spin": 0
     },
-    "steps": 101,
+    "steps": 400,
     "texture": {
-        "code": "//SOUND_BEGIN\n//SOUND_BEGIN\n// =========================================================================\n// Title: Dust Storm Sonification (Pure Wind/Sand) =========================================================================\n\n// --- Le funzioni matematiche originali ---\nfloat tri(in float x) { \n    return abs(fract(x) - 0.5); \n}\n\nvec3 tri3(in vec3 p) { \n    return vec3(tri(p.z + tri(p.y * 1.0)), tri(p.z + tri(p.x * 1.0)), tri(p.y + tri(p.x * 1.0))); \n}\n\n// Generatore di turbolenza frattale 3D (il vento)\nfloat triNoise3d(in vec3 p, in float spd, in float time) {\n    float z = 1.4;\n    float rz = 0.0;\n    vec3 bp = p;\n    for (float i = 0.0; i <= 3.0; i++) {\n        vec3 dg = tri3(bp * 2.0);\n        p += (dg + time * spd);\n        bp *= 1.8;\n        z *= 1.5;\n        p *= 1.2;\n        rz += (tri(p.z + tri(p.x + tri(p.y)))) / z;\n        bp += 0.14;\n    }\n    return rz;\n}\n\n// --- Generazione Audio ---\nvec2 mainSound(int samp, float time) {\n    // 1. Muoviamo i \"microfoni virtuali\" attraverso il rumore 3D\n    vec3 pL = vec3(time * 150.0, time * 50.0, 0.0);\n    vec3 pR = vec3(time * 140.0, time * 60.0, 10.0);\n    \n    // 2. Estraiamo il rumore della tempesta\n    float noiseL = triNoise3d(pL, 0.0, time);\n    float noiseR = triNoise3d(pR, 0.0, time);\n    \n    // 3. Centriamo l'onda (il triNoise restituisce solo valori positivi) \n    // e ne regoliamo l'ampiezza per dare dinamica alla sabbia\n    noiseL = (noiseL - 0.4) * 2.5;\n    noiseR = (noiseR - 0.4) * 2.5;\n    \n    // 4. Mix finale: Solo il fruscio del vento e della sabbia, leggermente abbassato (80%)\n    vec2 audio = vec2(noiseL, noiseR) * 0.8;\n    \n    // 5. Inviluppo per entrare dolcemente\n    float env = smoothstep(0.0, 2.0, time);\n    \n    return clamp(audio * env, -1.0, 1.0);\n}\n//SOUND_END\n\n// --- PARAMETRI ---\n// Imposta nel dock: Rosso (c1) e Bianco (c2) per l'effetto classico\nvec3 c1 = u_col1;\nvec3 c2 = u_col2;\n\n// --- CONFIGURAZIONE SPIRALE ---\n// Coils: Quante strisce vedi in una sezione trasversale del tubo\nfloat coils = 6.0;\n\n// Twists: Quanti giri completi fa la spirale lungo tutto il toro\n// Deve essere un numero intero per evitare che la texture si tagli alla giunzione\nfloat twists = 40.0;\n\n// --- CALCOLO ---\n// La magia è sommare U e V moltiplicati.\n// (u * twists) spinge la texture lungo il percorso\n// (v * coils) avvolge la texture attorno al tubo\n// Sommando i due si ottiene una linea diagonale (elica/spirale)\nfloat pos = (u * twists) + (v * coils);\n\n// --- CREAZIONE STRISCE NETTE ---\n// fract(pos) crea un dente di sega da 0.0 a 1.0 ripetuto\n// step(0.5, ...) taglia di netto il valore: sotto 0.5 è 0, sopra è 1.\nfloat stripe = step(0.5, fract(pos));\n\n// Restituisce il colore (senza sfumature)\nreturn mix(c1, c2, stripe);",
-        "col1": "#33cc33",
-        "col2": "#000000",
+        "code": "//SOUND_BEGIN\n// =========================================================================\n// Title: Dust Storm Sonification (Pure Wind/Sand) =========================================================================\n\n// --- Le funzioni matematiche originali ---\nfloat tri(in float x) { \n    return abs(fract(x) - 0.5); \n}\n\nvec3 tri3(in vec3 p) { \n    return vec3(tri(p.z + tri(p.y * 1.0)), tri(p.z + tri(p.x * 1.0)), tri(p.y + tri(p.x * 1.0))); \n}\n\n// Generatore di turbolenza frattale 3D (il vento)\nfloat triNoise3d(in vec3 p, in float spd, in float time) {\n    float z = 1.4;\n    float rz = 0.0;\n    vec3 bp = p;\n    for (float i = 0.0; i <= 3.0; i++) {\n        vec3 dg = tri3(bp * 2.0);\n        p += (dg + time * spd);\n        bp *= 1.8;\n        z *= 1.5;\n        p *= 1.2;\n        rz += (tri(p.z + tri(p.x + tri(p.y)))) / z;\n        bp += 0.14;\n    }\n    return rz;\n}\n\n// --- Generazione Audio ---\nvec2 mainSound(int samp, float time) {\n    // 1. Muoviamo i \"microfoni virtuali\" attraverso il rumore 3D\n    vec3 pL = vec3(time * 150.0, time * 50.0, 0.0);\n    vec3 pR = vec3(time * 140.0, time * 60.0, 10.0);\n    \n    // 2. Estraiamo il rumore della tempesta\n    float noiseL = triNoise3d(pL, 0.0, time);\n    float noiseR = triNoise3d(pR, 0.0, time);\n    \n    // 3. Centriamo l'onda (il triNoise restituisce solo valori positivi) \n    // e ne regoliamo l'ampiezza per dare dinamica alla sabbia\n    noiseL = (noiseL - 0.4) * 2.5;\n    noiseR = (noiseR - 0.4) * 2.5;\n    \n    // 4. Mix finale: Solo il fruscio del vento e della sabbia, leggermente abbassato (80%)\n    vec2 audio = vec2(noiseL, noiseR) * 0.8;\n    \n    // 5. Inviluppo per entrare dolcemente\n    float env = smoothstep(0.0, 2.0, time);\n    \n    return clamp(audio * env, -1.0, 1.0);\n}\n//SOUND_END\n\n// --- Parametri Locali ---\nfloat density = 10.0;  // Quante strisce vuoi\nbool vertical = true;  // true = verticali, false = orizzontali\n\n// --- Logica ---\n\n// 1. We choose the coordinate to base it on (u or v)\n// 'u' and 'v' are standard variables available in the shader template\nfloat coord = vertical ? u : v;\n\n// 2. We compute the alternating pattern\n// We multiply the coordinate (0.0 -> 1.0) by the density.\n// floor() creates integer steps (0, 1, 2, 3...)\n// mod(..., 2.0) gives 0.0 or 1.0 alternately\nfloat pattern = mod(floor(coord * density), 2.0);\n\n// 3. Color mixing\n// u_col1 and u_col2 are the uniforms passed from the interface (Color 1 and Color 2)\n// If pattern is 0.0 -> gives u_col1\n// If pattern is 1.0 -> gives u_col2\nreturn mix(u_col1, u_col2, pattern);",
+        "col1": "#c6ee33",
+        "col2": "#000076",
         "enabled": true,
-        "libName": "Barber Stripe",
+        "libName": "Stripes",
         "pan_x": 0,
         "pan_y": 0,
-        "rotation": 0,
-        "zoom": 1
+        "rotation": -9,
+        "zoom": 0.09292593598365784
     },
     "type": "motion",
-    "use4DLighting": true
+    "use4DLighting": true,
+    "wireframe": {
+        "uStep": 4,
+        "vStep": 4
+    }
 }

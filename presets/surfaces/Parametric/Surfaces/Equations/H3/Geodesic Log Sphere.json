@@ -1,8 +1,8 @@
 {
     "angles": {
-        "omega": 3.7799971103668213,
-        "phi": 3.3399972915649414,
-        "psi": 3.9499969482421875
+        "omega": 9.999999747378752e-05,
+        "phi": 9.999999747378752e-05,
+        "psi": 9.999999747378752e-05
     },
     "camera3D": {
         "pitch": 0,
@@ -78,6 +78,7 @@
     "name": "Geodesic Log Sphere",
     "projectionMode": 1,
     "renderMode": 1,
+    "space": "H3",
     "steps": 101,
     "type": "surface",
     "use4DLighting": false,

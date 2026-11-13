@@ -1,0 +1,15 @@
+{
+    "code": "// Munching Voxels - color only, ANIMATED. Runs INSIDE shadeSurface().\n// The 1960s \"munching squares\" display hack, in 3D: space is cut into voxels and a\n// voxel lights up when x XOR y XOR z is below a threshold that sweeps up and down.\n// The lit region grows as nested cubes and tetrahedra; the surface shows where\n// it cuts them. Two munchers run at once (the second on a mirrored lattice, with\n// the dock color's channels rotated), each with a glowing front and a fading trail.\n// No displacement: one evaluation per pixel. Integer bit operations (GLSL 4.5).\n// In scope: pModel, t. Dock colors: u_col1 = first muncher, u_col2 = background.\n\nfloat CELLS = 12.0 * max(E, 0.05);   // slider E   // voxels per unit         [4 .. 40]\nfloat SPEED = 0.6 * F;               // slider F   // sweeps per 10 seconds   [0 .. 2]\nconst int BITS = 5;                  // pattern repeats every 2^BITS voxels    [3 .. 7]\nfloat GRID  = 0.35;                  // darkness of the voxel grid lines        [0 .. 1]\n\nint   MASK = (1 << BITS) - 1;\nfloat N    = float(1 << BITS);\n\nvec3  vp = pModel * CELLS;\nivec3 ic = ivec3(floor(vp));\nvec3  fp = fract(vp);\n\nint v1 = (ic.x ^ ic.y ^ ic.z) & MASK;\nint v2 = (ic.x ^ (MASK - (ic.y & MASK)) ^ ic.z) & MASK;\n\n// thresholds: triangle waves 0 -> N -> 0, the second half a period behind.\n// The +0.3 starts them mid-sweep, so the very first frame already shows the pattern.\nfloat ph = 0.1 * SPEED * t + 0.3;\nfloat T1 = N * (1.0 - abs(1.0 - 2.0 * fract(ph)));\nfloat T2 = N * (1.0 - abs(1.0 - 2.0 * fract(ph + 0.5)));\n\nfloat lit1   = step(float(v1), T1) * (0.35 + 0.65 * float(v1) / max(T1, 1.0));\nfloat front1 = exp(-0.8 * abs(float(v1) - T1));\nfloat lit2   = step(float(v2), T2) * (0.35 + 0.65 * float(v2) / max(T2, 1.0));\nfloat front2 = exp(-0.8 * abs(float(v2) - T2));\n\nvec3 colB = ubuf.u_col1.zxy;\nvec3 col = ubuf.u_col2;\ncol = mix(col, ubuf.u_col1 * 0.7, lit1 * 0.8);\ncol = mix(col, colB * 0.7, lit2 * 0.5);\ncol += ubuf.u_col1 * front1 * 0.9 + colB * front2 * 0.6;\n\n// voxel grid: thin dark lines where the surface crosses a voxel face\nvec3 e3 = min(fp, 1.0 - fp);\nfloat gridD = min(e3.x, min(e3.y, e3.z));\ncol *= 1.0 - GRID * (1.0 - smoothstep(0.0, 0.05, gridD));\n\ntextureCol = col;\n",
+    "color1": "#3dff80",
+    "color2": "#04160b",
+    "hasCustomColors": true,
+    "isImplicitMode": true,
+    "name": "Munching Voxels",
+    "pan_x": 0,
+    "pan_y": 0,
+    "rotation": 0,
+    "type": "custom_texture",
+    "zoom": 1,
+    "hintText": "Sliders\nE: size of the voxels (1 = default, higher = smaller)\nF: speed of the munching fronts (0 = still)",
+    "hintSeconds": 7
+}

@@ -73,6 +73,7 @@
     "name": "Helicoid",
     "projectionMode": 1,
     "renderMode": 1,
+    "space": "H3",
     "showBorder": false,
     "steps": 101,
     "type": "surface",
