@@ -7,9 +7,9 @@
 	senso — e "app che gira solo su iPhone" in un bundle macOS e' una
 	contraddizione che l'App Store puo' respingere.
 
-	ATTENZIONE: CFBundleVersion va tenuto allineato con i campi build number del
-	ramo macOS del CMakeLists. Lo fa ExC/Mac/release_testflight_mac.sh; a mano,
-	ricordarsi che ORA I FILE DA AGGIORNARE SONO DUE.
+	CFBundleShortVersionString e CFBundleVersion arrivano dal CMakeLists
+	(${MACOSX_BUNDLE_SHORT_VERSION_STRING}, ${MACOSX_BUNDLE_BUNDLE_VERSION}), come in
+	Info.plist: qui non si scrivono numeri.
 -->
 <plist version="1.0">
 <dict>
