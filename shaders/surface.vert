@@ -34,6 +34,12 @@ layout(location = 6) out float v_borderReach;
 // (surfaceTextureColor nel fragment), cosi' resta ferma sulla figura girandola.
 layout(location = 7) out vec3 v_objPos;
 layout(location = 8) out vec3 v_objNormal;
+// STEREOGRAFICA, LE CORDE OLTRE IL TETTO (stereoS3): x = 1 se il vertice sta oltre
+// il tetto del raggio proiettato, y = la sua distanza dall'origine della
+// proiezione. Il fragment ci riconosce i triangoli che attraversano la sfera
+// del tetto invece di starci sopra (surface.frag). Zero fuori dalla
+// stereografica e nei rami che non la usano.
+layout(location = 10) out vec2 v_stereoChord;
 #ifdef HAS_WIRE_QUAD
 // Posizione del pixel nel riferimento del segmento, in pixel: (distanza di lato
 // dall'asse, distanza lungo l'asse da A, lunghezza del segmento, meta' spessore).
@@ -203,6 +209,15 @@ vec4 rotateZW(vec4 p, float t) {
 // della libreria puo' vedere la calotta antipodale sparire oltre il far plane,
 // che sarebbe l'unica regressione possibile rispetto al vecchio clamp (il
 // quale, ripiegando, teneva tutto entro 6.24 e quindi non tagliava mai).
+//
+// LE CORDE OLTRE IL TETTO. Oltre il tetto ogni punto finisce sulla sfera di
+// raggio 12 r nella direzione di xyz, e vicino al polo quella direzione cambia
+// di molto per spostamenti minimi: due vertici vicini sulla superficie possono
+// finire in direzioni lontanissime, e il triangolo fra loro diventa una corda
+// piatta che attraversa la sfera (Clifford Tori Labirinth, omega 0.5: lastre
+// piatte in alto a sinistra, quando un vertice del 16-cell passa sul polo).
+// Il fragment le scarta (v_stereoChord): restano le calotte che stanno sulla
+// sfera, come il fondo di un tunnel attorno al polo.
 vec3 stereoS3(vec4 p) {
     float r = length(p);
     if (r < 0.0001) return vec3(0.0);
@@ -213,6 +228,15 @@ vec3 stereoS3(vec4 p) {
     vec3 dir = (sxy > 1.0e-6) ? pNorm.xyz / sxy : vec3(0.0, 0.0, 1.0);
 
     return dir * (r * rad);
+}
+
+// 1 se stereoS3 ha fermato il raggio di p al tetto (stessa soglia: raggio vero
+// sopra 12, cioe' (1 + w) / (1 - w) sopra 144), 0 altrimenti.
+float stereoBeyondCap(vec4 p) {
+    float r = length(p);
+    if (r < 0.0001) return 0.0;
+    float w = p.w / r;
+    return ((1.0 + w) / max(1.0 - w, 1.0e-6) > 144.0) ? 1.0 : 0.0;
 }
 
 // --- PROIEZIONE 4D -> 3D CON OSSERVATORE ---
@@ -1126,6 +1150,7 @@ void main() {
     v_borderReach = 0.0;
     v_objPos = vec3(0.0);
     v_objNormal = vec3(0.0, 0.0, 1.0);
+    v_stereoChord = vec2(0.0);
     // --- BYPASS PER FLAT VIEW (TEXTURE PREVIEW) ---
     if (ubuf.u_isFlat != 0) {
         gl_Position = ubuf.u_mvpMatrix * vec4(vertex.xyz, 1.0);
@@ -1260,6 +1285,7 @@ void main() {
     v_normal = ubuf.u_mvMatrix * vec4(finalNormal3D, 0.0);
     v_texCoord = vec2(texCoord.x, 1.0 - texCoord.y);
     v_objPos = finalPos3D;
+    if (ubuf.u_projMode == 2) v_stereoChord = vec2(stereoBeyondCap(pRot), length(finalPos3D));
     v_objNormal = finalNormal3D;
 
     vec4 pos = ubuf.u_mvpMatrix * vec4(finalPos3D, 1.0);

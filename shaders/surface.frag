@@ -13,6 +13,9 @@ layout(location = 6) in float v_borderReach;
 // globale, surfaceTextureColor).
 layout(location = 7) in vec3 v_objPos;
 layout(location = 8) in vec3 v_objNormal;
+// Stereografica: flag "oltre il tetto" e distanza dall'origine del vertice
+// (surface.vert, stereoS3), per scartare le corde.
+layout(location = 10) in vec2 v_stereoChord;
 #ifdef HAS_WIRE_QUAD
 // Posizione del pixel nel riferimento del segmento e meta' spessore (vedi surface.vert).
 layout(location = 9) in vec4 v_wireDist;
@@ -187,6 +190,14 @@ bool borderFragmentCovered() {
 
 // --- MAIN (LOGICA DI ILLUMINAZIONE CALIBRATA) ---
 void main() {
+    // STEREOGRAFICA, LE CORDE OLTRE IL TETTO (surface.vert, stereoS3). In un
+    // triangolo che tocca la zona oltre il tetto, un frammento che sta sulla
+    // sfera del tetto ha la distanza dall'origine dei suoi vertici; quello di
+    // una corda (vertici in direzioni lontane) sta molto piu' dentro: si scarta.
+    // 0.92 = i vertici distano piu' di ~46 gradi visti dall'origine. Vicino
+    // all'origine il flag e' zero e non si scarta niente (li' un triangolo puo'
+    // avere i vertici da parti opposte senza essere una corda).
+    if (ubuf.u_projMode == 2 && v_stereoChord.x > 0.0 && length(v_objPos) < 0.92 * v_stereoChord.y) discard;
 #ifdef HAS_BORDER
     if (ubuf.u_isBorder != 0 && borderFragmentCovered()) discard;
 #endif
