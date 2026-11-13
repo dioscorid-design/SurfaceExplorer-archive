@@ -548,12 +548,6 @@
         <file>presets/sounds/procedural/Trailing the Twinkling Tunnel.json</file>
         <file>presets/sounds/procedural/Alien Thorns.json</file>
         <file>presets/sounds/procedural/Dust Storm.json</file>
-        <file>shaders/surface.frag</file>
-        <file>shaders/common.glsl</file>
-        <file>shaders/geodesic.glsl</file>
-        <file>shaders/surface.vert</file>
-        <file>shaders/implicit.glsl</file>
-        <file>shaders/raymarch_template.txt</file>
     </qresource>
     <qresource prefix="/">
         <file>icon.png</file>

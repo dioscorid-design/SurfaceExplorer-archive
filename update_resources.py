@@ -14,9 +14,10 @@ RESOURCE_GROUPS = {
         "presets/surfaces",
         "presets/textures",
         "presets/records",  
-        "presets/sounds",
-        "shaders"
+        "presets/sounds"
     ],
+    # Gli shader si leggono solo da :/shaders/... (prefisso "/"): elencarli
+    # anche sotto "/library" li impacchettava due volte nel binario.
     "/": [
         "shaders"
     ]
