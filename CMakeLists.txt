@@ -301,10 +301,20 @@ elseif (APPLE)
     # funzionare e la libreria si riapriva sul percorso precedente. In piu' i
     # due bundle con lo stesso id (test e /Applications) si contendevano
     # l'attivazione, da cui l'icona nel Dock sostituita da un'altra copia.
+    #
+    # E NOME DIVERSO, oltre all'id (dal 2026-11-13): i due canali installavano lo
+    # stesso file, /Applications/SurfaceExplorer.app, e chi arrivava per ultimo
+    # sostituiva l'altro (la TestFlight 1.5 ha cancellato la copia del DMG). Il
+    # DMG e' "Surface Explorer v1.5" (CFBundleName e CFBundleDisplayName, che
+    # Info-macos.plist legge da MACOSX_BUNDLE_BUNDLE_NAME, e il nome della
+    # cartella .app nel DMG, release_macos.sh). L'id del DMG resta lo stesso:
+    # chi aggiorna ritrova le sue impostazioni.
     if (CMAKE_GENERATOR STREQUAL "Xcode" OR SE_APPSTORE_ID)
         set(SE_MACOS_BUNDLE_ID "com.dioscorid.surfaceexplorer")        # App Store
+        set(SE_MACOS_BUNDLE_NAME "Surface Explorer")
     else()
         set(SE_MACOS_BUNDLE_ID "com.dioscorid.surfaceexplorer.dmg")    # Developer ID
+        set(SE_MACOS_BUNDLE_NAME "Surface Explorer v${PROJECT_VERSION}")
     endif()
 
     # --- CONFIGURAZIONE NOME APP MACOS ---
@@ -319,10 +329,11 @@ elseif (APPLE)
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info-macos.plist"
 
         # 1. Nome nella BARRA DEI MENU (Accanto alla Mela )
-        MACOSX_BUNDLE_BUNDLE_NAME "Surface Explorer"
+        # (diverso fra DMG e App Store: vedi SE_MACOS_BUNDLE_NAME qui sopra)
+        MACOSX_BUNDLE_BUNDLE_NAME "${SE_MACOS_BUNDLE_NAME}"
 
         # 2. Nome dell'icona nel Launchpad/Dock
-        MACOSX_BUNDLE_DISPLAY_NAME "Surface Explorer"
+        MACOSX_BUNDLE_DISPLAY_NAME "${SE_MACOS_BUNDLE_NAME}"
 
         # 3. Nome del file fisico (.app)
         OUTPUT_NAME "SurfaceExplorer"

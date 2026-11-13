@@ -21,7 +21,9 @@ set -e
 
 # --- CONFIGURAZIONE ---
 APP_NAME="SurfaceExplorer"
-BUNDLE_ID="com.dioscorid.surfaceexplorer"
+# L'id del canale DMG (CMakeLists.txt, SE_MACOS_BUNDLE_ID): diverso da quello
+# dell'App Store, com.dioscorid.surfaceexplorer.
+BUNDLE_ID="com.dioscorid.surfaceexplorer.dmg"
 SIGN_IDENTITY="Developer ID Application: GAETANO MOSCHETTI (BAPKX72394)"
 NOTARY_PROFILE="notarytool-profile"
 REPO="dioscorid-design/SurfaceExplorer"
@@ -86,13 +88,29 @@ if [ ! -d "$APP_PATH" ]; then
 fi
 [ -x "$MACDEPLOYQT" ] || { echo "ERRORE: macdeployqt non trovato: $MACDEPLOYQT"; exit 1; }
 
+# IL NOME DELL'APP NEL DMG, come in CMakeLists.txt (SE_MACOS_BUNDLE_NAME):
+# "Surface Explorer v1.5". Con lo stesso nome dell'App Store (SurfaceExplorer.app)
+# le due copie finivano nello stesso file in Applicazioni e chi installava per
+# ultimo cancellava l'altra (la TestFlight 1.5 ha sostituito il DMG, 2026-11-13).
+APP_DISPLAY_NAME="Surface Explorer v$VERSION"
+# Una Release compilata prima del cambio (o col generatore Xcode) avrebbe l'id o il
+# nome sbagliati: meglio fermarsi che pubblicarla.
+BUILT_ID="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_PATH/Contents/Info.plist" 2>/dev/null || true)"
+BUILT_NAME="$(/usr/libexec/PlistBuddy -c 'Print CFBundleName' "$APP_PATH/Contents/Info.plist" 2>/dev/null || true)"
+if [ "$BUILT_ID" != "$BUNDLE_ID" ] || [ "$BUILT_NAME" != "$APP_DISPLAY_NAME" ]; then
+  echo "ERRORE: l'app compilata ha id '$BUILT_ID' e nome '$BUILT_NAME',"
+  echo "        attesi '$BUNDLE_ID' e '$APP_DISPLAY_NAME'."
+  echo "Ricompila la Release da Qt Creator (CMakeLists.txt la riconfigura) e rilancia lo script."
+  exit 1
+fi
+
 # Si lavora su una copia: macdeployqt e la firma cambiano il bundle, e quello di Qt
 # Creator deve restare com'e' (firmato in place, al primo Info.plist rigenerato senza
 # relink la firma non combaciava piu' e macOS uccideva l'app all'avvio).
 STAGING_DIR="$BUILD_DIR/dmg_staging"
 rm -rf "$STAGING_DIR"
 mkdir -p "$STAGING_DIR"
-STAGED_APP="$STAGING_DIR/$APP_NAME.app"
+STAGED_APP="$STAGING_DIR/$APP_DISPLAY_NAME.app"
 cp -R "$APP_PATH" "$STAGED_APP"
 
 echo ">>> 0. macdeployqt: framework e plugin Qt dentro l'app..."
@@ -117,7 +135,7 @@ codesign --verify --deep --strict --verbose=2 "$STAGED_APP"
 echo ">>> 3. Creazione .dmg (con collegamento alla cartella Applicazioni)..."
 rm -f "$DMG_PATH"
 ln -s /Applications "$STAGING_DIR/Applications"
-hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH"
+hdiutil create -volname "$APP_DISPLAY_NAME" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH"
 rm -rf "$STAGING_DIR"
 
 echo ">>> 4. Firma del .dmg..."
