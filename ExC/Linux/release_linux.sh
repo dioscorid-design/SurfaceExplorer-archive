@@ -14,8 +14,8 @@
 #
 # >>> PER UNA NUOVA VERSIONE, prima di lanciare lo script aggiorna la versione
 # >>> (vedi RELEASE_GUIDE.md) in:
-# >>>   - CMakeLists.txt : VERSION / MACOSX_BUNDLE_SHORT_VERSION_STRING / _BUNDLE_VERSION
-# >>>   - Info.plist     : CFBundleShortVersionString / CFBundleVersion
+# >>>   - CMakeLists.txt : project(SurfaceExplorer VERSION X.Y) e i build number
+# >>>     (Info.plist e Info-macos.plist li ricevono da CMake: nessun numero li')
 # >>> poi committa e pusha. La versione (=> tag vX.Y) viene letta da CMakeLists.txt.
 #
 # Requisiti: cmake, ninja, un Qt 6 gcc_64 (variabile QT_DIR), wget, curl, git.

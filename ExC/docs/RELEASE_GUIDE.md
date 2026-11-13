@@ -33,7 +33,7 @@ e integrarla nel desktop. Riassume il processo e gli strumenti per piattaforma:
 > ✅ **Modo rapido e a prova di errore:** usa lo script che aggiorna la versione
 > in tutti i punti che devono coincidere e committa in un colpo solo:
 > ```sh
-> ./ExC/bump-version.sh 1.1          # aggiorna CMakeLists.txt + Info.plist e committa
+> ./ExC/bump-version.sh 1.1          # aggiorna CMakeLists.txt e committa
 > ./ExC/bump-version.sh 1.1 --no-commit   # aggiorna soltanto i file
 > ```
 > Aggiorna solo la **versione marketing** (X.Y); NON tocca il build number, che si
@@ -48,13 +48,13 @@ Prima di tutto, **aggiorna il numero di versione in due file** (devono coincider
    - `MACOSX_BUNDLE_BUNDLE_VERSION "N"` e `XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION "N"` ← **build number**, va incrementato a ogni upload su App Store/TestFlight
    - `XCODE_ATTRIBUTE_MARKETING_VERSION "X.Y"`
 
-2. **`Info.plist`**:
-   - `CFBundleShortVersionString` → `X.Y`  (versione mostrata)
-   - `CFBundleVersion` → `N`  (build number, come sopra)
+2. **`Info.plist`** e **`Info-macos.plist`**: niente da fare. `CFBundleShortVersionString`
+   e `CFBundleVersion` valgono `${MACOSX_BUNDLE_SHORT_VERSION_STRING}` e
+   `${MACOSX_BUNDLE_BUNDLE_VERSION}`: li riempie CMake dai campi del punto 1.
 
 3. **Committa e pusha** le modifiche di versione **prima** di lanciare gli script:
    ```sh
-   git add CMakeLists.txt Info.plist
+   git add CMakeLists.txt
    git commit -m "Bump versione X.Y build N"
    git push origin v1
    ```

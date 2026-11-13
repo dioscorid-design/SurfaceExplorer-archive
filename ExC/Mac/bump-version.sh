@@ -6,8 +6,9 @@
 #
 # Aggiorna:
 #   CMakeLists.txt   : project(SurfaceExplorer VERSION X.Y ...)  <- unico punto
-#   Info.plist       : CFBundleShortVersionString
-#   Info-macos.plist : CFBundleShortVersionString  (bundle macOS App Store)
+# Info.plist e Info-macos.plist non contengono il numero: CFBundleShortVersionString
+# vale ${MACOSX_BUNDLE_SHORT_VERSION_STRING}, che CMake riempie da ${PROJECT_VERSION}
+# (dal 2026-11-06). Lo script verifica soltanto che restino cosi'.
 #
 # I campi del bundle (MACOSX_BUNDLE_SHORT_VERSION_STRING, XCODE_..._MARKETING_VERSION)
 # e la define APP_VERSION letta dal dialogo About derivano da ${PROJECT_VERSION}:
@@ -57,24 +58,12 @@ sed -E \
   -e "s/^(project\(SurfaceExplorer[[:space:]]+VERSION[[:space:]]+)[0-9][0-9.]*/\1${NEW}/" \
   "$CMAKE" > "$tmp" && mv "$tmp" "$CMAKE"
 
-# --- 2. i DUE plist (valore sulla riga DOPO la chiave) -----------------------
+# --- 2. i DUE plist: nessun numero da scrivere ------------------------------
 # Info.plist       -> bundle iOS / macOS diretto
-# Info-macos.plist -> bundle macOS App Store (CMakeLists:281)
-# Vanno aggiornati ENTRAMBI: fino alla 1.2 questo script toccava solo il primo,
-# e la build per Apple sarebbe partita con la versione vecchia mentre tutto il
-# resto era gia' bumpato — proprio il disallineamento che deve impedire.
-# (release_testflight_mac.sh, che gestisce il BUILD NUMBER, li tocca gia' tutti.)
-bump_plist() {
-  local f="$1" tmp
-  tmp="$(mktemp)"
-  awk -v v="$NEW" '
-    f && /<string>[0-9][0-9.]*<\/string>/ { sub(/<string>[0-9][0-9.]*<\/string>/, "<string>" v "</string>"); f=0 }
-    /CFBundleShortVersionString/ { f=1 }
-    { print }
-  ' "$f" > "$tmp" && mv "$tmp" "$f"
-}
-bump_plist "$PLIST"
-bump_plist "$PLIST_MAC"
+# Info-macos.plist -> bundle macOS App Store
+# Fino al 2026-11-06 il numero era scritto anche li' e questo script lo sostituiva;
+# ora CFBundleShortVersionString vale ${MACOSX_BUNDLE_SHORT_VERSION_STRING} e il
+# controllo qui sotto verifica che nessuno ci abbia rimesso un numero a mano.
 
 # --- verifica che i 4 punti riportino ora la nuova versione ------------------
 check() { grep -qE "$1" "$2" || err "sostituzione fallita: $3 (pattern non trovato dopo l'edit)"; }
@@ -85,11 +74,12 @@ check 'MACOSX_BUNDLE_SHORT_VERSION_STRING[[:space:]]+"\$\{PROJECT_VERSION\}"' "$
 check 'XCODE_ATTRIBUTE_MARKETING_VERSION[[:space:]]+"\$\{PROJECT_VERSION\}"'  "$CMAKE" "MARKETING_VERSION derivato da PROJECT_VERSION"
 check 'APP_VERSION="\$\{PROJECT_VERSION\}"'                                   "$CMAKE" "define APP_VERSION derivata da PROJECT_VERSION"
 for p in "$PLIST" "$PLIST_MAC"; do
-  grep -A1 'CFBundleShortVersionString' "$p" | grep -qE "<string>${NEW}</string>" \
-    || err "sostituzione fallita: $(basename "$p") CFBundleShortVersionString"
+  grep -A1 '<key>CFBundleShortVersionString</key>' "$p" \
+    | grep -qF '<string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>' \
+    || err "$(basename "$p"): CFBundleShortVersionString deve valere \${MACOSX_BUNDLE_SHORT_VERSION_STRING}, non un numero"
 done
 
-printf '\nVersione: %s -> %s   (CMakeLists.txt + Info.plist + Info-macos.plist)\n' "$OLD" "$NEW"
+printf '\nVersione: %s -> %s   (solo CMakeLists.txt: i plist la ricevono da CMake)\n' "$OLD" "$NEW"
 
 # --- Il dialogo About NON va piu' toccato: dalla 1.2 stampa APP_VERSION, che
 # arriva da project(... VERSION ...) nel CMakeLists via target_compile_definitions.
@@ -98,7 +88,7 @@ printf '\nVersione: %s -> %s   (CMakeLists.txt + Info.plist + Info-macos.plist)\
 
 # --- 3. commit (salvo --no-commit) -------------------------------------------
 if [ "$DO_COMMIT" -eq 1 ]; then
-  ( cd "$PROJECT_DIR" && git add CMakeLists.txt Info.plist Info-macos.plist \
+  ( cd "$PROJECT_DIR" && git add CMakeLists.txt \
       && git commit -m "Bump versione $NEW" )
   printf '\nCommit creato. Ricorda di: git push\n'
 else

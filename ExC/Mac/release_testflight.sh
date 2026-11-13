@@ -5,7 +5,8 @@
 # Automatizza i passi 3-5 della guida ExC/docs/GUIDA_rilascio_build_ios_macos.md:
 #   1. Incrementa il BUILD NUMBER (+1) in TUTTI i punti coerenti:
 #        CMakeLists.txt : MACOSX_BUNDLE_BUNDLE_VERSION, XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION
-#        Info.plist     : CFBundleVersion
+#        (Info.plist e Info-macos.plist lo leggono da li': CFBundleVersion vale
+#         ${MACOSX_BUNDLE_BUNDLE_VERSION}; lo script verifica che resti cosi')
 #      (la VERSIONE MARKETING X.Y NON viene toccata: si cambia con ExC/bump-version.sh)
 #   2. Committa il bump (a meno di --no-commit).
 #   3. Pulisce la cache Xcode (DerivedData) e la cartella del progetto iOS generato:
@@ -40,13 +41,31 @@ BUILD_DIR="$PROJECT_DIR/build/ios-appstore"
 XCODEPROJ="$BUILD_DIR/SurfaceExplorer.xcodeproj"
 SCHEME="SurfaceExplorer"
 QT_CMAKE="$HOME/Qt/6.12.0/ios_device/bin/qt-cmake"
-GIT_BRANCH="v1"
 # Cartella dove xcodebuild deposita l'archivio (poi visibile anche nell'Organizer).
 ARCHIVE_DIR="$HOME/Library/Developer/Xcode/Archives"
 
 err()  { printf '\033[31mERRORE:\033[0m %s\n' "$*" >&2; exit 1; }
 info() { printf '\033[36m==>\033[0m %s\n' "$*"; }
 ok()   { printf '\033[32m✓\033[0m %s\n' "$*"; }
+
+# Il comando che pusha il ramo corrente sul suo remoto, per il promemoria dopo il
+# commit del bump. Letto da git: prima era scritto a mano ("git push origin v1") e
+# indicava un ramo che questo repo non ha. Coi nomi completi (refs/heads/...):
+# dove un tag ha lo stesso nome del ramo (v1.5) "git push <remoto> v1.5" e' ambiguo.
+push_hint() {
+  local ref branch remote merge
+  # Il ref intero, non --short: col tag omonimo --short risponde "heads/v1.5",
+  # che non e' il nome sotto cui git tiene il remoto del ramo.
+  ref="$(git symbolic-ref --quiet HEAD 2>/dev/null || true)"
+  branch="${ref#refs/heads/}"
+  remote="$(git config --get "branch.$branch.remote" 2>/dev/null || true)"
+  merge="$(git config --get "branch.$branch.merge" 2>/dev/null || true)"
+  if [ -n "$branch" ] && [ -n "$remote" ] && [ -n "$merge" ]; then
+    printf 'git push %s %s:%s' "$remote" "$ref" "$merge"
+  else
+    printf 'git push'
+  fi
+}
 
 # ---------------------------------------------------------------------------
 # Argomenti
@@ -99,21 +118,19 @@ sed -E \
   -e "s/(XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION[[:space:]]+\")[0-9]+(\")/\1${NEW_BUILD}\2/" \
   "$CMAKE" > "$tmp" && mv "$tmp" "$CMAKE"
 
-# --- Info.plist: <string> sulla riga DOPO la chiave CFBundleVersion ---
-tmp="$(mktemp)"
-awk -v v="$NEW_BUILD" '
-  f && /<string>[0-9]+<\/string>/ { sub(/<string>[0-9]+<\/string>/, "<string>" v "</string>"); f=0 }
-  /<key>CFBundleVersion<\/key>/ { f=1 }
-  { print }
-' "$PLIST" > "$tmp" && mv "$tmp" "$PLIST"
+# --- Info.plist: nessun numero da scrivere ---
+# Dal 2026-11-06 CFBundleVersion vale ${MACOSX_BUNDLE_BUNDLE_VERSION}, che CMake
+# riempie dal campo qui sopra (anche col generatore Xcode). Prima lo script vi
+# scriveva il numero; ora verifica solo che nessuno ce ne abbia rimesso uno.
 
-# --- Verifica coerenza dei tre punti ---
+# --- Verifica coerenza ---
 C1="$(sed -nE 's/.*MACOSX_BUNDLE_BUNDLE_VERSION[[:space:]]+"([0-9]+)".*/\1/p' "$CMAKE" | head -1)"
 C2="$(sed -nE 's/.*XCODE_ATTRIBUTE_CURRENT_PROJECT_VERSION[[:space:]]+"([0-9]+)".*/\1/p' "$CMAKE" | head -1)"
-P1="$(awk '/<key>CFBundleVersion<\/key>/{getline; gsub(/[^0-9]/,""); print; exit}' "$PLIST")"
-[ "$C1" = "$NEW_BUILD" ] && [ "$C2" = "$NEW_BUILD" ] && [ "$P1" = "$NEW_BUILD" ] \
-  || err "Bump build number incoerente: CMake($C1,$C2) Plist($P1), atteso $NEW_BUILD. Controlla i file."
-ok "Build number aggiornato a $NEW_BUILD (CMake x2 + Info.plist)."
+[ "$C1" = "$NEW_BUILD" ] && [ "$C2" = "$NEW_BUILD" ] \
+  || err "Bump build number incoerente: CMake($C1,$C2), atteso $NEW_BUILD. Controlla i file."
+grep -A1 '<key>CFBundleVersion</key>' "$PLIST" | grep -qF '<string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>' \
+  || err "Info.plist: CFBundleVersion deve valere \${MACOSX_BUNDLE_BUNDLE_VERSION}, non un numero."
+ok "Build number aggiornato a $NEW_BUILD (CMake x2; Info.plist lo legge da li')."
 
 # Info.plist deve restare un plist valido (una copia-cartella lo puo' corrompere).
 plutil -lint "$PLIST" >/dev/null || err "Info.plist non valido dopo il bump (plutil -lint fallito)."
@@ -125,7 +142,7 @@ if [ "$DO_COMMIT" -eq 1 ]; then
   git add "$CMAKE" "$PLIST"
   git commit -m "iOS: build number -> $NEW_BUILD (TestFlight)" >/dev/null
   ok "Commit del bump creato."
-  info "Ricorda di fare 'git push origin $GIT_BRANCH' quando vuoi."
+  info "Ricorda di fare '$(push_hint)' quando vuoi."
 else
   info "--no-commit: bump applicato ai file ma NON committato."
 fi

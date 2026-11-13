@@ -93,7 +93,7 @@ if [ -n "$REF" ]; then
                 # Stessa configurazione della build dei test: fra Debug e
                 # Release i calcoli in virgola mobile possono differire
                 # nell'ultima cifra, e darebbero immagini "diverse" per finta.
-                "$PROJECT_DIR/ExC/Mac/Test/build-tests.sh" "$SRC" "$BLD" > "$REF_DIR/build.log" 2>&1 \
+                bash "$PROJECT_DIR/ExC/Mac/Test/build-tests.sh" "$SRC" "$BLD" > "$REF_DIR/build.log" 2>&1 \
                     || err "build di riferimento fallita: vedi $REF_DIR/build.log"
             else
                 # Commit di prima di build/Tests: i test esistono solo in Debug.
