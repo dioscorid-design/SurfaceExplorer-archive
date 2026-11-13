@@ -7414,6 +7414,47 @@ void ScenarioTest::runLibraryFolderScenarios()
                              "(%1 voci evidenziate)").arg(tree->selectedItems().size()));
     }
     for (QTreeWidgetItem *p = folder; p; p = p->parent()) p->setExpanded(true);
+
+    // DOPO UNA RILETTURA DELLA LIBRERIA (refreshRepositories: la fa partire il
+    // watcher della cartella, 500 ms dopo un Incolla, a menu gia' chiuso e
+    // evidenziazione gia' rimessa) il preset a schermo resta l'elemento
+    // corrente. Prima tornava la sola selezione: il primo Cmd+clic non lo
+    // toglieva piu', e i comandi del menu agivano anche su di lui (segnalato
+    // dall'utente: copia, incolla, Cmd+clic su tre voci -> quattro evidenziate).
+    // Gli item si ricostruiscono: dopo, si ritrovano per percorso.
+    {
+        const QString leafPath = LibraryTreeFocus::itemPath(leaf);
+        const QString otherPath = LibraryTreeFocus::itemPath(other);
+        tree->clearSelection();
+        leaf->setSelected(true);
+        tree->setCurrentItem(leaf);
+        m_mw->refreshRepositories();
+        wait(200);
+        QTreeWidgetItem *leafAfter = LibraryTreeFocus::itemAt(tree, leafPath);
+        QTreeWidgetItem *otherAfter = LibraryTreeFocus::itemAt(tree, otherPath);
+        check(leafAfter && tree->currentItem() == leafAfter
+                  && tree->selectedItems() == QList<QTreeWidgetItem *>{ leafAfter },
+              QStringLiteral("libreria riletta: il preset a schermo resta selezionato e corrente (corrente: %1)")
+                  .arg(tree->currentItem() ? tree->currentItem()->text(0) : QStringLiteral("-")));
+        if (leafAfter && otherAfter) {
+            tree->scrollToItem(otherAfter);
+            wait(200);
+            const QPoint pos = tree->visualItemRect(otherAfter).center();
+            const QPoint global = tree->viewport()->mapToGlobal(pos);
+            QMouseEvent press(QEvent::MouseButtonPress, pos, global, Qt::LeftButton, Qt::LeftButton, Qt::ControlModifier);
+            QMouseEvent release(QEvent::MouseButtonRelease, pos, global, Qt::LeftButton, Qt::NoButton, Qt::ControlModifier);
+            QCoreApplication::sendEvent(tree->viewport(), &press);
+            QCoreApplication::sendEvent(tree->viewport(), &release);
+            wait(200);
+            check(!leafAfter->isSelected() && otherAfter->isSelected() && tree->currentItem() == leafAfter,
+                  QStringLiteral("libreria riletta, poi Cmd+clic su un altro preset: selezionato lui solo, il preset "
+                                 "a schermo fuori dalla selezione e grigio (%1 voci evidenziate)")
+                      .arg(tree->selectedItems().size()));
+            LibraryTreeFocus::restoreHighlight(tree, LibraryTreeFocus::Highlight{ { leafPath }, leafPath });
+        } else {
+            check(false, QStringLiteral("libreria riletta: le due voci ritrovate per percorso"));
+        }
+    }
 }
 
 void ScenarioTest::runRecordTextureScenarios()

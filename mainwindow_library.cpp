@@ -1568,11 +1568,17 @@ void MainWindow::refreshRepositories()
         return path;
     };
 
-    // 2. SALVATAGGIO STATO ESPANSIONE E SELEZIONE (Ora basato sul percorso univoco)
+    // 2. SALVATAGGIO STATO ESPANSIONE, SELEZIONE ed ELEMENTO CORRENTE (Ora
+    // basato sul percorso univoco). L'elemento corrente e' il preset a schermo
+    // (LibraryTreeFocus::resting, LibraryTreeWidget::mousePressEvent): senza,
+    // dopo la rilettura che il watcher fa partire dopo un Incolla, il primo
+    // Cmd+clic non toglieva piu' il preset a schermo dalla selezione e i comandi
+    // del menu agivano anche su di lui.
     QSet<QString> expSurfaces, expTextures, expMotions, expSounds;
     QSet<QString> selSurfaces, selTextures, selMotions, selSounds;
+    QString curSurfaces, curTextures, curMotions, curSounds;
 
-    auto saveState = [&](QTreeWidget* tree, QSet<QString>& expSet, QSet<QString>& selSet) {
+    auto saveState = [&](QTreeWidget* tree, QSet<QString>& expSet, QSet<QString>& selSet, QString& cur) {
         QTreeWidgetItemIterator it(tree);
         while (*it) {
             QString path = getItemPath(*it);
@@ -1580,12 +1586,13 @@ void MainWindow::refreshRepositories()
             if ((*it)->isSelected()) selSet.insert(path);
             ++it;
         }
+        if (tree->currentItem()) cur = getItemPath(tree->currentItem());
     };
 
-    saveState(ui->treeSurfaces, expSurfaces, selSurfaces);
-    saveState(ui->treeTextures, expTextures, selTextures);
-    saveState(ui->treeMotions, expMotions, selMotions);
-    saveState(ui->treeSounds, expSounds, selSounds);
+    saveState(ui->treeSurfaces, expSurfaces, selSurfaces, curSurfaces);
+    saveState(ui->treeTextures, expTextures, selTextures, curTextures);
+    saveState(ui->treeMotions, expMotions, selMotions, curMotions);
+    saveState(ui->treeSounds, expSounds, selSounds, curSounds);
 
     // 3. SALVATAGGIO POSIZIONE BARRE DI SCORRIMENTO (Impedisce il salto visivo)
     int scrollSurfaces = ui->treeSurfaces->verticalScrollBar()->value();
@@ -1673,21 +1680,26 @@ void MainWindow::refreshRepositories()
         }
     }
 
-    // 6. RIPRISTINO STATO ESPANSIONE E SELEZIONE
-    auto restoreState = [&](QTreeWidget* tree, const QSet<QString>& expSet, const QSet<QString>& selSet) {
+    // 6. RIPRISTINO STATO ESPANSIONE, SELEZIONE ed ELEMENTO CORRENTE
+    auto restoreState = [&](QTreeWidget* tree, const QSet<QString>& expSet, const QSet<QString>& selSet,
+                            const QString& cur) {
+        QTreeWidgetItem *current = nullptr;
         QTreeWidgetItemIterator it(tree);
         while (*it) {
             QString path = getItemPath(*it);
             if (expSet.contains(path)) (*it)->setExpanded(true);
             if (selSet.contains(path)) (*it)->setSelected(true);
+            if (!current && !cur.isEmpty() && path == cur) current = *it;
             ++it;
         }
+        // Senza toccare la selezione e senza autoscroll (la barra si rimette qui sotto).
+        if (current) LibraryTreeFocus::setCurrentQuietly(tree, current);
     };
 
-    restoreState(ui->treeSurfaces, expSurfaces, selSurfaces);
-    restoreState(ui->treeTextures, expTextures, selTextures);
-    restoreState(ui->treeMotions, expMotions, selMotions);
-    restoreState(ui->treeSounds, expSounds, selSounds);
+    restoreState(ui->treeSurfaces, expSurfaces, selSurfaces, curSurfaces);
+    restoreState(ui->treeTextures, expTextures, selTextures, curTextures);
+    restoreState(ui->treeMotions, expMotions, selMotions, curMotions);
+    restoreState(ui->treeSounds, expSounds, selSounds, curSounds);
 
     // 7. RIPRISTINO BARRE DI SCORRIMENTO
     ui->treeSurfaces->verticalScrollBar()->setValue(scrollSurfaces);
