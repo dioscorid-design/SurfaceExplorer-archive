@@ -569,6 +569,7 @@ public:
 
         // --- INFORMAZIONI ---
         m_info = new QLabel;
+        m_info->setObjectName(QStringLiteral("imageInfo"));
         m_info->setWordWrap(true);
         m_info->setTextFormat(Qt::RichText);
         form->addRow(m_info);
@@ -636,9 +637,32 @@ public:
         st.setValue("imageDpi", m_dpiSpin->value());
     }
 
+protected:
+    void showEvent(QShowEvent *e) override
+    {
+        QDialog::showEvent(e);
+        // In coda: alla prima apertura la larghezza vera arriva dopo lo show.
+        QTimer::singleShot(0, this, [this]() { fitToText(); });
+    }
+
 private:
     enum Mode { ModeLong = 0, ModePrint = 1, ModeExact = 2 };
     int mode() const { return m_modeCombo->currentData().toInt(); }
+
+    // L'ALTEZZA SEGUE IL TESTO. Le informazioni vanno a capo e cambiano a ogni
+    // scelta (righe che compaiono: rapporto, avvisi, trascinamento), ma il
+    // dialogo restava alto quanto all'apertura e l'ultima riga usciva tagliata
+    // ("Drag the frame in the view to choose what goes in the"). Qui l'altezza
+    // e' quella che il layout chiede per la larghezza attuale, in su e in giu'.
+    void fitToText()
+    {
+        if (!isVisible() || !layout()) return;
+        layout()->activate();
+        int need = layout()->totalHeightForWidth(width());
+        if (need <= 0) need = sizeHint().height();
+        need = std::max(need, minimumSizeHint().height());
+        if (need != height()) resize(width(), need);
+    }
 
     void refresh()
     {
@@ -747,6 +771,7 @@ private:
         if (qAbs(m_ratio - m_viewRatio) > 0.02)
             text += tr("<br>Drag the frame in the view to choose what goes in the image; double-click it to centre it again.");
         m_info->setText(text);
+        fitToText();
     }
 
     GLWidget *m_gl;

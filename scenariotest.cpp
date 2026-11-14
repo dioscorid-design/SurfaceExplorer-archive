@@ -5862,6 +5862,43 @@ void ScenarioTest::runImageCaptureScenarios()
                   QStringLiteral("telefono: il dialogo sta nell'angolo in alto a sinistra della finestra (a %1,%2, atteso %3,%4)")
                       .arg(at.x()).arg(at.y()).arg(expected.x()).arg(expected.y()));
         }
+        // IL TESTO SI LEGGE TUTTO, in ogni modo e con le righe che le scelte
+        // aggiungono (rapporto, trascinamento): il dialogo cresce col testo.
+        // Prima restava alto come all'apertura e l'ultima riga usciva tagliata.
+        // Anche col ramo del telefono, dove il dialogo e' ancorato all'angolo.
+        for (const bool corner : { false, true }) {
+            QStringList report;
+            bool allFit = true;
+            ImageCapture::setTestCornerDialog(corner);
+            ImageCapture::setTestDialogHandler([&](QDialog *d) {
+                QLabel *info = d->findChild<QLabel *>(QStringLiteral("imageInfo"));
+                // 1:1, piu' stretto della vista: compare la riga del trascinamento.
+                for (QComboBox *c : d->findChildren<QComboBox *>())
+                    if (c->findText(QStringLiteral("1:1")) >= 0) { c->setCurrentIndex(c->findText(QStringLiteral("1:1"))); break; }
+                if (auto *w = d->findChild<QSpinBox *>(QStringLiteral("imageExactW"))) w->setValue(1203);
+                if (auto *h = d->findChild<QSpinBox *>(QStringLiteral("imageExactH"))) h->setValue(1301);
+                for (const QString &mode : { QStringLiteral("Width × height (px)"), QStringLiteral("Long side (px)"),
+                                             QStringLiteral("Print size"), QStringLiteral("Width × height (px)") }) {
+                    setSizeMode(d, mode);
+                    QCoreApplication::processEvents();
+                    QCoreApplication::processEvents();
+                    const int need = info ? info->heightForWidth(info->width()) : -1;
+                    const bool fits = info && need > 0 && info->height() >= need
+                                      && info->geometry().bottom() < d->height();
+                    allFit = allFit && fits;
+                    report << QStringLiteral("%1 %2/%3").arg(mode.section(QLatin1Char(' '), 0, 0))
+                                  .arg(info ? info->height() : -1).arg(need);
+                }
+                d->reject();
+            });
+            ImageCapture::run(gl, m_mw, m_outDir);
+            ImageCapture::setTestCornerDialog(false);
+            ImageCapture::setTestDialogHandler(nullptr);
+            check(allFit, QStringLiteral("dialogo%1: il testo informativo si legge tutto in ogni modo (altezza/necessaria: %2)")
+                              .arg(corner ? QStringLiteral(" nell'angolo (telefono)") : QString(),
+                                   report.join(QStringLiteral(", "))));
+        }
+        clearImageSettings();
         // A misura di stampa i dpi vanno nel file: 10 cm a 300 dpi.
         const QString outPrint = m_outDir + QStringLiteral("/image-capture-print.png");
         ImageCapture::setTestSavePath(outPrint);
