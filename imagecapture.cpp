@@ -20,6 +20,7 @@
 #include <QGuiApplication>
 #include <QImageWriter>
 #include <QLabel>
+#include <QLineF>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMouseEvent>
@@ -31,6 +32,7 @@
 #include <QScreen>
 #include <QSettings>
 #include <QSpinBox>
+#include <QStyleHints>
 #include <QTimer>
 #include <QTouchEvent>
 #include <QVector2D>
@@ -283,18 +285,16 @@ protected:
     {
         // IL DITO (telefono e tablet): lo stesso trascinamento del mouse, col
         // primo punto. Accettato qui, il tocco non arriva alla vista.
+        // E IL DOPPIO TOCCO ricentra, come il doppio clic: accettando i tocchi
+        // Qt non sintetizza piu' il doppio clic, e mouseDoubleClickEvent sul
+        // dito non arrivava mai (il testo del dialogo lo prometteva).
         switch (ev->type()) {
         case QEvent::TouchBegin:
         case QEvent::TouchUpdate:
         case QEvent::TouchEnd:
         case QEvent::TouchCancel: {
             auto *te = static_cast<QTouchEvent *>(ev);
-            if (!te->points().isEmpty()) {
-                const QPointF at = te->points().first().position();
-                if (ev->type() == QEvent::TouchBegin) beginDrag(at);
-                else if (ev->type() == QEvent::TouchUpdate) dragTo(at);
-                else endDrag();
-            }
+            if (!te->points().isEmpty()) touch(ev->type(), te->points().first().position());
             ev->accept();
             return true;
         }
@@ -320,8 +320,7 @@ protected:
     // Doppio clic: di nuovo al centro.
     void mouseDoubleClickEvent(QMouseEvent *e) override
     {
-        m_position = QPointF();
-        changed();
+        recentre();
         e->accept();
     }
     void paintEvent(QPaintEvent *) override
@@ -384,6 +383,55 @@ private:
         m_dragging = false;
         updateCursor();
     }
+    void recentre()
+    {
+        m_position = QPointF();
+        changed();
+    }
+    // Un tocco: trascina, e due tocchi brevi e vicini entro l'intervallo del
+    // doppio clic ricentrano. Il secondo tocco di un doppio tocco non
+    // trascina; un tocco che si e' mosso o e' durato troppo non conta come
+    // primo tocco.
+    void touch(QEvent::Type type, const QPointF &at)
+    {
+        const QStyleHints *hints = QGuiApplication::styleHints();
+        const int interval = hints->mouseDoubleClickInterval();
+        const qreal reach = std::max(hints->touchDoubleTapDistance(), 1);
+        switch (type) {
+        case QEvent::TouchBegin:
+            if (m_lastTap.isValid() && m_lastTap.elapsed() <= interval
+                && QLineF(at, m_lastTapAt).length() <= reach) {
+                m_lastTap.invalidate();
+                m_secondTap = true;
+                recentre();
+                return;
+            }
+            m_secondTap = false;
+            m_touchAt = at;
+            m_touchTime.start();
+            beginDrag(at);
+            return;
+        case QEvent::TouchUpdate:
+            if (!m_secondTap) dragTo(at);
+            return;
+        case QEvent::TouchEnd:
+            endDrag();
+            if (!m_secondTap && m_touchTime.isValid() && m_touchTime.elapsed() <= interval
+                && QLineF(at, m_touchAt).length() <= reach) {
+                m_lastTap.start();
+                m_lastTapAt = at;
+            } else {
+                m_lastTap.invalidate();
+            }
+            m_secondTap = false;
+            return;
+        default:   // TouchCancel
+            endDrag();
+            m_lastTap.invalidate();
+            m_secondTap = false;
+            return;
+        }
+    }
     void changed()
     {
         publish();
@@ -398,6 +446,12 @@ private:
     bool m_dragging = false;
     QPointF m_pressAt;
     QPointF m_pressPosition;
+    // Il doppio tocco (touch): il primo tocco breve, dove e quando e' finito.
+    QElapsedTimer m_lastTap;
+    QPointF m_lastTapAt;
+    QElapsedTimer m_touchTime;   // il tocco in corso: quando e dove e' cominciato
+    QPointF m_touchAt;
+    bool m_secondTap = false;    // il tocco in corso e' il secondo di un doppio tocco
 };
 
 // Telefono (e non tablet): su iPhone e Android in verticale la finestra offre solo

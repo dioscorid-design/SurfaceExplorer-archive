@@ -41,6 +41,11 @@
 #include <rhi/qrhi.h>
 #include <QPlainTextEdit>
 #include <QWindow>
+#include <QBackingStore>
+#include <qpa/qwindowsysteminterface.h>
+#include <QtGui/private/qeventpoint_p.h>
+#include <QTouchEvent>
+#include <QStyleHints>
 #include <QPushButton>
 #include <QSlider>
 #include <QTreeWidget>
@@ -5897,6 +5902,59 @@ void ScenarioTest::runImageCaptureScenarios()
             check(allFit, QStringLiteral("dialogo%1: il testo informativo si legge tutto in ogni modo (altezza/necessaria: %2)")
                               .arg(corner ? QStringLiteral(" nell'angolo (telefono)") : QString(),
                                    report.join(QStringLiteral(", "))));
+        }
+        // IL DITO: il riquadro si trascina coi tocchi, e il DOPPIO TOCCO lo
+        // ricentra come il doppio clic. Accettando i tocchi Qt non sintetizza
+        // il doppio clic: prima sul telefono il doppio tocco non faceva nulla.
+        // Due tocchi piu' distanti dell'intervallo del doppio clic no.
+        {
+            double afterDrag = 0.0, afterDoubleTap = 1.0, afterSlowTaps = 0.0;
+            ImageCapture::setTestDialogHandler([&](QDialog *d) {
+                for (QComboBox *c : d->findChildren<QComboBox *>())
+                    if (c->findText(QStringLiteral("1:1")) >= 0) { c->setCurrentIndex(c->findText(QStringLiteral("1:1"))); break; }
+                setSizeMode(d, QStringLiteral("Long side (px)"));
+                QCoreApplication::processEvents();
+                QWidget *guide = gl->findChild<QWidget *>(QStringLiteral("imageFrameGuide"));
+                if (!guide) { d->reject(); return; }
+                const auto touchAt = [&](QEvent::Type type, QEventPoint::State state, const QPointF &at) {
+                    // La posizione locale (position()) il costruttore non la
+                    // scrive: senza, il riquadro riceveva sempre (0, 0).
+                    QEventPoint pt(1, state, at, guide->mapToGlobal(at));
+                    QMutableEventPoint::setPosition(pt, at);
+                    QTouchEvent te(type, nullptr, Qt::NoModifier, { pt });
+                    QCoreApplication::sendEvent(guide, &te);
+                };
+                const auto tap = [&](const QPointF &at) {
+                    touchAt(QEvent::TouchBegin, QEventPoint::Pressed, at);
+                    touchAt(QEvent::TouchEnd, QEventPoint::Released, at);
+                };
+                const auto position = [&] { return guide->property("framePosition").toPointF().x(); };
+                const QPointF c(guide->width() / 2.0, guide->height() / 2.0);
+                const QPointF right = c + QPointF(guide->width() / 8.0, 0.0);
+                // Trascinamento col dito.
+                touchAt(QEvent::TouchBegin, QEventPoint::Pressed, c);
+                touchAt(QEvent::TouchUpdate, QEventPoint::Updated, right);
+                touchAt(QEvent::TouchEnd, QEventPoint::Released, right);
+                afterDrag = position();
+                // Doppio tocco: al centro.
+                tap(right);
+                tap(right + QPointF(2.0, 1.0));
+                afterDoubleTap = position();
+                // Di nuovo a destra, poi due tocchi lenti: resta dov'e'.
+                touchAt(QEvent::TouchBegin, QEventPoint::Pressed, c);
+                touchAt(QEvent::TouchUpdate, QEventPoint::Updated, right);
+                touchAt(QEvent::TouchEnd, QEventPoint::Released, right);
+                tap(right);
+                wait(QGuiApplication::styleHints()->mouseDoubleClickInterval() + 150);
+                tap(right);
+                afterSlowTaps = position();
+                d->reject();
+            });
+            ImageCapture::run(gl, m_mw, m_outDir);
+            ImageCapture::setTestDialogHandler(nullptr);
+            check(afterDrag > 0.1 && std::abs(afterDoubleTap) < 1e-9 && afterSlowTaps > 0.1,
+                  QStringLiteral("dito: il riquadro si trascina (%1), il doppio tocco lo ricentra (%2), due tocchi lenti no (%3)")
+                      .arg(afterDrag, 0, 'f', 2).arg(afterDoubleTap, 0, 'f', 2).arg(afterSlowTaps, 0, 'f', 2));
         }
         clearImageSettings();
         // A misura di stampa i dpi vanno nel file: 10 cm a 300 dpi.
