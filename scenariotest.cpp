@@ -2,6 +2,7 @@
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "camerapaths.h"
 #include "glwidget.h"
 #include "imagecapture.h"
 #include <QImageReader>
@@ -5730,6 +5731,44 @@ void ScenarioTest::runImageCaptureScenarios()
         // Il taglio dipende da (u,v): le strisce tagliano dove tagliano le linee native, ne'
         // piu' ne' meno (con (u,v) sbagliati sparivano bande intere). Ogni pixel di una delle
         // due immagini ha una linea dell'altra a pochi pixel.
+        // Come uncovered, a una dimensione qualunque.
+        auto uncoveredIn = [&](const QImage &a, const QImage &b, const QSize &sz) {
+            QVector<char> ink(sz.width() * sz.height(), 0);
+            for (int y = 0; y < sz.height(); ++y)
+                for (int x = 0; x < sz.width(); ++x)
+                    ink[y * sz.width() + x] = inked(b, x, y);
+            QPair<qint64, qint64> n(0, 0);
+            for (int y = 3; y + 3 < sz.height(); ++y)
+                for (int x = 3; x + 3 < sz.width(); ++x) {
+                    if (!inked(a, x, y)) continue;
+                    ++n.first;
+                    bool near = false;
+                    for (int dy = -3; dy <= 3 && !near; ++dy)
+                        for (int dx = -3; dx <= 3 && !near; ++dx)
+                            near = ink[(y + dy) * sz.width() + x + dx];
+                    if (!near) ++n.second;
+                }
+            return n;
+        };
+        // Pixel di linea di a e quanti di loro non hanno una linea di b entro 3 pixel.
+        auto uncovered = [&](const QImage &a, const QImage &b) {
+            QVector<char> ink(sw.width() * sw.height(), 0);
+            for (int y = 0; y < sw.height(); ++y)
+                for (int x = 0; x < sw.width(); ++x)
+                    ink[y * sw.width() + x] = inked(b, x, y);
+            QPair<qint64, qint64> n(0, 0);
+            for (int y = 3; y + 3 < sw.height(); ++y)
+                for (int x = 3; x + 3 < sw.width(); ++x) {
+                    if (!inked(a, x, y)) continue;
+                    ++n.first;
+                    bool near = false;
+                    for (int dy = -3; dy <= 3 && !near; ++dy)
+                        for (int dx = -3; dx <= 3 && !near; ++dx)
+                            near = ink[(y + dy) * sw.width() + x + dx];
+                    if (!near) ++n.second;
+                }
+            return n;
+        };
         if (loadSurface(QStringLiteral("surfaces/Parametric/Surfaces/Multi Meshes/Octahedron Bands.json"))) {
             gl->stopAllTimers();
             gl->setClocksDrivenByRecorder(true);
@@ -5738,29 +5777,57 @@ void ScenarioTest::runImageCaptureScenarios()
             const QImage native = wireShot(1, sw), strips = wireShot(3, sw);
             const bool quads = gl->wireframeQuadsActive() && gl->wireframeQuadsEligible();
             strips.save(m_outDir + QStringLiteral("/image-capture-cutout-strips.png"));
-            auto uncovered = [&](const QImage &a, const QImage &b) {
-                QVector<char> ink(sw.width() * sw.height(), 0);
-                for (int y = 0; y < sw.height(); ++y)
-                    for (int x = 0; x < sw.width(); ++x)
-                        ink[y * sw.width() + x] = inked(b, x, y);
-                QPair<qint64, qint64> n(0, 0);
-                for (int y = 3; y + 3 < sw.height(); ++y)
-                    for (int x = 3; x + 3 < sw.width(); ++x) {
-                        if (!inked(a, x, y)) continue;
-                        ++n.first;
-                        bool near = false;
-                        for (int dy = -3; dy <= 3 && !near; ++dy)
-                            for (int dx = -3; dx <= 3 && !near; ++dx)
-                                near = ink[(y + dy) * sw.width() + x + dx];
-                        if (!near) ++n.second;
-                    }
-                return n;
-            };
             const QPair<qint64, qint64> extra = uncovered(strips, native), missing = uncovered(native, strips);
             check(quads && extra.first > 1000 && extra.second < extra.first / 200 && missing.second < missing.first / 200,
                   QStringLiteral("wireframe con taglio CUTOUT: strisce (%1) e linee native coincidono "
                                  "(%2 pixel di striscia di troppo, %3 di linea mancanti su %4)")
                       .arg(quads).arg(extra.second).arg(missing.second).arg(missing.first));
+            gl->setClocksDrivenByRecorder(false);
+        }
+        // LA CAMERA SULLA SUPERFICIE: i segmenti con un estremo dietro la
+        // camera. Le linee native li tagliano al piano vicino; le strisce li
+        // buttavano interi, e nelle immagini scattate da dentro la superficie
+        // mancavano proprio le linee piu' vicine. Mobius Racing corre a 0.05
+        // sopra il nastro; a maglie larghe (20 passi) i segmenti che passano
+        // sotto la camera arrivano dentro la vista. La camera si porta a tempi
+        // fissi del path (applyCameraAt): gli scatti sono gli stessi a ogni giro.
+        if (loadRecord(QStringLiteral("records/Paths/Parametric/Surfaces/Equations/Non-orientables/Mobius Racing.json"))) {
+            Ui::MainWindow *ui = m_mw->ui;
+            gl->stopAllTimers();
+            gl->setClocksDrivenByRecorder(true);
+            ui->lineSteps->setText(QStringLiteral("20"));
+            emit ui->lineSteps->editingFinished();
+            wait(900);
+            gl->setGlobalRenderMode(2);
+            wait(400);
+            const QSize sc = ImageCapture::sizeFor(viewRatio, 1200);
+            qint64 worstMissing = 0, worstTotal = 0;
+            int worstAt = 0;
+            bool quads = true;
+            QImage worstStrips, worstNative;
+            QStringList trace;
+            // Il passaggio graduale alla vista del path (advancePathHandoff,
+            // 40 passi) dipende da quanti tick sono corsi prima dello stop:
+            // lo si completa, cosi' la camera e' quella del path e basta.
+            for (int i = 0; i < 45; ++i) m_mw->m_paths->applyCameraAt(CameraPaths::Path3D, 0.0f);
+            for (int k = 0; k < 36; ++k) {
+                m_mw->m_paths->applyCameraAt(CameraPaths::Path3D, 0.35f * float(k));
+                wait(60);
+                const QImage native = wireShot(1, sc), strips = wireShot(3, sc);
+                quads = quads && gl->wireframeQuadsActive() && gl->wireframeQuadsEligible();
+                const QPair<qint64, qint64> m = uncoveredIn(native, strips, sc);
+                trace << QStringLiteral("%1/%2").arg(m.second).arg(m.first);
+                if (m.second > worstMissing || (m.second == worstMissing && m.first > worstTotal)) {
+                    worstMissing = m.second; worstTotal = m.first; worstAt = k;
+                    worstStrips = strips; worstNative = native;
+                }
+            }
+            worstStrips.save(m_outDir + QStringLiteral("/image-capture-racing-strips.png"));
+            worstNative.save(m_outDir + QStringLiteral("/image-capture-racing-native.png"));
+            check(quads && worstTotal > 1000 && worstMissing <= 20,
+                  QStringLiteral("wireframe con la camera sulla superficie (Mobius Racing, 20 passi): le strisce hanno anche "
+                                 "le linee che vanno dietro la camera (peggior scatto %1: %2 di linea mancanti su %3) [%4]")
+                      .arg(worstAt).arg(worstMissing).arg(worstTotal).arg(trace.join(QLatin1Char(' '))));
             gl->setClocksDrivenByRecorder(false);
         }
         // Alpha < 1 in WIREFRAME: le linee escono OPACHE. Il wireframe non ha

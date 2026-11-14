@@ -1298,12 +1298,21 @@ void main() {
     {
         const vec4 here = vertex;
         vertex = otherVertex;
-        const vec4 posOther = wireClipPosition();
+        vec4 posOther = wireClipPosition();
         vertex = here;
-        if (pos.w <= 0.0001 || posOther.w <= 0.0001) {
-            gl_Position = vec4(2.0, 2.0, 2.0, 1.0);   // dietro la camera: il segmento sparisce
+        // UN ESTREMO DIETRO LA CAMERA (w <= 0): il segmento si taglia dove
+        // attraversa il piano della camera, come fa la GPU con le linee native
+        // (poi il piano vicino toglie il resto). Prima si buttava intero, e
+        // nelle immagini scattate da dentro la superficie mancavano proprio le
+        // linee piu' vicine. Tutti e due dietro: sparisce. Il taglio e'
+        // lineare nel clip space, cioe' lungo il segmento vero.
+        const float kCameraW = 0.0001;
+        if (pos.w <= kCameraW && posOther.w <= kCameraW) {
+            gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
             return;
         }
+        if (pos.w < kCameraW) pos = mix(pos, posOther, (kCameraW - pos.w) / (posOther.w - pos.w));
+        else if (posOther.w < kCameraW) posOther = mix(posOther, pos, (kCameraW - posOther.w) / (pos.w - posOther.w));
         const vec2 view = vec2(ubuf.u_wireViewW, ubuf.u_wireViewH);
         const vec2 here2 = pos.xy / pos.w * view * 0.5;
         const vec2 other2 = posOther.xy / posOther.w * view * 0.5;
