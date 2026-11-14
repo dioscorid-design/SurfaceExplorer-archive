@@ -5995,8 +5995,16 @@ void ScenarioTest::runImageCaptureScenarios()
             });
             ImageCapture::run(gl, m_mw, m_outDir);
             ImageCapture::setTestDialogHandler(nullptr);
-            check(coveredFirst && frontAfter && recentred,
-                  QStringLiteral("doppio clic sul riquadro con la finestra principale davanti: il dialogo torna davanti "
+            // Sul Mac il dialogo e' una finestra strumento: la finestra
+            // principale non lo copre nemmeno portata davanti. Altrove lo copre,
+            // e il doppio clic deve riportarlo su.
+#ifdef Q_OS_MACOS
+            const bool coveredOk = !coveredFirst;
+#else
+            const bool coveredOk = coveredFirst;
+#endif
+            check(coveredOk && frontAfter && recentred,
+                  QStringLiteral("doppio clic sul riquadro con la finestra principale davanti: il dialogo e' davanti "
                                  "(coperto prima %1, davanti dopo %2, riquadro al centro %3)")
                       .arg(coveredFirst).arg(frontAfter).arg(recentred));
         }

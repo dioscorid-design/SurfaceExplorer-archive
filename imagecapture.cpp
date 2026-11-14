@@ -1063,6 +1063,16 @@ bool ImageCapture::run(GLWidget *gl, QWidget *parent, const QString &defaultDir)
         QEventLoop loop;
         QObject::connect(&dlg, &QDialog::finished, &loop, &QEventLoop::quit);
         if (s_testDialogHandler) QTimer::singleShot(0, &dlg, [&dlg]() { s_testDialogHandler(&dlg); });
+#ifdef Q_OS_MACOS
+        // SUL MAC UNA FINESTRA STRUMENTO (Qt::Tool, la classe "floating" di
+        // macOS): sta sempre sopra le finestre normali dell'app, quindi un
+        // clic sulla vista non la copre piu'. Prima ogni clic portava la
+        // finestra principale davanti e CaptureSession riportava su il
+        // dialogo un istante dopo: col doppio clic che ricentra il riquadro il
+        // dialogo sfarfallava due volte. Sparisce quando l'app non e' attiva,
+        // come le palette.
+        dlg.setWindowFlags((dlg.windowFlags() & ~Qt::WindowType_Mask) | Qt::Tool);
+#endif
         dlg.show();
         if (isPhone() || s_testCornerDialog) placeDialogInCorner(&dlg, gl->window());
         dlg.raise();
