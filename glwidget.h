@@ -1152,7 +1152,24 @@ public:
     // scena viene renderizzata NATIVAMENTE a quella risoluzione e grabFramebuffer()
     // restituisce pixel nitidi senza upscale (fix wireframe sfocato nei video).
     // begin va chiamata una volta prima del loop di registrazione, end alla fine.
+    // Un'uscita PIU' PICCOLA DELLA VISTA si disegna alla scala della vista e si
+    // riduce (captureRenderSize): getFrameForVideo restituisce comunque w x h.
     void beginHiResCapture(int w, int h);
+    // LA DIMENSIONE A CUI SI DISEGNA un'uscita di `out` pixel. Uguale a `out`,
+    // tranne quando l'uscita e' piu' piccola della vista (lungo l'altezza; nelle
+    // immagini piu' larghe della vista conta la fascia ridotta da
+    // `verticalScale`): li' si disegna alla scala della vista, con le stesse
+    // proporzioni, e getFrameForVideo riduce con ricampionamento morbido.
+    // Cosi' un'immagine o un video piccoli sono la vista rimpicciolita: le
+    // texture che misurano in pixel (fwidth, dFdx: Wireframe, frattali)
+    // uscivano larghe una frazione di pixel, spezzate e granulose.
+    QSize captureRenderSize(const QSize &out, float verticalScale) const;
+    // Ricampionamento acceso o spento (spento: l'uscita si disegna alla sua
+    // misura). Acceso di default: le immagini ricampionano sempre. Il recorder lo
+    // imposta con la scelta dell'utente nel dialogo dei video (spento di default:
+    // l'esportazione e' piu' lenta) e lo riaccende a fine registrazione; i test
+    // lo spengono per confrontare.
+    void setCaptureResampling(bool on) { m_captureResample = on; }
     // Cattura di un'IMMAGINE (vedi ImageCapture): il campo visivo VERTICALE e' quello
     // della vista moltiplicato per questa scala (1 = invariato, mai oltre). Serve a
     // un'immagine piu' LARGA della vista: col campo verticale fisso mostrerebbe di
@@ -1800,6 +1817,8 @@ private:
     // true tra beginHiResCapture/endHiResCapture: il color buffer è già fissato
     // alla risoluzione di export, quindi getFrameForVideo NON deve riscalare.
     bool m_hiResCapture = false;
+    QSize m_captureOutputSize;      // l'uscita chiesta a beginHiResCapture (vedi captureRenderSize)
+    bool m_captureResample = true;  // vedi setCaptureResampling
     // true durante l'esportazione video: il rendering e' frame-by-frame (con
     // cattura + scrittura su disco tra i frame), quindi gli intervalli sono
     // naturalmente lentissimi -> il watchdog di performance darebbe un FALSO

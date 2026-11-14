@@ -6969,13 +6969,30 @@ float GLWidget::effectiveCameraFov() const
     return 2.0f * std::atan(std::tan(halfRad) * m_captureVerticalScale) * 180.0f / float(M_PI);
 }
 
+QSize GLWidget::captureRenderSize(const QSize &out, float verticalScale) const
+{
+    if (out.isEmpty() || !m_captureResample) return out;
+    const double viewH = double(height()) * devicePixelRatioF() * double(std::clamp(verticalScale, 0.05f, 1.0f));
+    if (viewH <= 0.0 || double(out.height()) >= viewH * 0.999) return out;
+    double f = viewH / double(out.height());
+    // Il lato massimo della GPU (una vista enorme e un'uscita molto stretta).
+    const int maxSide = rhi() ? rhi()->resourceLimit(QRhi::TextureSizeMax) : 0;
+    if (maxSide > 0) f = std::min(f, double(maxSide) / double(std::max(out.width(), out.height())));
+    if (f <= 1.0) return out;
+    return QSize(int(std::lround(out.width() * f)), int(std::lround(out.height() * f)));
+}
+
 void GLWidget::beginHiResCapture(int w, int h) {
     if (w <= 0 || h <= 0) return;
     m_hiResCapture = true;
+    m_captureOutputSize = QSize(w, h);
     // Fissa il color buffer offscreen di QRhiWidget alla risoluzione di export:
-    // d'ora in poi render() disegna NATIVAMENTE a w x h (renderTarget()->pixelSize()
-    // diventa questa) e grabFramebuffer() restituisce pixel nitidi a quella misura.
-    setFixedColorBufferSize(QSize(w, h));
+    // d'ora in poi render() disegna NATIVAMENTE a quella misura (renderTarget()->
+    // pixelSize() diventa questa) e grabFramebuffer() restituisce pixel nitidi.
+    // Un'uscita piu' piccola della vista si disegna alla scala della vista e
+    // getFrameForVideo la riduce (captureRenderSize). La scala verticale delle
+    // immagini va impostata prima (ImageCapture::render lo fa).
+    setFixedColorBufferSize(captureRenderSize(QSize(w, h), m_captureVerticalScale));
     // La riconfigurazione del render target avviene al prossimo grab/render:
     // grabFramebuffer() in getFrameForVideo fa un render sincrono e raccoglie la
     // nuova dimensione. Niente processEvents (ignorato su iOS).
@@ -6984,6 +7001,7 @@ void GLWidget::beginHiResCapture(int w, int h) {
 void GLWidget::endHiResCapture() {
     if (!m_hiResCapture) return;
     m_hiResCapture = false;
+    m_captureOutputSize = QSize();
     // Torna a seguire la dimensione a schermo del widget (QSize() = dinamica).
     setFixedColorBufferSize(QSize());
     this->repaint();
@@ -7015,6 +7033,14 @@ QImage GLWidget::getFrameForVideo(int targetW, int targetH, bool useFbo) {
                      QImage::Format_RGBA8888);
         img.fill(Qt::black);
         return img;
+    }
+
+    // 2. Uscita piu' piccola della vista: disegnata alla scala della vista
+    //    (captureRenderSize), si riduce qui alla misura chiesta. Ricampionamento
+    //    morbido (media delle aree): e' la vista rimpicciolita.
+    if (m_hiResCapture && !m_captureOutputSize.isEmpty() && img.size() != m_captureOutputSize) {
+        img = img.scaled(m_captureOutputSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        img.setDevicePixelRatio(1.0);
     }
 
     // 3. In hi-res capture il buffer è GIÀ alla risoluzione di export: NON riscalare

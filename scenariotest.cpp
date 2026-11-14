@@ -5,6 +5,9 @@
 #include "camerapaths.h"
 #include "glwidget.h"
 #include "imagecapture.h"
+#ifdef Q_OS_MACOS
+#include "nativevideoencoder.h"
+#endif
 #include <QImageReader>
 #include <QComboBox>
 #include "librarymanager.h"
@@ -6238,6 +6241,106 @@ void ScenarioTest::runImageCaptureScenarios()
         } else {
             check(false, QStringLiteral("immagine piu' grande della vista: rendering fallito %1").arg(e));
         }
+        // IMMAGINE PIU' PICCOLA DELLA VISTA: si disegna alla scala della vista e si
+        // riduce (GLWidget::captureRenderSize). Senza, le linee della texture
+        // (fwidth) uscivano larghe un terzo di pixel: spezzate e granulose. Il
+        // riferimento e' la vista rimpicciolita; si misura la differenza media
+        // per pixel, col ricampionamento e senza (setCaptureResampling).
+        if (!live.isNull()) {
+            const QSize small = ImageCapture::sizeFor(vr, std::max(live.width(), live.height()) / 3);
+            const QImage ref = live.scaled(small, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+                                   .convertToFormat(QImage::Format_RGB32);
+            auto diffTo = [&](const QImage &im) {
+                if (im.isNull() || im.size() != ref.size()) return 255.0;
+                const QImage a = im.convertToFormat(QImage::Format_RGB32);
+                double sum = 0.0;
+                for (int y = 0; y < a.height(); ++y)
+                    for (int x = 0; x < a.width(); ++x) {
+                        const QRgb p = a.pixel(x, y), q = ref.pixel(x, y);
+                        sum += (std::abs(qRed(p) - qRed(q)) + std::abs(qGreen(p) - qGreen(q)) + std::abs(qBlue(p) - qBlue(q))) / 3.0;
+                    }
+                return sum / std::max(1.0, double(a.width()) * a.height());
+            };
+            const QImage resampled = ImageCapture::render(gl, small, vr, &e);
+            gl->setCaptureResampling(false);
+            const QImage native = ImageCapture::render(gl, small, vr, &e);
+            gl->setCaptureResampling(true);
+            resampled.save(m_outDir + QStringLiteral("/image-small-resampled.png"));
+            native.save(m_outDir + QStringLiteral("/image-small-native.png"));
+            ref.save(m_outDir + QStringLiteral("/image-small-reference.png"));
+            const double dr = diffTo(resampled), dn = diffTo(native);
+            const double lr = luma(resampled), ln = luma(native), lref = luma(ref);
+            check(resampled.size() == small && dr < 0.5 * dn && std::abs(lr - lref) < 0.1 * lref,
+                  QStringLiteral("immagine %1x%2 (un terzo della vista): ricampionata, scarto medio dallo schermo rimpicciolito %3 "
+                                 "(senza ricampionamento %4), luminosita' %5 contro %6 (senza %7)")
+                      .arg(small.width()).arg(small.height()).arg(dr, 0, 'f', 1).arg(dn, 0, 'f', 1)
+                      .arg(lr, 0, 'f', 1).arg(lref, 0, 'f', 1).arg(ln, 0, 'f', 1));
+        }
+        // I VIDEO PIU' PICCOLI DELLA VISTA si ricampionano allo stesso modo: il
+        // tempo per fotogramma, 1080p col percorso del recorder (beginHiResCapture,
+        // getFrameForVideo), col ricampionamento e senza.
+        auto msPerFrame = [&](bool resample) {
+            gl->setCaptureResampling(resample);
+            gl->beginHiResCapture(1920, 1080);
+            gl->getFrameForVideo(1920, 1080, true);   // il primo paga la riconfigurazione
+            QElapsedTimer t;
+            t.start();
+            constexpr int kFrames = 12;
+            QSize got;
+            for (int i = 0; i < kFrames; ++i) got = gl->getFrameForVideo(1920, 1080, true).size();
+            const double ms = double(t.nsecsElapsed()) * 1e-6 / kFrames;
+            gl->endHiResCapture();
+            gl->setCaptureResampling(true);
+            return std::make_pair(ms, got);
+        };
+        {
+            const auto off = msPerFrame(false), on = msPerFrame(true);
+            const QSize drawn = gl->captureRenderSize(QSize(1920, 1080), 1.0f);
+            check(on.second == QSize(1920, 1080) && off.second == QSize(1920, 1080),
+                  QStringLiteral("video 1920x1080 da una vista %1x%2 (Gyroid, ray marching): disegnato a %3x%4 e ridotto, "
+                                 "%5 ms per fotogramma contro %6 senza ricampionamento (x%7)")
+                      .arg(live.width()).arg(live.height()).arg(drawn.width()).arg(drawn.height())
+                      .arg(on.first, 0, 'f', 1).arg(off.first, 0, 'f', 1).arg(on.first / std::max(0.001, off.first), 0, 'f', 2));
+        }
+#ifdef Q_OS_MACOS
+        // L'ESPORTAZIONE INTERA, come nel recorder: orologi avanti, fotogramma,
+        // conversione, encoder nativo (AVFoundation) su un file temporaneo.
+        auto exportSeconds = [&](bool resample) {
+            const QString out = m_outDir + QStringLiteral("/video-%1.mp4").arg(resample ? QStringLiteral("on") : QStringLiteral("off"));
+            QFile::remove(out);
+            gl->setCaptureResampling(resample);
+            gl->beginHiResCapture(1920, 1080);
+            QElapsedTimer t;
+            t.start();
+            bool ok = NativeVideoEncoder::begin(out, 60, 1920, 1080, QString(), 1.0);
+            for (int i = 0; ok && i < 60; ++i) {
+                gl->advanceClocksBy(1.0f / 60.0f);
+                QImage frame = gl->getFrameForVideo(1920, 1080, true);
+                frame.setDevicePixelRatio(1.0);
+                if (frame.format() != QImage::Format_RGB32) frame = frame.convertToFormat(QImage::Format_RGB32);
+                ok = NativeVideoEncoder::appendFrame(frame);
+            }
+            ok = NativeVideoEncoder::end() && ok;
+            const double sec = double(t.nsecsElapsed()) * 1e-9;
+            gl->endHiResCapture();
+            gl->setCaptureResampling(true);
+            return std::make_pair(ok ? sec : -1.0, QFileInfo(out).size());
+        };
+        {
+            const auto off = exportSeconds(false), on = exportSeconds(true);
+            check(on.first > 0.0 && off.first > 0.0 && on.second > 0,
+                  QStringLiteral("esportazione video 1080p, 60 fotogrammi (Gyroid, ray marching): %1 s col ricampionamento, %2 s senza (x%3)")
+                      .arg(on.first, 0, 'f', 2).arg(off.first, 0, 'f', 2).arg(on.first / std::max(0.001, off.first), 0, 'f', 2));
+        }
+#endif
+        if (loadRecord(QStringLiteral("records/Rotations/Parametric/Surfaces/Multi Meshes/Torus Necklace Spin.json"))) {
+            gl->stopAllTimers();
+            wait(400);
+            const auto off = msPerFrame(false), on = msPerFrame(true);
+            check(on.second == QSize(1920, 1080),
+                  QStringLiteral("video 1920x1080 (Torus Necklace Spin, mesh): %1 ms per fotogramma contro %2 senza ricampionamento (x%3)")
+                      .arg(on.first, 0, 'f', 1).arg(off.first, 0, 'f', 1).arg(on.first / std::max(0.001, off.first), 0, 'f', 2));
+        }
     }
     // IL RIQUADRO TRASCINATO (FrameGuide, GLWidget::setCaptureShift): l'immagine
     // e' la parte della vista sotto il riquadro. Prima la logica pura; poi, su
@@ -6268,7 +6371,12 @@ void ScenarioTest::runImageCaptureScenarios()
         gl->stopAllTimers();
         wait(500);
         const double vr = double(gl->width()) / double(std::max(1, gl->height()));
-        const int h = 600;
+        // All'altezza della vista (pari), non piu' piccola: qui si verifica lo
+        // spostamento del riquadro, e un'immagine piu' piccola della vista verrebbe
+        // ricampionata (GLWidget::captureRenderSize), con bordi spostati di un
+        // pixel fra intero e pezzi sulle scacchiere a contrasto pieno.
+        int h = int(std::lround(gl->height() * gl->devicePixelRatioF()));
+        h -= h % 2;
         int w = int(std::lround(h * vr));
         w -= w % 2;
         QString e;

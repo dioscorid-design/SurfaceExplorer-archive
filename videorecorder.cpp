@@ -1,4 +1,5 @@
 #include "videorecorder.h"
+#include <QCheckBox>
 #include "imagecapture.h"
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -71,6 +72,7 @@ public:
     QSpinBox* spinFps;
     QComboBox* comboRes;
     QComboBox* comboEngine;
+    QCheckBox* chkResample;
     QLineEdit* nameEdit;
 #if !defined(Q_OS_IOS)
     QComboBox* comboFormat;
@@ -148,6 +150,17 @@ public:
         });
         comboEngine->setStyleSheet("padding: 8px; font-size: 14px;");
         form->addRow("Render Engine:", comboEngine);
+
+        // RICAMPIONAMENTO (vedi GLWidget::captureRenderSize): un video piu'
+        // piccolo della vista disegnato alla scala della vista e ridotto. Conta
+        // solo col motore a risoluzione nativa; spento di default (esportazione
+        // piu' veloce), lo stato lo mette chi apre il dialogo.
+        chkResample = new QCheckBox("Downscale from view size (sharper fine textures, slower)", scrollContent);
+        chkResample->setStyleSheet("font-size: 14px;");
+        form->addRow("Downscaling:", chkResample);
+        auto engineGate = [this]() { chkResample->setEnabled(comboEngine->currentIndex() == 0); };
+        connect(comboEngine, QOverload<int>::of(&QComboBox::currentIndexChanged), this, engineGate);
+        engineGate();
 
         scrollLayout->addLayout(form);
 
@@ -426,6 +439,9 @@ void VideoRecorder::toggleRecord()
     int targetHeight = -1;
     bool useFBO = false;
     bool usePng = false;
+    // Video piu' piccolo della vista disegnato alla scala della vista e ridotto
+    // (GLWidget::captureRenderSize): scelta dell'utente, spenta di default.
+    bool resample = false;
 
     QString rootPath;
 #if defined(Q_OS_ANDROID)
@@ -468,6 +484,7 @@ void VideoRecorder::toggleRecord()
     int defRes = settings.value("lastRecResIndex", 1).toInt();
 
     MobileVideoSaveDialog pathDialog(defaultVideoDir, defDur, defFps, defRes, m_mainWindow);
+    pathDialog.chkResample->setChecked(settings.value("lastRecResample", false).toBool());
     if (pathDialog.exec() != QDialog::Accepted) {
         restoreState();
         return;
@@ -478,6 +495,8 @@ void VideoRecorder::toggleRecord()
     resIndex = pathDialog.comboRes->currentIndex();
     userSelectedFile = pathDialog.getSelectedPath();
     useFBO = (pathDialog.comboEngine->currentIndex() == 0);
+    settings.setValue("lastRecResample", pathDialog.chkResample->isChecked());
+    resample = useFBO && pathDialog.chkResample->isChecked();
 
 #if defined(Q_OS_IOS)
     // iOS non espone la scelta del formato: i frame temporanei sono sempre RAW
@@ -545,6 +564,30 @@ void VideoRecorder::toggleRecord()
     int engineIndex = engineModes.indexOf(selectedEngine);
     settings.setValue("lastRecEngine", engineIndex);
     useFBO = (engineIndex == 0);
+
+    // RICAMPIONAMENTO: chiesto solo quando conta, cioe' col motore a risoluzione
+    // nativa e un video piu' piccolo della vista (GLWidget::captureRenderSize).
+    // Li' le texture che misurano in pixel (linee del Wireframe, frattali)
+    // uscirebbero larghe una frazione di pixel, spezzate e granulose; disegnate
+    // alla scala della vista e ridotte sono la vista rimpicciolita, ma
+    // l'esportazione e' piu' lenta (circa 1,5 volte, misurato). Spento di default.
+    {
+        static const QSize kResSizes[] = { QSize(), QSize(1920, 1080), QSize(2560, 1440), QSize(3840, 2160) };
+        const QSize wanted = (resIndex >= 1 && resIndex <= 3) ? kResSizes[resIndex] : QSize();
+        if (useFBO && !wanted.isEmpty() && m_mainWindow->ui->glWidget->captureRenderSize(wanted, 1.0f) != wanted) {
+            QStringList modes = {
+                "Draw at video size (Faster)",
+                "Draw at view size and downscale (Matches the screen, Slower)"
+            };
+            const int defMode = settings.value("lastRecResample", false).toBool() ? 1 : 0;
+            QString selectedMode = QInputDialog::getItem(m_mainWindow, "Downscaling",
+                "The video is smaller than the view: fine textures (wireframe lines, fractals)\n"
+                "can be drawn at the view's resolution and scaled down.", modes, defMode, false, &ok);
+            if (!ok) { restoreState(); return; }
+            resample = (modes.indexOf(selectedMode) == 1);
+            settings.setValue("lastRecResample", resample);
+        }
+    }
 
     // Salvataggio File
     QString lastVideoDir = settings.value("lastVideoDir", defaultVideoDir).toString();
@@ -854,6 +897,7 @@ void VideoRecorder::toggleRecord()
                         m_mainWindow->ui->glWidget->devicePixelRatio();
             capW = nat.width(); capH = nat.height();
         }
+        m_mainWindow->ui->glWidget->setCaptureResampling(resample);
         m_mainWindow->ui->glWidget->beginHiResCapture(capW, capH);
     }
 
@@ -1093,6 +1137,8 @@ void VideoRecorder::toggleRecord()
     // Va fatto SEMPRE, anche su stop anticipato (il loop esce solo con break).
     if (fboCapture) {
         m_mainWindow->ui->glWidget->endHiResCapture();
+        // Le immagini (ImageCapture) ricampionano sempre.
+        m_mainWindow->ui->glWidget->setCaptureResampling(true);
     }
 
     m_mainWindow->ui->glWidget->setUpdatesEnabled(true);

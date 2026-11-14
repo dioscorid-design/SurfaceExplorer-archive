@@ -155,7 +155,10 @@ QImage ImageCapture::render(GLWidget *gl, const QSize &size, double ratio, QStri
     // si ispessiscono in proporzione a quanto l'immagine e' piu' grande della vista
     // (nel verso che resta fisso: l'altezza se si taglia ai lati, la larghezza se
     // il campo verticale si riduce).
-    const double scale = wireScaleFor(gl, size, ratio);
+    // Si conta sulla dimensione a cui si DISEGNA: un'immagine piu' piccola della
+    // vista si disegna alla scala della vista e poi si riduce (GLWidget::
+    // captureRenderSize), quindi li' lo spessore e' quello dello schermo.
+    const double scale = wireScaleFor(gl, gl->captureRenderSize(size, verticalScale), ratio);
     // Ogni ridisegno costa tutto il wireframe: su una scena fitta troppi ridisegni
     // in un solo fotogramma fanno fallire la GPU (immagine tutta magenta). Si limita
     // lo spessore al costo (indici x ridisegni, al massimo 30 milioni) e, se l'immagine
@@ -232,6 +235,9 @@ void ImageCapture::setTestBlankFrames(int frames) { s_testBlankFrames = frames; 
 double ImageCapture::secondsPerMegapixel(GLWidget *gl)
 {
     const QSize probe(1280, 720);
+    // Il tempo va diviso per i pixel DISEGNATI: piu' piccola della vista, la
+    // sonda si disegna alla scala della vista (GLWidget::captureRenderSize).
+    const QSize drawn = gl->captureRenderSize(probe, 1.0f);
     // Due giri: il primo paga le risorse e la riconfigurazione del buffer.
     double seconds = 0.0;
     for (int i = 0; i < 2; ++i) {
@@ -243,7 +249,7 @@ double ImageCapture::secondsPerMegapixel(GLWidget *gl)
         seconds = double(t.nsecsElapsed()) * 1e-9;
         if (img.isNull()) return 0.0;
     }
-    return seconds / (double(probe.width()) * probe.height() / 1e6);
+    return seconds / (double(drawn.width()) * drawn.height() / 1e6);
 }
 
 // ==========================================================
@@ -802,7 +808,8 @@ private:
             const qint64 segments = m_gl->wireframeIndexTotal() / 2;
             const double factor = m_wireCombo->currentData().toDouble();
             auto fits = [&]() {
-                const int w = int(std::lround(wireScaleFor(m_gl, m_size, m_ratio) * factor));
+                const QSize drawn = m_gl->captureRenderSize(m_size, ImageCapture::verticalScaleFor(m_ratio, m_viewRatio));
+                const int w = int(std::lround(wireScaleFor(m_gl, drawn, m_ratio) * factor));
                 return ImageCapture::wireFits(wl.maxWidth, wl.budget, segments, w);
             };
             while (!fits() && longSide > 16) {
@@ -814,8 +821,11 @@ private:
         if (m_guide) m_guide->setRatio(m_ratio);
 
         const double mp = double(m_size.width()) * m_size.height() / 1e6;
-        const double seconds = m_secPerMp * mp;
-        const double gb = double(m_size.width()) * m_size.height() * 4.0 * 3.0 / 1e9;   // colore, profondita', copia
+        // Tempo e memoria sui pixel DISEGNATI: un'immagine piu' piccola della vista
+        // si disegna alla scala della vista (GLWidget::captureRenderSize).
+        const QSize drawn = m_gl->captureRenderSize(m_size, ImageCapture::verticalScaleFor(m_ratio, m_viewRatio));
+        const double seconds = m_secPerMp * double(drawn.width()) * drawn.height() / 1e6;
+        const double gb = double(drawn.width()) * drawn.height() * 4.0 * 3.0 / 1e9;   // colore, profondita', copia
         QString text = tr("<b>%1 &times; %2 px</b> (%3 megapixel)")
                            .arg(m_size.width()).arg(m_size.height()).arg(mp, 0, 'f', 1);
         if (exact)
