@@ -35,6 +35,7 @@
 #include <QTouchEvent>
 #include <QVector2D>
 #include <QVBoxLayout>
+#include <QWindow>
 #include <QtConcurrent>
 #include <algorithm>
 #include <cmath>
@@ -894,6 +895,23 @@ static QString s_testSavePath;
 static std::function<void(QDialog *)> s_testDialogHandler;
 void ImageCapture::setTestSavePath(const QString &path) { s_testSavePath = path; }
 void ImageCapture::setTestDialogHandler(std::function<void(QDialog *)> handler) { s_testDialogHandler = std::move(handler); }
+static bool s_testCornerDialog = false;
+void ImageCapture::setTestCornerDialog(bool on) { s_testCornerDialog = on; }
+
+// IL DIALOGO NELL'ANGOLO, sul telefono: centrato copriva buona parte della
+// vista e il riquadro guida non si vedeva (segnalato dall'utente su iPhone).
+// In alto a sinistra, dentro l'area sicura (in orizzontale l'isola dinamica
+// sta su un lato); il riquadro resta visibile e si trascina nel resto della
+// vista. Ancorato all'angolo, il dialogo cresce verso il basso e a destra
+// quando cambia il modo (righe che compaiono), senza spostarsi.
+static void placeDialogInCorner(QWidget *dlg, QWidget *mainWindow)
+{
+    if (!dlg || !mainWindow) return;
+    constexpr int kMargin = 8;
+    QMargins safe;
+    if (QWindow *w = mainWindow->windowHandle()) safe = w->safeAreaMargins();
+    dlg->move(mainWindow->geometry().topLeft() + QPoint(safe.left() + kMargin, safe.top() + kMargin));
+}
 
 bool ImageCapture::run(GLWidget *gl, QWidget *parent, const QString &defaultDir)
 {
@@ -917,6 +935,7 @@ bool ImageCapture::run(GLWidget *gl, QWidget *parent, const QString &defaultDir)
         QObject::connect(&dlg, &QDialog::finished, &loop, &QEventLoop::quit);
         if (s_testDialogHandler) QTimer::singleShot(0, &dlg, [&dlg]() { s_testDialogHandler(&dlg); });
         dlg.show();
+        if (isPhone() || s_testCornerDialog) placeDialogInCorner(&dlg, gl->window());
         dlg.raise();
         dlg.activateWindow();
         loop.exec();

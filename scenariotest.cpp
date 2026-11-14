@@ -40,6 +40,7 @@
 #include <QPainter>
 #include <rhi/qrhi.h>
 #include <QPlainTextEdit>
+#include <QWindow>
 #include <QPushButton>
 #include <QSlider>
 #include <QTreeWidget>
@@ -5839,6 +5840,28 @@ void ScenarioTest::runImageCaptureScenarios()
         check(sawDialog && done && QFile::exists(out) && onDisk.isValid() && onDisk.width() > 100,
               QStringLiteral("flusso intero: dialogo, rendering e PNG salvato (dialogo %1, salvato %2, su disco %3x%4)")
                   .arg(sawDialog).arg(done).arg(onDisk.width()).arg(onDisk.height()));
+        // SUL TELEFONO il dialogo sta nell'angolo in alto a sinistra della
+        // finestra (dentro l'area sicura): centrato copriva buona parte della
+        // vista e il riquadro guida non si vedeva. Qui il ramo del telefono
+        // forzato (setTestCornerDialog), poi Cancel.
+        {
+            QPoint at(-1, -1);
+            ImageCapture::setTestCornerDialog(true);
+            ImageCapture::setTestDialogHandler([&](QDialog *d) {
+                QCoreApplication::processEvents();
+                at = d->pos();
+                d->reject();
+            });
+            ImageCapture::run(gl, m_mw, m_outDir);
+            ImageCapture::setTestCornerDialog(false);
+            ImageCapture::setTestDialogHandler(nullptr);
+            QMargins safe;
+            if (QWindow *w = m_mw->windowHandle()) safe = w->safeAreaMargins();
+            const QPoint expected = m_mw->geometry().topLeft() + QPoint(safe.left() + 8, safe.top() + 8);
+            check((at - expected).manhattanLength() <= 4,
+                  QStringLiteral("telefono: il dialogo sta nell'angolo in alto a sinistra della finestra (a %1,%2, atteso %3,%4)")
+                      .arg(at.x()).arg(at.y()).arg(expected.x()).arg(expected.y()));
+        }
         // A misura di stampa i dpi vanno nel file: 10 cm a 300 dpi.
         const QString outPrint = m_outDir + QStringLiteral("/image-capture-print.png");
         ImageCapture::setTestSavePath(outPrint);

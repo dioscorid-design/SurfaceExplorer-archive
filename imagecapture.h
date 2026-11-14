@@ -46,6 +46,10 @@ public:
     // Solo per i test: i prossimi `frames` fotogrammi di render() escono di un solo
     // colore, come quelli che la GPU non riesce a finire.
     static void setTestBlankFrames(int frames);
+    // Solo per i test: il dialogo va nell'angolo in alto a sinistra della
+    // finestra come sul telefono (dove la vista e' troppo piccola per tenerlo
+    // al centro: copriva il riquadro guida).
+    static void setTestCornerDialog(bool on);
 
     // --- Logica pura, usata dal dialogo e dai test ---
     // Le dimensioni da un rapporto (largo/alto) e dal lato lungo in pixel.
