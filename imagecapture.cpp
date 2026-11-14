@@ -274,6 +274,13 @@ public:
     }
     // Dove sta il riquadro lungo il lato libero (ImageCapture::guideRect).
     QPointF position() const { return m_position; }
+    // Prima di sparire: si ridipinge trasparente, subito, cosi' nell'immagine
+    // della finestra non resta la velatura (vedi paintEvent).
+    void clearPaint()
+    {
+        m_ratio = 0.0;
+        repaint();
+    }
 
 protected:
     bool eventFilter(QObject *obj, QEvent *ev) override
@@ -325,9 +332,18 @@ protected:
     }
     void paintEvent(QPaintEvent *) override
     {
+        // PRIMA SI CANCELLA. Sotto c'e' la vista, che si disegna da se' (una
+        // texture): nell'immagine della finestra quest'area non la ripulisce
+        // nessuno. Senza, a ogni ridisegno del trascinamento la velatura si
+        // sommava a quella vecchia, e chiuso il dialogo restava dipinta sopra
+        // la vista finche' un dock non faceva ridisegnare tutta la finestra
+        // (segnalato dall'utente, Mac e iPhone).
+        QPainter p(this);
+        p.setCompositionMode(QPainter::CompositionMode_Source);
+        p.fillRect(rect(), Qt::transparent);
+        p.setCompositionMode(QPainter::CompositionMode_SourceOver);
         if (m_ratio <= 0.0) return;
         const QRect r = ImageCapture::guideRect(size(), m_ratio, m_position);
-        QPainter p(this);
         p.setPen(Qt::NoPen);
         p.setBrush(QColor(0, 0, 0, 120));
         // Fuori dal riquadro: scurito.
@@ -1056,7 +1072,9 @@ bool ImageCapture::run(GLWidget *gl, QWidget *parent, const QString &defaultDir)
     }
     // Dove l'utente ha lasciato il riquadro: l'inquadratura dell'immagine.
     const QPointF framePosition = guide->position();
+    guide->clearPaint();
     delete guide;
+    gl->update();
     if (!accepted) return false;
     dlg.saveSettings();
     const QSize size = dlg.size();

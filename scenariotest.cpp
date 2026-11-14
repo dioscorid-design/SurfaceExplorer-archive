@@ -6000,6 +6000,85 @@ void ScenarioTest::runImageCaptureScenarios()
                                  "(coperto prima %1, davanti dopo %2, riquadro al centro %3)")
                       .arg(coveredFirst).arg(frontAfter).arg(recentred));
         }
+        // CANCEL DOPO UN DOPPIO CLIC SUL RIQUADRO, con eventi del sistema a
+        // finestre (QWindowSystemInterface: la stessa strada dei clic veri,
+        // doppio clic sintetizzato da Qt): il dialogo si chiude, run() torna,
+        // la cornice sparisce e la finestra principale e' di nuovo libera.
+        {
+            bool dialogClosed = false;
+            // L'IMMAGINE DELLA FINESTRA (backing store): li' il riquadro dipinge
+            // la velatura, sopra la vista che ha un disegno suo. Alfa medio sulla
+            // striscia di sinistra della vista, fuori dal riquadro 1:1.
+            const auto stripAlpha = [&]() {
+                QBackingStore *bs = m_mw->window()->backingStore();
+                const QImage *img = bs ? dynamic_cast<const QImage *>(bs->paintDevice()) : nullptr;
+                if (!img || img->isNull()) return -1.0;
+                const qreal dpr = img->devicePixelRatio();
+                const QPoint tl = gl->mapTo(m_mw->window(), QPoint(0, 0));
+                const QRect r(QPoint(int(tl.x() * dpr), int(tl.y() * dpr)),
+                              QSize(int(gl->width() / 8 * dpr), int(gl->height() * dpr)));
+                double sum = 0.0; int n = 0;
+                for (int y = r.top(); y <= r.bottom() && y < img->height(); y += 4)
+                    for (int x = r.left(); x <= r.right() && x < img->width(); x += 4) { sum += qAlpha(img->pixel(x, y)); ++n; }
+                return n ? sum / n : -1.0;
+            };
+            double alphaDuring = -1.0;
+            ImageCapture::setTestDialogHandler([&](QDialog *d) {
+                for (QComboBox *c : d->findChildren<QComboBox *>())
+                    if (c->findText(QStringLiteral("1:1")) >= 0) { c->setCurrentIndex(c->findText(QStringLiteral("1:1"))); break; }
+                setSizeMode(d, QStringLiteral("Long side (px)"));
+                wait(300);
+                QWidget *guide = gl->findChild<QWidget *>(QStringLiteral("imageFrameGuide"));
+                QWindow *mainWin = m_mw->window()->windowHandle();
+                // Un trascinamento vero del riquadro (il residuo compariva solo dopo).
+                if (guide && mainWin) {
+                    const QPointF from(guide->mapTo(m_mw->window(), QPoint(guide->width() / 2, guide->height() / 2)));
+                    const QPointF to = from + QPointF(guide->width() / 10.0, 0.0);
+                    using WSI = QWindowSystemInterface;
+                    WSI::handleMouseEvent<WSI::SynchronousDelivery>(mainWin, from, mainWin->mapToGlobal(from), Qt::LeftButton, Qt::LeftButton, QEvent::MouseButtonPress);
+                    for (int k = 1; k <= 5; ++k) {
+                        const QPointF at = from + (to - from) * (k / 5.0);
+                        WSI::handleMouseEvent<WSI::SynchronousDelivery>(mainWin, at, mainWin->mapToGlobal(at), Qt::LeftButton, Qt::NoButton, QEvent::MouseMove);
+                        wait(30);
+                    }
+                    WSI::handleMouseEvent<WSI::SynchronousDelivery>(mainWin, to, mainWin->mapToGlobal(to), Qt::NoButton, Qt::LeftButton, QEvent::MouseButtonRelease);
+                    wait(300);
+                }
+                alphaDuring = stripAlpha();
+                const auto click = [](QWindow *w, const QPointF &local, int times) {
+                    const QPointF global = w->mapToGlobal(local);
+                    for (int i = 0; i < times; ++i) {
+                        QWindowSystemInterface::handleMouseEvent<QWindowSystemInterface::SynchronousDelivery>(
+                            w, local, global, Qt::LeftButton, Qt::LeftButton, QEvent::MouseButtonPress);
+                        QWindowSystemInterface::handleMouseEvent<QWindowSystemInterface::SynchronousDelivery>(
+                            w, local, global, Qt::NoButton, Qt::LeftButton, QEvent::MouseButtonRelease);
+                    }
+                };
+                if (guide && mainWin)
+                    click(mainWin, QPointF(guide->mapTo(m_mw->window(), QPoint(int(guide->width() * 0.6), guide->height() / 2))), 2);
+                wait(400);
+                QPushButton *cancel = nullptr;
+                for (QPushButton *b : d->findChildren<QPushButton *>())
+                    if (b->text() == QLatin1String("Cancel")) cancel = b;
+                if (cancel && d->windowHandle())
+                    click(d->windowHandle(), QPointF(cancel->mapTo(d, cancel->rect().center())), 1);
+                wait(400);
+                dialogClosed = !d->isVisible();
+                if (d->isVisible()) d->reject();   // non resti aperto se il clic non e' arrivato
+            });
+            const bool done = ImageCapture::run(gl, m_mw, m_outDir);
+            ImageCapture::setTestDialogHandler(nullptr);
+            wait(300);
+            const bool guideGone = gl->findChild<QWidget *>(QStringLiteral("imageFrameGuide")) == nullptr;
+            const double alphaAfter = stripAlpha();
+            // La velatura c'era (alfa alto) e dopo il Cancel non deve restare.
+            const bool veilGone = alphaDuring > 40.0 && alphaAfter >= 0.0 && alphaAfter < 10.0;
+            check(dialogClosed && !done && guideGone && veilGone,
+                  QStringLiteral("trascinamento, doppio clic sul riquadro e Cancel col mouse: dialogo chiuso %1, cornice sparita %2, "
+                                 "velatura ripulita dall'immagine della finestra %3 (alfa durante %4, dopo %5)")
+                      .arg(dialogClosed).arg(guideGone).arg(veilGone)
+                      .arg(alphaDuring, 0, 'f', 1).arg(alphaAfter, 0, 'f', 1));
+        }
         clearImageSettings();
         // A misura di stampa i dpi vanno nel file: 10 cm a 300 dpi.
         const QString outPrint = m_outDir + QStringLiteral("/image-capture-print.png");
