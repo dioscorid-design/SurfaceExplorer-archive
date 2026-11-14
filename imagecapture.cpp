@@ -901,8 +901,12 @@ protected:
         case QEvent::Gesture:
         case QEvent::DragEnter:
         case QEvent::DragMove:
-        case QEvent::Drop:
-            return inMainWindow(obj) && !inGuide(obj);
+        case QEvent::Drop: {
+            const bool main = inMainWindow(obj);
+            const bool guide = main && inGuide(obj);
+            if (main) keepDialogInFront(ev->type(), guide);
+            return main && !guide;
+        }
         case QEvent::KeyPress:
         case QEvent::KeyRelease:
         case QEvent::ShortcutOverride:
@@ -927,6 +931,36 @@ protected:
     }
 
 private:
+    // IL DIALOGO RESTA DAVANTI. Sul Mac ogni clic nella finestra principale la
+    // porta sopra il dialogo, che e' una finestra a se'. WindowActivate scatta
+    // solo quando la finestra principale DIVENTA attiva, cioe' al primo clic:
+    // dal secondo in poi (il doppio clic che ricentra il riquadro, o un altro
+    // trascinamento) il dialogo restava coperto, e con la sessione ancora
+    // aperta la finestra principale non riceveva clic ne' chiusura e il menu
+    // era spento -- l'app sembrava bloccata e non si chiudeva nemmeno col Quit
+    // (segnalato dall'utente). Qui a ogni clic o tocco sulla finestra
+    // principale il dialogo torna davanti, in coda all'evento (dopo che il
+    // sistema ha riordinato le finestre). Un clic fuori dal riquadro, che non
+    // fa nulla, gli da' anche la tastiera.
+    void keepDialogInFront(QEvent::Type type, bool onGuide)
+    {
+        if (type != QEvent::MouseButtonPress && type != QEvent::MouseButtonRelease
+            && type != QEvent::MouseButtonDblClick && type != QEvent::TouchBegin && type != QEvent::TouchEnd)
+            return;
+        if (!m_dialog || m_raisePending) return;
+        m_raisePending = true;
+        QPointer<QWidget> dialog = m_dialog;
+        QPointer<CaptureSession> self = this;
+        const bool activate = !onGuide;
+        QTimer::singleShot(0, this, [dialog, self, activate]() {
+            if (self) self->m_raisePending = false;
+            if (!dialog) return;
+            dialog->raise();
+            if (activate) dialog->activateWindow();
+        });
+    }
+    bool m_raisePending = false;
+
     // Il widget che riceve l'evento, o che possiede l'azione o la scorciatoia.
     static QWidget *widgetOf(QObject *obj)
     {

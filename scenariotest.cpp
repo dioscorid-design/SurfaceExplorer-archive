@@ -5956,6 +5956,50 @@ void ScenarioTest::runImageCaptureScenarios()
                   QStringLiteral("dito: il riquadro si trascina (%1), il doppio tocco lo ricentra (%2), due tocchi lenti no (%3)")
                       .arg(afterDrag, 0, 'f', 2).arg(afterDoubleTap, 0, 'f', 2).arg(afterSlowTaps, 0, 'f', 2));
         }
+        // IL DIALOGO RESTA DAVANTI. Sul Mac un clic nella finestra principale
+        // la porta sopra il dialogo; dal secondo clic (il doppio clic che
+        // ricentra il riquadro) non arrivava piu' un WindowActivate e il dialogo
+        // restava coperto, con la finestra principale bloccata dalla sessione
+        // (non si chiudeva nemmeno col Quit). Qui il riordino del sistema si
+        // rifa' con raise() sulla finestra principale, poi un doppio clic sul
+        // riquadro: il dialogo deve tornare davanti (topLevelAt legge l'ordine
+        // vero delle finestre).
+        {
+            bool coveredFirst = false, frontAfter = false, recentred = false;
+            ImageCapture::setTestDialogHandler([&](QDialog *d) {
+                for (QComboBox *c : d->findChildren<QComboBox *>())
+                    if (c->findText(QStringLiteral("1:1")) >= 0) { c->setCurrentIndex(c->findText(QStringLiteral("1:1"))); break; }
+                setSizeMode(d, QStringLiteral("Long side (px)"));
+                wait(300);
+                QWidget *guide = gl->findChild<QWidget *>(QStringLiteral("imageFrameGuide"));
+                const QPoint probe = d->frameGeometry().center();
+                m_mw->raise();
+                wait(300);
+                coveredFirst = QGuiApplication::topLevelAt(probe) != d->windowHandle();
+                if (guide) {
+                    const QPointF at(guide->width() * 0.6, guide->height() / 2.0);
+                    // Prima a destra col trascinamento, poi il doppio clic.
+                    guide->setProperty("framePosition", QPointF());
+                    const QPointF g = guide->mapToGlobal(at);
+                    for (const auto &[type, buttons] : std::initializer_list<std::pair<QEvent::Type, Qt::MouseButtons>>{
+                             { QEvent::MouseButtonPress, Qt::LeftButton }, { QEvent::MouseButtonRelease, Qt::NoButton },
+                             { QEvent::MouseButtonDblClick, Qt::LeftButton }, { QEvent::MouseButtonRelease, Qt::NoButton } }) {
+                        QMouseEvent me(type, at, g, Qt::LeftButton, buttons, Qt::NoModifier);
+                        QCoreApplication::sendEvent(guide, &me);
+                    }
+                    recentred = guide->property("framePosition").toPointF().isNull();
+                }
+                wait(300);
+                frontAfter = QGuiApplication::topLevelAt(probe) == d->windowHandle();
+                d->reject();
+            });
+            ImageCapture::run(gl, m_mw, m_outDir);
+            ImageCapture::setTestDialogHandler(nullptr);
+            check(coveredFirst && frontAfter && recentred,
+                  QStringLiteral("doppio clic sul riquadro con la finestra principale davanti: il dialogo torna davanti "
+                                 "(coperto prima %1, davanti dopo %2, riquadro al centro %3)")
+                      .arg(coveredFirst).arg(frontAfter).arg(recentred));
+        }
         clearImageSettings();
         // A misura di stampa i dpi vanno nel file: 10 cm a 300 dpi.
         const QString outPrint = m_outDir + QStringLiteral("/image-capture-print.png");
