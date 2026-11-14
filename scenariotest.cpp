@@ -6004,6 +6004,35 @@ void ScenarioTest::runImageCaptureScenarios()
     }
     if (loadRecord(QStringLiteral("records/Rotations/Parametric/Surfaces/Multi Meshes/Torus Necklace Spin.json")))
         sameAsPart(QStringLiteral("Torus Necklace Spin (mesh, cielo a sfera)"), QStringLiteral("necklace"));
+    // LO SFONDO FISSO E LA VISTA 2D: si disegnano a schermo intero senza
+    // proiezione e la finestra della cattura la ricevono da
+    // GLWidget::captureViewWindow. Prima un'immagine col rapporto diverso
+    // dalla vista mostrava lo sfondo (o la texture) intero, stirato sul suo
+    // rapporto, e non seguiva il riquadro trascinato. Una scacchiera con le
+    // tinte che cambiano lungo u e v: ogni casella e' riconoscibile.
+    {
+        Ui::MainWindow *ui = m_mw->ui;
+        gl->setBackgroundSkyMode(GLWidget::BgFixed);
+        gl->setBackgroundFraming(1.0f, QVector2D(), 0.0f);
+        gl->loadBackgroundScript(QStringLiteral("return vec3(mod(floor(u * 8.0) + floor(v * 8.0), 2.0), u, v);"));
+        gl->setBackgroundTextureEnabled(true);
+        wait(600);
+        sameAsPart(QStringLiteral("sfondo fisso (scacchiera da script)"), QStringLiteral("bg-fixed"));
+        gl->setBackgroundTextureEnabled(false);
+        selectTexture(QStringLiteral("textures/Procedurals/Animated Checkerboard.json"));
+        wait(600);
+        ui->btnFlatPreview->setChecked(true);
+        wait(300);
+        sameAsPart(QStringLiteral("vista 2D della texture (Animated Checkerboard)"), QStringLiteral("flat"));
+        ui->btnFlatPreview->setChecked(false);
+        wait(300);
+        // Il flusso qui sotto riparte dalla scena di prima, senza texture
+        // animata e FERMA: il record fa ripartire la rotazione, e il flusso
+        // confronta pixel per pixel il PNG con un secondo scatto.
+        loadRecord(QStringLiteral("records/Rotations/Parametric/Surfaces/Multi Meshes/Torus Necklace Spin.json"));
+        gl->stopAllTimers();
+        wait(500);
+    }
     // IL FLUSSO, col riquadro trascinato dal mouse: il dialogo non e' modale,
     // il riquadro riceve il trascinamento, il resto della finestra principale
     // no (un clic sul GO va perso). L'immagine salvata e' quella del riquadro.

@@ -1863,6 +1863,14 @@ private:
     // Il campo visivo verticale con cui si disegna: m_cameraFov, scalato in
     // tangente durante una cattura d'immagine.
     float effectiveCameraFov() const;
+    // LA PARTE DELLA VISTA CHE ENTRA NELL'IMMAGINE, per cio' che si disegna
+    // a schermo intero senza proiezione (lo sfondo in modalita' fissa, la
+    // vista piatta 2D): (kx, ky, sx, sy) con ndc_vista = (ndc_immagine - s) * k,
+    // la stessa finestra che la proiezione da' alle mesh (rapporto
+    // dell'immagine, campo verticale ridotto, riquadro spostato). (1, 1, 0, 0)
+    // a schermo: k vale solo nelle catture e non supera mai 1 (un video piu'
+    // largo della vista stira lo sfondo come prima, invece di uscirne).
+    QVector4D captureViewWindow() const;
     bool m_externalClockActive = false; // vedi setExternalClockActive()
 
     bool m_isPathFollowing = false;   // MODALITA' camera tangent (persiste dopo stop)
