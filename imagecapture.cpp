@@ -279,7 +279,18 @@ public:
     void clearPaint()
     {
         m_ratio = 0.0;
+        m_clearPainted = false;
         repaint();
+        // repaint() non sempre dipinge subito (visto nei test: a volte Qt lo
+        // rimanda, e distrutto il riquadro la velatura restava). Allora lo si
+        // chiede di nuovo e lo si aspetta, per poco, senza eventi dell'utente.
+        if (!m_clearPainted) {
+            update();
+            QElapsedTimer waited;
+            waited.start();
+            while (!m_clearPainted && waited.elapsed() < 300)
+                QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 20);
+        }
     }
 
 protected:
@@ -342,7 +353,10 @@ protected:
         p.setCompositionMode(QPainter::CompositionMode_Source);
         p.fillRect(rect(), Qt::transparent);
         p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-        if (m_ratio <= 0.0) return;
+        if (m_ratio <= 0.0) {
+            m_clearPainted = true;
+            return;
+        }
         const QRect r = ImageCapture::guideRect(size(), m_ratio, m_position);
         p.setPen(Qt::NoPen);
         p.setBrush(QColor(0, 0, 0, 120));
@@ -468,6 +482,7 @@ private:
     QElapsedTimer m_touchTime;   // il tocco in corso: quando e dove e' cominciato
     QPointF m_touchAt;
     bool m_secondTap = false;    // il tocco in corso e' il secondo di un doppio tocco
+    bool m_clearPainted = false; // clearPaint: il ridisegno trasparente e' arrivato
 };
 
 // Telefono (e non tablet): su iPhone e Android in verticale la finestra offre solo

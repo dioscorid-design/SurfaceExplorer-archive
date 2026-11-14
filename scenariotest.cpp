@@ -6032,7 +6032,7 @@ void ScenarioTest::runImageCaptureScenarios()
         // riquadro: il dialogo deve tornare davanti (topLevelAt legge l'ordine
         // vero delle finestre).
         {
-            bool coveredFirst = false, frontAfter = false, recentred = false;
+            bool coveredFirst = false, frontAfter = false, recentred = false, appActive = true;
             ImageCapture::setTestDialogHandler([&](QDialog *d) {
                 for (QComboBox *c : d->findChildren<QComboBox *>())
                     if (c->findText(QStringLiteral("1:1")) >= 0) { c->setCurrentIndex(c->findText(QStringLiteral("1:1"))); break; }
@@ -6042,6 +6042,10 @@ void ScenarioTest::runImageCaptureScenarios()
                 const QPoint probe = d->frameGeometry().center();
                 m_mw->raise();
                 wait(300);
+                // Sul Mac la finestra strumento si nasconde quando l'app non e'
+                // in primo piano (l'utente lavora in un'altra finestra): li' il
+                // controllo non dice nulla.
+                appActive = QGuiApplication::applicationState() == Qt::ApplicationActive;
                 coveredFirst = QGuiApplication::topLevelAt(probe) != d->windowHandle();
                 if (guide) {
                     const QPointF at(guide->width() * 0.6, guide->height() / 2.0);
@@ -6070,10 +6074,11 @@ void ScenarioTest::runImageCaptureScenarios()
 #else
             const bool coveredOk = coveredFirst;
 #endif
-            check(coveredOk && frontAfter && recentred,
+            check((!appActive || (coveredOk && frontAfter)) && recentred,
                   QStringLiteral("doppio clic sul riquadro con la finestra principale davanti: il dialogo e' davanti "
-                                 "(coperto prima %1, davanti dopo %2, riquadro al centro %3)")
-                      .arg(coveredFirst).arg(frontAfter).arg(recentred));
+                                 "(coperto prima %1, davanti dopo %2, riquadro al centro %3)%4")
+                      .arg(coveredFirst).arg(frontAfter).arg(recentred)
+                      .arg(appActive ? QString() : QStringLiteral(" [app non in primo piano: ordine delle finestre non verificato]")));
         }
         // CANCEL DOPO UN DOPPIO CLIC SUL RIQUADRO, con eventi del sistema a
         // finestre (QWindowSystemInterface: la stessa strada dei clic veri,
